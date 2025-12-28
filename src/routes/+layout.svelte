@@ -33,41 +33,9 @@
 	// PWA webmanifest link
 	const webManifest = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
-	onMount(async () => {
+	onMount(() => {
 		// テーマを初期化
 		initializeTheme();
-
-		// Service Workerを登録（本番ビルド時のみ有効）
-		if (pwaInfo) {
-			const { registerSW } = await import('virtual:pwa-register');
-			updateSW = registerSW({
-				immediate: true,
-				onRegistered(r) {
-					console.log('SW Registered:', r);
-				},
-				onRegisterError(error) {
-					console.error('SW registration error:', error);
-				},
-				onNeedRefresh() {
-					// 新しいバージョンが利用可能
-					toast.info('新しいバージョンが利用可能です', {
-						description: 'クリックして更新',
-						duration: Infinity,
-						action: {
-							label: '更新',
-							onClick: () => {
-								updateSW?.(true);
-							}
-						}
-					});
-				},
-				onOfflineReady() {
-					toast.success('オフラインで使用できます', {
-						description: 'アプリがキャッシュされました'
-					});
-				}
-			});
-		}
 
 		// オフライン/オンライン検知
 		function handleOnline() {
@@ -81,22 +49,63 @@
 		window.addEventListener('online', handleOnline);
 		window.addEventListener('offline', handleOffline);
 
-		// File System Access API対応ならチェック不要
-		if (supportsFileSystemAccess()) {
-			const storageMode = await getStorageMode();
-			if (storageMode === 'filesystem') {
-				return;
+		// 非同期処理をIIFEで実行（クリーンアップを返すため）
+		(async () => {
+			// Service Workerを登録（本番ビルド時のみ有効）
+			if (pwaInfo) {
+				const { registerSW } = await import('virtual:pwa-register');
+				updateSW = registerSW({
+					immediate: true,
+					onRegistered(r) {
+						console.log('SW Registered:', r);
+					},
+					onRegisterError(error) {
+						console.error('SW registration error:', error);
+					},
+					onNeedRefresh() {
+						// 新しいバージョンが利用可能
+						toast.info('新しいバージョンが利用可能です', {
+							description: 'クリックして更新',
+							duration: Infinity,
+							action: {
+								label: '更新',
+								onClick: () => {
+									updateSW?.(true);
+								}
+							}
+						});
+					},
+					onOfflineReady() {
+						toast.success('オフラインで使用できます', {
+							description: 'アプリがキャッシュされました'
+						});
+					}
+				});
 			}
-		}
 
-		// ストレージ使用量をチェック
-		const usage = await getStorageUsage();
-		const percentage = getRecommendedUsagePercentage(usage.used);
+			// File System Access API対応ならチェック不要
+			if (supportsFileSystemAccess()) {
+				const storageMode = await getStorageMode();
+				if (storageMode === 'filesystem') {
+					return;
+				}
+			}
 
-		if (percentage >= WARNING_THRESHOLD) {
-			storageUsedBytes = usage.used;
-			showStorageWarning = true;
-		}
+			// ストレージ使用量をチェック
+			const usage = await getStorageUsage();
+			const percentage = getRecommendedUsagePercentage(usage.used);
+
+			if (percentage >= WARNING_THRESHOLD) {
+				storageUsedBytes = usage.used;
+				showStorageWarning = true;
+			}
+		})();
+
+		// クリーンアップ関数を返す（HMR時のリスナー重複を防止）
+		return () => {
+			window.removeEventListener('online', handleOnline);
+			window.removeEventListener('offline', handleOffline);
+		};
 	});
 
 	function handleOpenSettings() {

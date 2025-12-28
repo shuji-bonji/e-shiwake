@@ -18,7 +18,8 @@
 		getAllVendors,
 		getUnexportedAttachmentCount,
 		getStorageMode,
-		setLastExportedAt
+		setLastExportedAt,
+		markAttachmentAsExported
 	} from '$lib/db';
 	import type { ExportData, StorageType } from '$lib/types';
 
@@ -176,6 +177,9 @@
 					// IndexedDBに保存されている未エクスポートの添付ファイルのみ
 					if (attachment.storageType === 'indexeddb' && attachment.blob) {
 						downloadBlob(attachment.blob, attachment.generatedName);
+
+						// 個別の添付ファイルをエクスポート済みとしてマーク
+						await markAttachmentAsExported(journal.id, attachment.id);
 						exportedCount++;
 
 						// ダウンロード間隔を空ける（ブラウザ制限対策）

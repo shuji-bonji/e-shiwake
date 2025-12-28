@@ -468,24 +468,8 @@ export async function setStorageMode(mode: StorageType): Promise<void> {
 	await setSetting('storageMode', mode);
 }
 
-/**
- * ディレクトリハンドルを取得
- */
-export async function getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
-	const record = await db.settings.get('directoryHandle');
-	return (record?.value as FileSystemDirectoryHandle) ?? null;
-}
-
-/**
- * ディレクトリハンドルを保存
- */
-export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
-	await db.settings.put({
-		key: 'directoryHandle',
-		value: handle,
-		updatedAt: new Date().toISOString()
-	});
-}
+// ディレクトリハンドルの操作は $lib/utils/filesystem.ts を使用すること
+// キー: 'outputDirectoryHandle', 構造: { key, handle, updatedAt }
 
 /**
  * 最終エクスポート日時を取得
@@ -516,6 +500,27 @@ export async function getUnexportedAttachmentCount(): Promise<number> {
 		}
 	}
 	return count;
+}
+
+/**
+ * 添付ファイルをエクスポート済みとしてマーク
+ */
+export async function markAttachmentAsExported(
+	journalId: string,
+	attachmentId: string
+): Promise<void> {
+	const journal = await db.journals.get(journalId);
+	if (!journal) return;
+
+	const now = new Date().toISOString();
+	const updatedAttachments = journal.attachments.map((att) =>
+		att.id === attachmentId ? { ...att, exportedAt: now } : att
+	);
+
+	await db.journals.update(journalId, {
+		attachments: updatedAttachments,
+		updatedAt: now
+	});
 }
 
 // ==================== 容量管理関連 ====================

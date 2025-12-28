@@ -1,38 +1,159 @@
-# sv
+# e-shiwake（電子仕訳）
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+フリーランス・個人事業主向けの仕訳入力 + 証憑管理 PWA
 
-## Creating a project
+## 特徴
 
-If you're seeing this, you've probably already done this step. Congrats!
+- **ローカルファースト**: サーバー不要、IndexedDB にデータ保存
+- **電帳法対応**: 日本の電子帳簿保存法の検索要件を満たす
+- **証憑管理**: PDF を仕訳に紐付け、自動リネームして保存
+- **PWA**: オフライン動作、インストール可能
+- **複合仕訳対応**: 家事按分・源泉徴収など複数行の仕訳に対応
+
+## ターゲットユーザー
+
+- 日本のフリーランス・個人事業主
+- 確定申告を自分で行う人
+- クラウド会計の月額課金を避けたい人
+
+## 技術スタック
+
+- **フレームワーク**: SvelteKit 2 + Svelte 5
+- **言語**: TypeScript
+- **UI**: shadcn-svelte + Tailwind CSS v4
+- **データ保存**: IndexedDB（Dexie.js）
+- **ファイル操作**: File System Access API（デスクトップ）
+- **PWA**: Service Worker + Web App Manifest
+- **テスト**: Vitest
+
+## セットアップ
 
 ```sh
-# create a new project in the current directory
-npx sv create
+# 依存関係のインストール
+npm install
 
-# create a new project in my-app
-npx sv create my-app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
+# 開発サーバーの起動
 npm run dev
 
-# or start the server and open the app in a new browser tab
+# ブラウザで自動的に開く場合
 npm run dev -- --open
 ```
 
-## Building
-
-To create a production version of your app:
+## スクリプト
 
 ```sh
+# 開発サーバー
+npm run dev
+
+# ビルド
 npm run build
+
+# ビルドのプレビュー
+npm run preview
+
+# 型チェック
+npm run check
+
+# Lint
+npm run lint
+
+# ユニットテスト
+npm test
+
+# テスト（ウォッチモード）
+npm run test:unit
 ```
 
-You can preview the production build with `npm run preview`.
+## 機能
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+### 実装済み（Phase 1: MVP）
+
+- サイドバーレイアウト
+- 年度管理（選択 / フィルタリング）
+- 仕訳 CRUD（複合仕訳対応、インライン編集）
+- 勘定科目マスタ（初期データ込み）
+- 勘定科目管理ページ（追加/編集/削除）
+- 取引先オートコンプリート
+- PDF 紐付け + 自動リネーム
+- 証跡ステータス管理
+- IndexedDB 保存
+- JSON / CSV エクスポート
+- ダークモード対応
+- PWA 対応（オフライン動作）
+
+### 今後の予定
+
+**Phase 2: 帳簿機能**
+
+- 総勘定元帳
+- 試算表
+- 高度なフィルタ/検索
+
+**Phase 3: 確定申告対応（有料オプション）**
+
+- 損益計算書
+- 貸借対照表
+- 青色申告決算書生成
+- 完全バックアップ（ZIP: JSON + PDF）
+
+## 電帳法対応
+
+### 検索要件（必須 3 項目）
+
+1. **取引年月日**: 仕訳の日付フィールド
+2. **取引金額**: 借方/貸方金額
+3. **取引先名**: 取引先フィールド
+
+### ファイル命名規則
+
+証憑ファイルは以下の形式で自動リネームされます：
+
+```
+{書類の日付}_{種類}_{勘定科目名}_{金額}円_{取引先名}.pdf
+```
+
+例：
+
+```
+2024-01-15_領収書_消耗品費_3,980円_Amazon.pdf
+2024-01-15_請求書発行_売上_100,000円_クライアントA.pdf
+```
+
+## データ保存
+
+### デスクトップ（Chrome, Edge）
+
+File System Access API を使用して、ユーザーが選択したディレクトリに直接保存。
+
+### iPad / モバイル
+
+IndexedDB に Blob として保存。定期的なエクスポートを推奨。
+
+## 開発者向け
+
+詳細な仕様については `CLAUDE.md` を参照してください。
+
+### ファイル構成
+
+```
+src/
+├── lib/
+│   ├── components/     # 再利用可能なコンポーネント
+│   │   ├── ui/         # shadcn-svelte コンポーネント
+│   │   ├── layout/     # レイアウトコンポーネント
+│   │   └── journal/    # 仕訳関連コンポーネント
+│   ├── stores/         # Svelte stores
+│   ├── db/             # IndexedDB 関連（Dexie）
+│   ├── types/          # TypeScript 型定義
+│   └── utils/          # ユーティリティ関数
+├── routes/
+│   ├── +layout.svelte        # サイドバーレイアウト
+│   ├── +page.svelte          # 仕訳帳（ホーム）
+│   ├── accounts/             # 勘定科目管理
+│   ├── settings/             # 設定
+│   └── export/               # エクスポート
+```
+
+## ライセンス
+
+MIT

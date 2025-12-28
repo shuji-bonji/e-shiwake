@@ -20,6 +20,7 @@
 	} from '$lib/db';
 	import { useFiscalYear, setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
 	import { getSavedDirectoryHandle, supportsFileSystemAccess } from '$lib/utils/filesystem';
+	import { cloneJournal } from '$lib/utils/clone';
 
 	// 年度ストア
 	const fiscalYear = useFiscalYear();
@@ -119,7 +120,8 @@
 	// 仕訳の更新
 	async function handleUpdateJournal(journal: JournalEntry) {
 		// Svelte 5のリアクティブプロキシを除去してプレーンオブジェクトに変換
-		const plainJournal = JSON.parse(JSON.stringify(journal)) as JournalEntry;
+		// 注意: JSON.parse/stringifyはBlobを{}に変換するため使用不可
+		const plainJournal = cloneJournal(journal);
 
 		// 既存仕訳の場合、日付変更でソート位置が変わったらフラッシュ
 		const isExisting = editingJournalId !== journal.id;

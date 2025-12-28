@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Check, ChevronsUpDown } from '@lucide/svelte';
+	import { ChevronsUpDown, Receipt, Wallet, TrendingUp, CreditCard, Gem } from '@lucide/svelte';
 	import { cn } from '$lib/utils.js';
-	import type { Account } from '$lib/types';
+	import { AccountTypeLabels, type Account, type AccountType } from '$lib/types';
 
 	interface Props {
 		accounts: Account[];
@@ -27,6 +26,29 @@
 	let triggerRef = $state<HTMLButtonElement>(null!);
 
 	const selectedAccount = $derived(accounts.find((a) => a.code === value));
+
+	// カテゴリの表示順序（フリーランス向け: よく使う順）
+	const categoryOrder: AccountType[] = ['expense', 'asset', 'revenue', 'liability', 'equity'];
+
+	// カテゴリ別にグループ化
+	const groupedAccounts = $derived(
+		categoryOrder.reduce(
+			(acc, type) => {
+				acc[type] = accounts.filter((a) => a.type === type);
+				return acc;
+			},
+			{} as Record<AccountType, Account[]>
+		)
+	);
+
+	// カテゴリごとのアイコン
+	const categoryIcons: Record<AccountType, typeof Receipt> = {
+		expense: Receipt,
+		asset: Wallet,
+		revenue: TrendingUp,
+		liability: CreditCard,
+		equity: Gem
+	};
 
 	function closeAndFocusTrigger() {
 		open = false;
@@ -60,25 +82,49 @@
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-52 p-0" align="start">
-		<Command.Root>
-			<Command.Input placeholder="検索..." />
-			<Command.List>
-				<Command.Empty>見つかりません</Command.Empty>
-				<Command.Group>
-					{#each accounts as account (account.code)}
-						<Command.Item
-							value={account.code}
-							keywords={[account.name]}
-							onSelect={() => handleSelect(account.code)}
-						>
-							<Check class={cn(value !== account.code && 'text-transparent')} />
-							<span class="font-mono text-xs text-muted-foreground">{account.code}</span>
-							<span class="truncate">{account.name}</span>
-						</Command.Item>
-					{/each}
-				</Command.Group>
-			</Command.List>
-		</Command.Root>
+	<Popover.Content class="w-80 p-0" align="start">
+		<div class="max-h-80 overflow-y-auto p-2">
+			{#each categoryOrder as type (type)}
+				{@const accountsInCategory = groupedAccounts[type]}
+				{@const Icon = categoryIcons[type]}
+				{#if accountsInCategory.length > 0}
+					<div class="mb-3 last:mb-0">
+						<!-- カテゴリヘッダー -->
+						<div class="mb-1.5 flex items-center gap-1.5 bg-muted px-2 py-1">
+							<Icon class="size-3.5 text-muted-foreground" />
+							<span class="text-xs font-semibold">{AccountTypeLabels[type]}</span>
+						</div>
+						<!-- 科目グリッド -->
+						<div class="flex flex-wrap gap-1">
+							{#each accountsInCategory as account (account.code)}
+								{#if account.isSystem}
+									<button
+										type="button"
+										class={cn(
+											'px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground',
+											value === account.code && 'font-medium text-foreground underline'
+										)}
+										onclick={() => handleSelect(account.code)}
+									>
+										{account.name}
+									</button>
+								{:else}
+									<button
+										type="button"
+										class={cn(
+											'rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-sm font-medium transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700',
+											value === account.code && 'ring-2 ring-primary ring-offset-1'
+										)}
+										onclick={() => handleSelect(account.code)}
+									>
+										{account.name}
+									</button>
+								{/if}
+							{/each}
+						</div>
+					</div>
+				{/if}
+			{/each}
+		</div>
 	</Popover.Content>
 </Popover.Root>

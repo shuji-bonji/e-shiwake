@@ -35,7 +35,6 @@ import {
 	// インポート
 	validateExportData
 } from './index';
-import type { JournalEntry, Account } from '$lib/types';
 
 /**
  * 全テーブルをクリアするヘルパー関数
@@ -590,7 +589,13 @@ describe('取引先管理', () => {
 describe('添付ファイル', () => {
 	describe('generateAttachmentName', () => {
 		it('正しいファイル名を生成する', () => {
-			const name = generateAttachmentName('2024-01-15', 'receipt', 'コーヒー代', 500, 'スターバックス');
+			const name = generateAttachmentName(
+				'2024-01-15',
+				'receipt',
+				'コーヒー代',
+				500,
+				'スターバックス'
+			);
 
 			expect(name).toBe('2024-01-15_領収書_コーヒー代_500円_スターバックス.pdf');
 		});

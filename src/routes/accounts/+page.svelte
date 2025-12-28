@@ -1,14 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
-	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { Plus, Pencil, Trash2 } from '@lucide/svelte';
+	import {
+		Plus,
+		Pencil,
+		Trash2,
+		Receipt,
+		Wallet,
+		TrendingUp,
+		CreditCard,
+		Gem
+	} from '@lucide/svelte';
 	import type { Account, AccountType } from '$lib/types';
 	import { AccountTypeLabels } from '$lib/types';
 	import {
@@ -37,8 +43,17 @@
 	let formType = $state<AccountType>('expense');
 	let formError = $state('');
 
-	// カテゴリ順序
-	const typeOrder: AccountType[] = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+	// カテゴリ順序（フリーランス向け: よく使う順）
+	const typeOrder: AccountType[] = ['expense', 'asset', 'revenue', 'liability', 'equity'];
+
+	// カテゴリごとのアイコン
+	const categoryIcons: Record<AccountType, typeof Receipt> = {
+		expense: Receipt,
+		asset: Wallet,
+		revenue: TrendingUp,
+		liability: CreditCard,
+		equity: Gem
+	};
 
 	// カテゴリ別にグループ化
 	const groupedAccounts = $derived.by(() => {
@@ -155,19 +170,6 @@
 			console.error('Delete failed:', error);
 		}
 	}
-
-	function getTypeBadgeVariant(type: AccountType): 'default' | 'secondary' | 'outline' {
-		switch (type) {
-			case 'asset':
-			case 'expense':
-				return 'default';
-			case 'liability':
-			case 'revenue':
-				return 'secondary';
-			default:
-				return 'outline';
-		}
-	}
 </script>
 
 <div class="space-y-6">
@@ -188,72 +190,52 @@
 			<p class="text-muted-foreground">読み込み中...</p>
 		</div>
 	{:else}
-		<!-- カテゴリ別リスト -->
-		<div class="grid gap-6">
+		<!-- カテゴリ別グリッド表示 -->
+		<div class="space-y-6">
 			{#each typeOrder as type (type)}
 				{@const typeAccounts = groupedAccounts[type]}
+				{@const Icon = categoryIcons[type]}
 				{#if typeAccounts.length > 0}
-					<Card.Root>
-						<Card.Header>
-							<Card.Title class="flex items-center gap-2">
-								<Badge variant={getTypeBadgeVariant(type)}>{AccountTypeLabels[type]}</Badge>
-								<span class="text-sm font-normal text-muted-foreground">
-									{typeAccounts.length}件
-								</span>
-							</Card.Title>
-						</Card.Header>
-						<Card.Content>
-							<Table.Root>
-								<Table.Header>
-									<Table.Row>
-										<Table.Head class="w-24">コード</Table.Head>
-										<Table.Head>勘定科目名</Table.Head>
-										<Table.Head class="w-20">種別</Table.Head>
-										<Table.Head class="w-24 text-right">操作</Table.Head>
-									</Table.Row>
-								</Table.Header>
-								<Table.Body>
-									{#each typeAccounts as account (account.code)}
-										<Table.Row>
-											<Table.Cell class="font-mono">{account.code}</Table.Cell>
-											<Table.Cell>{account.name}</Table.Cell>
-											<Table.Cell>
-												{#if account.isSystem}
-													<Badge variant="outline" class="text-xs">システム</Badge>
-												{:else}
-													<Badge variant="secondary" class="text-xs">カスタム</Badge>
-												{/if}
-											</Table.Cell>
-											<Table.Cell class="text-right">
-												{#if !account.isSystem}
-													<div class="flex justify-end gap-1">
-														<Button
-															variant="ghost"
-															size="icon"
-															class="size-8"
-															onclick={() => openEditDialog(account)}
-														>
-															<Pencil class="size-4" />
-															<span class="sr-only">編集</span>
-														</Button>
-														<Button
-															variant="ghost"
-															size="icon"
-															class="size-8 text-destructive hover:text-destructive"
-															onclick={() => openDeleteDialog(account)}
-														>
-															<Trash2 class="size-4" />
-															<span class="sr-only">削除</span>
-														</Button>
-													</div>
-												{/if}
-											</Table.Cell>
-										</Table.Row>
-									{/each}
-								</Table.Body>
-							</Table.Root>
-						</Card.Content>
-					</Card.Root>
+					<div>
+						<!-- カテゴリヘッダー -->
+						<div class="mb-2 flex items-center gap-1.5 bg-muted px-2 py-1.5">
+							<Icon class="size-4 text-muted-foreground" />
+							<span class="text-sm font-semibold">{AccountTypeLabels[type]}</span>
+							<span class="text-xs text-muted-foreground">({typeAccounts.length})</span>
+						</div>
+						<!-- 科目グリッド -->
+						<div class="flex flex-wrap gap-1">
+							{#each typeAccounts as account (account.code)}
+								{#if account.isSystem}
+									<div class="px-2 py-1 text-sm text-muted-foreground">
+										{account.name}
+									</div>
+								{:else}
+									<div
+										class="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-sm font-medium dark:border-slate-700 dark:bg-slate-800"
+									>
+										<span>{account.name}</span>
+										<button
+											type="button"
+											class="rounded p-0.5 text-muted-foreground hover:bg-slate-200 hover:text-foreground dark:hover:bg-slate-600"
+											onclick={() => openEditDialog(account)}
+										>
+											<Pencil class="size-3" />
+											<span class="sr-only">編集</span>
+										</button>
+										<button
+											type="button"
+											class="rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+											onclick={() => openDeleteDialog(account)}
+										>
+											<Trash2 class="size-3" />
+											<span class="sr-only">削除</span>
+										</button>
+									</div>
+								{/if}
+							{/each}
+						</div>
+					</div>
 				{/if}
 			{/each}
 		</div>
@@ -295,11 +277,6 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
-			</div>
-			<div class="space-y-2">
-				<Label for="code">勘定科目コード</Label>
-				<Input id="code" value={formCode} readonly class="bg-muted font-mono" />
-				<p class="text-xs text-muted-foreground">カテゴリに基づいて自動採番されます</p>
 			</div>
 			<div class="space-y-2">
 				<Label for="name">勘定科目名</Label>
