@@ -4,13 +4,15 @@
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { Circle, FileText, Paperclip, Trash2, Plus, ArrowUp, ArrowDown, Check } from '@lucide/svelte';
 	import AccountSelect from './AccountSelect.svelte';
-	import type { JournalEntry, JournalLine, Account, AccountType, EvidenceStatus } from '$lib/types';
+	import VendorInput from './VendorInput.svelte';
+	import type { JournalEntry, JournalLine, Account, AccountType, EvidenceStatus, Vendor } from '$lib/types';
 	import { validateJournal } from '$lib/db';
 	import { cn } from '$lib/utils.js';
 
 	interface Props {
 		journal: JournalEntry;
 		accounts: Account[];
+		vendors: Vendor[];
 		isEditing?: boolean;
 		isFlashing?: boolean;
 		onupdate: (journal: JournalEntry) => void;
@@ -18,7 +20,7 @@
 		onconfirm?: (id: string) => void;
 	}
 
-	let { journal, accounts, isEditing = false, isFlashing = false, onupdate, ondelete, onconfirm }: Props = $props();
+	let { journal, accounts, vendors, isEditing = false, isFlashing = false, onupdate, ondelete, onconfirm }: Props = $props();
 
 	// バリデーション
 	const validation = $derived(validateJournal(journal));
@@ -130,7 +132,7 @@
 		'rounded-lg border bg-card p-4 shadow-sm transition-all',
 		isEditing && 'border-primary ring-2 ring-primary/20',
 		isFlashing && 'animate-flash',
-		!isEditing && !validation.isValid && journal.lines.some((l) => l.amount > 0) && 'border-destructive'
+		!validation.isValid && (!isEditing || journal.lines.some((l) => l.amount > 0)) && 'border-destructive'
 	)}
 >
 	<!-- ヘッダー行: 証跡ステータス、日付、摘要、取引先、削除ボタン -->
@@ -179,20 +181,44 @@
 		/>
 
 		<!-- 取引先 -->
-		<Input
-			type="text"
+		<VendorInput
+			{vendors}
 			value={journal.vendor}
-			oninput={(e) => updateField('vendor', e.currentTarget.value)}
+			onchange={(name) => updateField('vendor', name)}
 			placeholder="取引先"
 			class="w-40"
 		/>
 
 		<!-- 確定ボタン（編集中のみ表示） -->
 		{#if isEditing && onconfirm}
-			<Button variant="default" size="sm" class="gap-1" onclick={() => onconfirm(journal.id)}>
-				<Check class="size-4" />
-				確定
-			</Button>
+			<Tooltip.Provider>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="default"
+								size="sm"
+								class="gap-1"
+								disabled={!validation.isValid}
+								onclick={() => onconfirm(journal.id)}
+							>
+								<Check class="size-4" />
+								確定
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					{#if !validation.isValid}
+						<Tooltip.Content>
+							{#if validation.debitTotal === 0 && validation.creditTotal === 0}
+								金額を入力してください
+							{:else}
+								借方・貸方の合計が一致しません
+							{/if}
+						</Tooltip.Content>
+					{/if}
+				</Tooltip.Root>
+			</Tooltip.Provider>
 		{/if}
 
 		<!-- 削除ボタン -->
@@ -244,7 +270,10 @@
 						type="number"
 						value={line.amount}
 						onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
-						class="w-28 text-right font-mono"
+						class={cn(
+							'w-28 text-right font-mono',
+							!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
+						)}
 						min="0"
 					/>
 					{#if debitLines.length > 1}
@@ -316,7 +345,10 @@
 						type="number"
 						value={line.amount}
 						onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
-						class="w-28 text-right font-mono"
+						class={cn(
+							'w-28 text-right font-mono',
+							!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
+						)}
 						min="0"
 					/>
 					{#if creditLines.length > 1}

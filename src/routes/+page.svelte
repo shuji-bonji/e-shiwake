@@ -4,10 +4,11 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Plus } from '@lucide/svelte';
 	import JournalRow from '$lib/components/journal/JournalRow.svelte';
-	import type { JournalEntry, Account } from '$lib/types';
+	import type { JournalEntry, Account, Vendor } from '$lib/types';
 	import {
 		initializeDatabase,
 		getAllAccounts,
+		getAllVendors,
 		getJournalsByYear,
 		getJournalById,
 		addJournal,
@@ -19,6 +20,7 @@
 	// 状態
 	let journals = $state<JournalEntry[]>([]);
 	let accounts = $state<Account[]>([]);
+	let vendors = $state<Vendor[]>([]);
 	let isLoading = $state(true);
 	let deleteDialogOpen = $state(false);
 	let deletingJournalId = $state<string | null>(null);
@@ -52,8 +54,9 @@
 	async function loadData() {
 		isLoading = true;
 		try {
-			[accounts, journals] = await Promise.all([
+			[accounts, vendors, journals] = await Promise.all([
 				getAllAccounts(),
+				getAllVendors(),
 				getJournalsByYear(currentYear)
 			]);
 		} finally {
@@ -87,6 +90,9 @@
 		// ローカル状態も更新し、日付順にソート（編集中は上に固定）
 		const updated = journals.map((j) => (j.id === journal.id ? plainJournal : j));
 		journals = sortJournals(updated, editingJournalId);
+
+		// 取引先リストを更新（新規取引先が自動登録されるため）
+		vendors = await getAllVendors();
 
 		// 既存仕訳で日付が変わったらフラッシュ
 		if (isExisting && dateChanged) {
@@ -172,6 +178,7 @@
 				<JournalRow
 					{journal}
 					{accounts}
+					{vendors}
 					isEditing={editingJournalId === journal.id}
 					isFlashing={flashingJournalId === journal.id}
 					onupdate={handleUpdateJournal}
