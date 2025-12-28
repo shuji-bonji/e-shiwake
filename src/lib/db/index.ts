@@ -198,10 +198,13 @@ export async function getJournalsByYear(year: number): Promise<JournalEntry[]> {
 		.toArray();
 
 	// 日付降順（新しい順）でソート、同日内は作成日時降順
+	// createdAtが欠けている場合に備えて防御的に比較
 	return journals.sort((a, b) => {
-		const dateCompare = b.date.localeCompare(a.date);
+		const dateCompare = (b.date || '').localeCompare(a.date || '');
 		if (dateCompare !== 0) return dateCompare;
-		return b.createdAt.localeCompare(a.createdAt);
+		const aCreatedAt = a.createdAt || a.updatedAt || '';
+		const bCreatedAt = b.createdAt || b.updatedAt || '';
+		return bCreatedAt.localeCompare(aCreatedAt);
 	});
 }
 
@@ -391,7 +394,7 @@ export function generateAttachmentName(
 		documentDate,
 		DocumentTypeShortLabels[documentType],
 		sanitize(description) || '未分類',
-		`${amount.toLocaleString()}円`,
+		`${amount.toLocaleString('ja-JP')}円`,
 		sanitize(vendor) || '不明'
 	];
 
@@ -1005,6 +1008,15 @@ export function validateExportData(data: unknown): data is ExportData {
 	if (!Array.isArray(d.journals)) return false;
 	if (!Array.isArray(d.accounts)) return false;
 	if (!Array.isArray(d.vendors)) return false;
+
+	// 仕訳の必須フィールドをチェック
+	for (const journal of d.journals as Record<string, unknown>[]) {
+		if (typeof journal.id !== 'string') return false;
+		if (typeof journal.date !== 'string') return false;
+		if (typeof journal.createdAt !== 'string') return false;
+		if (typeof journal.updatedAt !== 'string') return false;
+		if (!Array.isArray(journal.lines)) return false;
+	}
 
 	return true;
 }

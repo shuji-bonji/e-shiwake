@@ -37,21 +37,26 @@ import {
 } from './index';
 import type { JournalEntry, Account } from '$lib/types';
 
+/**
+ * 全テーブルをクリアするヘルパー関数
+ * テスト間の独立性を保証する
+ */
+async function clearAllTables() {
+	await db.accounts.clear();
+	await db.journals.clear();
+	await db.vendors.clear();
+	await db.settings.clear();
+	// attachmentsテーブルは仕訳に埋め込まれているため個別クリア不要
+	// （journalsクリアで一緒に削除される）
+}
+
 describe('データベース初期化', () => {
 	beforeEach(async () => {
-		// テスト前にDBをクリア
-		await db.accounts.clear();
-		await db.journals.clear();
-		await db.vendors.clear();
-		await db.settings.clear();
+		await clearAllTables();
 	});
 
 	afterEach(async () => {
-		// テスト後にDBをクリア
-		await db.accounts.clear();
-		await db.journals.clear();
-		await db.vendors.clear();
-		await db.settings.clear();
+		await clearAllTables();
 	});
 
 	it('初回起動時にデフォルト勘定科目が登録される', async () => {
@@ -80,16 +85,12 @@ describe('データベース初期化', () => {
 
 describe('勘定科目管理', () => {
 	beforeEach(async () => {
-		await db.accounts.clear();
-		await db.journals.clear();
-		await db.vendors.clear();
+		await clearAllTables();
 		await initializeDatabase();
 	});
 
 	afterEach(async () => {
-		await db.accounts.clear();
-		await db.journals.clear();
-		await db.vendors.clear();
+		await clearAllTables();
 	});
 
 	describe('getAccountsByType', () => {
@@ -206,16 +207,12 @@ describe('勘定科目管理', () => {
 
 describe('仕訳管理', () => {
 	beforeEach(async () => {
-		await db.accounts.clear();
-		await db.journals.clear();
-		await db.vendors.clear();
+		await clearAllTables();
 		await initializeDatabase();
 	});
 
 	afterEach(async () => {
-		await db.accounts.clear();
-		await db.journals.clear();
-		await db.vendors.clear();
+		await clearAllTables();
 	});
 
 	describe('createEmptyJournal', () => {
@@ -549,11 +546,11 @@ describe('仕訳管理', () => {
 
 describe('取引先管理', () => {
 	beforeEach(async () => {
-		await db.vendors.clear();
+		await clearAllTables();
 	});
 
 	afterEach(async () => {
-		await db.vendors.clear();
+		await clearAllTables();
 	});
 
 	describe('searchVendors', () => {
@@ -653,6 +650,32 @@ describe('インポート/エクスポート', () => {
 			expect(validateExportData(validData)).toBe(true);
 		});
 
+		it('仕訳を含む有効なデータを検証できる', () => {
+			const validData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [
+					{
+						id: 'test-id',
+						date: '2024-01-15',
+						lines: [],
+						vendor: 'テスト',
+						description: 'テスト仕訳',
+						evidenceStatus: 'none',
+						attachments: [],
+						createdAt: '2024-01-15T00:00:00.000Z',
+						updatedAt: '2024-01-15T00:00:00.000Z'
+					}
+				],
+				accounts: [],
+				vendors: [],
+				settings: {}
+			};
+
+			expect(validateExportData(validData)).toBe(true);
+		});
+
 		it('無効なデータを検出できる', () => {
 			expect(validateExportData(null)).toBe(false);
 			expect(validateExportData({})).toBe(false);
@@ -663,6 +686,107 @@ describe('インポート/エクスポート', () => {
 					exportedAt: '2024-01-15',
 					fiscalYear: '2024', // 数値でないといけない
 					journals: [],
+					accounts: [],
+					vendors: []
+				})
+			).toBe(false);
+		});
+
+		it('仕訳にcreatedAt/updatedAtがない場合は無効', () => {
+			// createdAtがない
+			expect(
+				validateExportData({
+					version: '1.0.0',
+					exportedAt: '2024-01-15T00:00:00.000Z',
+					fiscalYear: 2024,
+					journals: [
+						{
+							id: 'test-id',
+							date: '2024-01-15',
+							lines: [],
+							updatedAt: '2024-01-15T00:00:00.000Z'
+							// createdAtがない
+						}
+					],
+					accounts: [],
+					vendors: []
+				})
+			).toBe(false);
+
+			// updatedAtがない
+			expect(
+				validateExportData({
+					version: '1.0.0',
+					exportedAt: '2024-01-15T00:00:00.000Z',
+					fiscalYear: 2024,
+					journals: [
+						{
+							id: 'test-id',
+							date: '2024-01-15',
+							lines: [],
+							createdAt: '2024-01-15T00:00:00.000Z'
+							// updatedAtがない
+						}
+					],
+					accounts: [],
+					vendors: []
+				})
+			).toBe(false);
+		});
+
+		it('仕訳にid/date/linesがない場合は無効', () => {
+			// idがない
+			expect(
+				validateExportData({
+					version: '1.0.0',
+					exportedAt: '2024-01-15T00:00:00.000Z',
+					fiscalYear: 2024,
+					journals: [
+						{
+							date: '2024-01-15',
+							lines: [],
+							createdAt: '2024-01-15T00:00:00.000Z',
+							updatedAt: '2024-01-15T00:00:00.000Z'
+						}
+					],
+					accounts: [],
+					vendors: []
+				})
+			).toBe(false);
+
+			// dateがない
+			expect(
+				validateExportData({
+					version: '1.0.0',
+					exportedAt: '2024-01-15T00:00:00.000Z',
+					fiscalYear: 2024,
+					journals: [
+						{
+							id: 'test-id',
+							lines: [],
+							createdAt: '2024-01-15T00:00:00.000Z',
+							updatedAt: '2024-01-15T00:00:00.000Z'
+						}
+					],
+					accounts: [],
+					vendors: []
+				})
+			).toBe(false);
+
+			// linesがない
+			expect(
+				validateExportData({
+					version: '1.0.0',
+					exportedAt: '2024-01-15T00:00:00.000Z',
+					fiscalYear: 2024,
+					journals: [
+						{
+							id: 'test-id',
+							date: '2024-01-15',
+							createdAt: '2024-01-15T00:00:00.000Z',
+							updatedAt: '2024-01-15T00:00:00.000Z'
+						}
+					],
 					accounts: [],
 					vendors: []
 				})
