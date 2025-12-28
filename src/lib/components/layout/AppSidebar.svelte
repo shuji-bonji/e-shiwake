@@ -2,13 +2,26 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Calendar, BookOpen, FileSpreadsheet, Settings, Download, List } from '@lucide/svelte';
 	import { page } from '$app/state';
+	import {
+		useFiscalYear,
+		setSelectedYear,
+		setAvailableYears
+	} from '$lib/stores/fiscalYear.svelte.js';
+	import { getAvailableYears, initializeDatabase } from '$lib/db';
+	import { onMount } from 'svelte';
 
-	// 年度リスト（後で IndexedDB から取得）
-	const fiscalYears = [2025, 2024, 2023];
-	let selectedYear = $state(2024);
+	// 年度ストア
+	const fiscalYear = useFiscalYear();
 
 	// パス比較用のヘルパー
 	const pathname = $derived(page.url.pathname as string);
+
+	// 年度リストを読み込み
+	onMount(async () => {
+		await initializeDatabase();
+		const years = await getAvailableYears();
+		setAvailableYears(years);
+	});
 </script>
 
 <Sidebar.Root>
@@ -39,14 +52,14 @@
 			</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
-					{#each fiscalYears as year (year)}
+					{#each fiscalYear.availableYears as year (year)}
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
-								isActive={selectedYear === year}
-								onclick={() => (selectedYear = year)}
+								isActive={fiscalYear.selectedYear === year}
+								onclick={() => setSelectedYear(year)}
 							>
 								<span>{year}</span>
-								{#if selectedYear === year}
+								{#if fiscalYear.selectedYear === year}
 									<span class="ml-auto text-xs text-muted-foreground">選択中</span>
 								{/if}
 							</Sidebar.MenuButton>
@@ -144,7 +157,7 @@
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<div class="p-2 text-xs text-muted-foreground">
-					<span>選択中: {selectedYear}年度</span>
+					<span>選択中: {fiscalYear.selectedYear}年度</span>
 				</div>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>

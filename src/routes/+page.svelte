@@ -14,8 +14,13 @@
 		addJournal,
 		updateJournal,
 		deleteJournal,
-		createEmptyJournal
+		createEmptyJournal,
+		getAvailableYears
 	} from '$lib/db';
+	import { useFiscalYear, setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
+
+	// 年度ストア
+	const fiscalYear = useFiscalYear();
 
 	// 状態
 	let journals = $state<JournalEntry[]>([]);
@@ -26,9 +31,7 @@
 	let deletingJournalId = $state<string | null>(null);
 	let editingJournalId = $state<string | null>(null); // 新規追加で編集中の仕訳ID
 	let flashingJournalId = $state<string | null>(null); // フラッシュ表示中の仕訳ID
-
-	// 現在の年度（後でサイドバーの選択と連動）
-	const currentYear = new Date().getFullYear();
+	let isInitialized = $state(false); // 初期化完了フラグ
 
 	// 仕訳をソート（編集中は常に上、それ以外は日付降順）
 	function sortJournals(list: JournalEntry[], editingId: string | null = null): JournalEntry[] {
@@ -48,16 +51,26 @@
 	// 初期化
 	onMount(async () => {
 		await initializeDatabase();
-		await loadData();
+		const years = await getAvailableYears();
+		setAvailableYears(years);
+		isInitialized = true;
 	});
 
-	async function loadData() {
+	// 年度変更時にデータを再読み込み
+	$effect(() => {
+		if (isInitialized && fiscalYear.selectedYear) {
+			loadData(fiscalYear.selectedYear);
+		}
+	});
+
+	async function loadData(year: number) {
 		isLoading = true;
+		editingJournalId = null; // 年度変更時は編集中状態をリセット
 		try {
 			[accounts, vendors, journals] = await Promise.all([
 				getAllAccounts(),
 				getAllVendors(),
-				getJournalsByYear(currentYear)
+				getJournalsByYear(year)
 			]);
 		} finally {
 			isLoading = false;
@@ -76,6 +89,12 @@
 		}
 	}
 
+	// 年度リストを更新
+	async function refreshAvailableYears() {
+		const years = await getAvailableYears();
+		setAvailableYears(years);
+	}
+
 	// 仕訳の更新
 	async function handleUpdateJournal(journal: JournalEntry) {
 		// Svelte 5のリアクティブプロキシを除去してプレーンオブジェクトに変換
@@ -90,6 +109,11 @@
 		// ローカル状態も更新し、日付順にソート（編集中は上に固定）
 		const updated = journals.map((j) => (j.id === journal.id ? plainJournal : j));
 		journals = sortJournals(updated, editingJournalId);
+
+		// 日付が変更された場合、年度リストを更新（新しい年度が追加される可能性）
+		if (dateChanged) {
+			await refreshAvailableYears();
+		}
 
 		// 取引先リストを更新（新規取引先が自動登録されるため）
 		vendors = await getAllVendors();
@@ -129,7 +153,8 @@
 		await deleteJournal(deletingJournalId);
 		deleteDialogOpen = false;
 		deletingJournalId = null;
-		await loadData();
+		await refreshAvailableYears();
+		await loadData(fiscalYear.selectedYear);
 	}
 </script>
 
@@ -138,7 +163,7 @@
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-2xl font-bold">仕訳帳</h1>
-			<p class="text-sm text-muted-foreground">{currentYear}年度</p>
+			<p class="text-sm text-muted-foreground">{fiscalYear.selectedYear}年度</p>
 		</div>
 		<Button onclick={handleAddJournal}>
 			<Plus class="mr-2 size-4" />
