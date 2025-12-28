@@ -18,7 +18,8 @@
 		addAccount,
 		updateAccount,
 		deleteAccount,
-		isAccountInUse
+		isAccountInUse,
+		generateNextCode
 	} from '$lib/db';
 
 	// 状態
@@ -71,13 +72,21 @@
 		}
 	}
 
-	function openAddDialog() {
+	async function openAddDialog() {
 		editingAccount = null;
-		formCode = '';
 		formName = '';
 		formType = 'expense';
 		formError = '';
+		formCode = await generateNextCode('expense');
 		dialogOpen = true;
+	}
+
+	async function handleTypeChange(newType: AccountType) {
+		formType = newType;
+		if (!editingAccount) {
+			// 新規追加時のみコードを自動生成
+			formCode = await generateNextCode(newType);
+		}
 	}
 
 	function openEditDialog(account: Account) {
@@ -216,17 +225,17 @@
 												{/if}
 											</Table.Cell>
 											<Table.Cell class="text-right">
-												<div class="flex justify-end gap-1">
-													<Button
-														variant="ghost"
-														size="icon"
-														class="size-8"
-														onclick={() => openEditDialog(account)}
-													>
-														<Pencil class="size-4" />
-														<span class="sr-only">編集</span>
-													</Button>
-													{#if !account.isSystem}
+												{#if !account.isSystem}
+													<div class="flex justify-end gap-1">
+														<Button
+															variant="ghost"
+															size="icon"
+															class="size-8"
+															onclick={() => openEditDialog(account)}
+														>
+															<Pencil class="size-4" />
+															<span class="sr-only">編集</span>
+														</Button>
 														<Button
 															variant="ghost"
 															size="icon"
@@ -236,8 +245,8 @@
 															<Trash2 class="size-4" />
 															<span class="sr-only">削除</span>
 														</Button>
-													{/if}
-												</div>
+													</div>
+												{/if}
 											</Table.Cell>
 										</Table.Row>
 									{/each}
@@ -270,21 +279,13 @@
 			}}
 		>
 			<div class="space-y-2">
-				<Label for="code">勘定科目コード</Label>
-				<Input
-					id="code"
-					bind:value={formCode}
-					placeholder="例: 540"
-					disabled={!!editingAccount}
-				/>
-			</div>
-			<div class="space-y-2">
-				<Label for="name">勘定科目名</Label>
-				<Input id="name" bind:value={formName} placeholder="例: 車両費" />
-			</div>
-			<div class="space-y-2">
 				<Label for="type">カテゴリ</Label>
-				<Select.Root type="single" bind:value={formType}>
+				<Select.Root
+					type="single"
+					value={formType}
+					onValueChange={(v) => v && handleTypeChange(v as AccountType)}
+					disabled={!!editingAccount}
+				>
 					<Select.Trigger class="w-full">
 						{AccountTypeLabels[formType]}
 					</Select.Trigger>
@@ -294,6 +295,15 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+			</div>
+			<div class="space-y-2">
+				<Label for="code">勘定科目コード</Label>
+				<Input id="code" value={formCode} readonly class="bg-muted font-mono" />
+				<p class="text-xs text-muted-foreground">カテゴリに基づいて自動採番されます</p>
+			</div>
+			<div class="space-y-2">
+				<Label for="name">勘定科目名</Label>
+				<Input id="name" bind:value={formName} placeholder="例: 車両費" />
 			</div>
 			{#if formError}
 				<p class="text-sm text-destructive">{formError}</p>
