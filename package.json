@@ -12,7 +12,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
-		"test:unit": "vitest",
+		"test:unit": "vitest --project server",
+		"test:browser": "vitest --project client",
 		"test": "npm run test:unit -- --run"
 	},
 	"devDependencies": {
@@ -34,6 +35,7 @@
 		"eslint": "^9.39.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.13.1",
+		"fake-indexeddb": "^6.2.5",
 		"globals": "^16.5.0",
 		"mode-watcher": "^1.1.0",
 		"playwright": "^1.57.0",
