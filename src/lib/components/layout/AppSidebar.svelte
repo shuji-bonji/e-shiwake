@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { Calendar, BookOpen, FileSpreadsheet, Settings, Download, List, AlertTriangle } from '@lucide/svelte';
+	import { Calendar, BookOpen, FileSpreadsheet, Settings, Database, List, AlertTriangle } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
@@ -167,11 +167,11 @@
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/export'}>
+						<Sidebar.MenuButton isActive={pathname === '/data'}>
 							{#snippet child({ props })}
-								<a href="/export" {...props}>
-									<Download class="size-4" />
-									<span>エクスポート</span>
+								<a href="/data" {...props}>
+									<Database class="size-4" />
+									<span>データ管理</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
@@ -186,9 +186,9 @@
 			<!-- 未エクスポートリマインダー -->
 			{#if showReminder}
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={pathname === '/export'}>
+					<Sidebar.MenuButton isActive={pathname === '/data'}>
 						{#snippet child({ props })}
-							<a href="/export" {...props} class="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+							<a href="/data" {...props} class="flex items-center gap-2 text-amber-600 dark:text-amber-400">
 								<AlertTriangle class="size-4" />
 								<span class="text-xs">未エクスポート: {unexportedCount}件</span>
 							</a>
