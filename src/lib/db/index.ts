@@ -1,7 +1,16 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Account, Vendor, JournalEntry, Attachment, DocumentType } from '$lib/types';
-import { DocumentTypeLabels } from '$lib/types';
+import type { Account, Vendor, JournalEntry, Attachment, DocumentType, StorageType } from '$lib/types';
 import { defaultAccounts } from './seed';
+
+/**
+ * 設定レコード（キーバリュー形式）
+ */
+interface SettingsRecord {
+	key: string;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	value: any;
+	updatedAt: string;
+}
 
 /**
  * e-shiwake データベース
@@ -11,6 +20,7 @@ class EShiwakeDatabase extends Dexie {
 	vendors!: EntityTable<Vendor, 'id'>;
 	journals!: EntityTable<JournalEntry, 'id'>;
 	attachments!: EntityTable<Attachment, 'id'>;
+	settings!: EntityTable<SettingsRecord, 'key'>;
 
 	constructor() {
 		super('e-shiwake');
@@ -20,6 +30,15 @@ class EShiwakeDatabase extends Dexie {
 			vendors: 'id, name',
 			journals: 'id, date, vendor, evidenceStatus',
 			attachments: 'id, journalEntryId'
+		});
+
+		// Version 2: 設定テーブルを追加
+		this.version(2).stores({
+			accounts: 'code, name, type, isSystem',
+			vendors: 'id, name',
+			journals: 'id, date, vendor, evidenceStatus',
+			attachments: 'id, journalEntryId',
+			settings: 'key'
 		});
 	}
 }
@@ -33,7 +52,8 @@ export const db = new EShiwakeDatabase();
 export async function initializeDatabase(): Promise<void> {
 	const count = await db.accounts.count();
 	if (count === 0) {
-		await db.accounts.bulkAdd(defaultAccounts);
+		// bulkPutを使用して、既存のキーがあっても上書き（競合回避）
+		await db.accounts.bulkPut(defaultAccounts);
 		console.log('Default accounts initialized');
 	}
 }
@@ -398,38 +418,305 @@ export interface AttachmentParams {
 	documentDate: string;
 	documentType: DocumentType;
 	generatedName: string;
+	year: number; // 保存先の年度ディレクトリ
+}
+
+// ==================== 設定関連 ====================
+
+/**
+ * 設定値を取得
+ */
+export async function getSetting<T>(key: string): Promise<T | undefined> {
+	const record = await db.settings.get(key);
+	return record?.value as T | undefined;
 }
 
 /**
- * 仕訳に添付ファイルを追加
+ * 設定値を保存
+ */
+export async function setSetting<T>(key: string, value: T): Promise<void> {
+	await db.settings.put({
+		key,
+		value,
+		updatedAt: new Date().toISOString()
+	});
+}
+
+/**
+ * 現在の保存モードを取得
+ */
+export async function getStorageMode(): Promise<StorageType> {
+	const mode = await getSetting<StorageType>('storageMode');
+	return mode ?? 'indexeddb';
+}
+
+/**
+ * 保存モードを設定
+ */
+export async function setStorageMode(mode: StorageType): Promise<void> {
+	await setSetting('storageMode', mode);
+}
+
+/**
+ * ディレクトリハンドルを取得
+ */
+export async function getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+	const record = await db.settings.get('directoryHandle');
+	return (record?.value as FileSystemDirectoryHandle) ?? null;
+}
+
+/**
+ * ディレクトリハンドルを保存
+ */
+export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+	await db.settings.put({
+		key: 'directoryHandle',
+		value: handle,
+		updatedAt: new Date().toISOString()
+	});
+}
+
+/**
+ * 最終エクスポート日時を取得
+ */
+export async function getLastExportedAt(): Promise<string | null> {
+	const value = await getSetting<string>('lastExportedAt');
+	return value ?? null;
+}
+
+/**
+ * 最終エクスポート日時を更新
+ */
+export async function setLastExportedAt(date: string): Promise<void> {
+	await setSetting('lastExportedAt', date);
+}
+
+/**
+ * 未エクスポートの添付ファイル数を取得
+ */
+export async function getUnexportedAttachmentCount(): Promise<number> {
+	const journals = await db.journals.toArray();
+	let count = 0;
+	for (const journal of journals) {
+		for (const attachment of journal.attachments) {
+			if (attachment.storageType === 'indexeddb' && !attachment.exportedAt) {
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
+// ==================== 容量管理関連 ====================
+
+/**
+ * 自動Blob削除設定を取得
+ */
+export async function getAutoPurgeBlobSetting(): Promise<boolean> {
+	const value = await getSetting<boolean>('autoPurgeBlobAfterExport');
+	return value ?? true; // デフォルト: true
+}
+
+/**
+ * 自動Blob削除設定を保存
+ */
+export async function setAutoPurgeBlobSetting(enabled: boolean): Promise<void> {
+	await setSetting('autoPurgeBlobAfterExport', enabled);
+}
+
+/**
+ * Blob保持日数を取得
+ */
+export async function getBlobRetentionDays(): Promise<number> {
+	const value = await getSetting<number>('blobRetentionDays');
+	return value ?? 30; // デフォルト: 30日
+}
+
+/**
+ * Blob保持日数を保存
+ */
+export async function setBlobRetentionDays(days: number): Promise<void> {
+	await setSetting('blobRetentionDays', days);
+}
+
+/**
+ * 削除可能なBlob（エクスポート済みで保持期間を過ぎたもの）の数を取得
+ */
+export async function getPurgeableBlobCount(): Promise<number> {
+	const retentionDays = await getBlobRetentionDays();
+	const now = new Date();
+	const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+
+	const journals = await db.journals.toArray();
+	let count = 0;
+
+	for (const journal of journals) {
+		for (const attachment of journal.attachments) {
+			if (
+				attachment.storageType === 'indexeddb' &&
+				attachment.exportedAt &&
+				attachment.blob &&
+				!attachment.blobPurgedAt
+			) {
+				const exportedAt = new Date(attachment.exportedAt);
+				if (now.getTime() - exportedAt.getTime() >= retentionMs) {
+					count++;
+				}
+			}
+		}
+	}
+
+	return count;
+}
+
+/**
+ * エクスポート済みのBlobを削除（容量節約）
+ * @returns 削除した件数
+ */
+export async function purgeExportedBlobs(): Promise<number> {
+	const retentionDays = await getBlobRetentionDays();
+	const now = new Date();
+	const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+	const purgedAt = now.toISOString();
+
+	const journals = await db.journals.toArray();
+	let purgedCount = 0;
+
+	for (const journal of journals) {
+		let modified = false;
+		const updatedAttachments = journal.attachments.map((attachment) => {
+			if (
+				attachment.storageType === 'indexeddb' &&
+				attachment.exportedAt &&
+				attachment.blob &&
+				!attachment.blobPurgedAt
+			) {
+				const exportedAt = new Date(attachment.exportedAt);
+				if (now.getTime() - exportedAt.getTime() >= retentionMs) {
+					modified = true;
+					purgedCount++;
+					// Blobを削除し、削除日時を記録
+					// eslint-disable-next-line @typescript-eslint/no-unused-vars
+					const { blob, ...rest } = attachment;
+					return { ...rest, blobPurgedAt: purgedAt };
+				}
+			}
+			return attachment;
+		});
+
+		if (modified) {
+			await db.journals.update(journal.id, {
+				attachments: updatedAttachments,
+				updatedAt: purgedAt
+			});
+		}
+	}
+
+	return purgedCount;
+}
+
+/**
+ * すべてのエクスポート済みBlobを即座に削除（容量節約）
+ * 保持期間を無視して即座に削除
+ * @returns 削除した件数
+ */
+export async function purgeAllExportedBlobs(): Promise<number> {
+	const now = new Date().toISOString();
+
+	const journals = await db.journals.toArray();
+	let purgedCount = 0;
+
+	for (const journal of journals) {
+		let modified = false;
+		const updatedAttachments = journal.attachments.map((attachment) => {
+			if (
+				attachment.storageType === 'indexeddb' &&
+				attachment.exportedAt &&
+				attachment.blob &&
+				!attachment.blobPurgedAt
+			) {
+				modified = true;
+				purgedCount++;
+				// Blobを削除し、削除日時を記録
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				const { blob, ...rest } = attachment;
+				return { ...rest, blobPurgedAt: now };
+			}
+			return attachment;
+		});
+
+		if (modified) {
+			await db.journals.update(journal.id, {
+				attachments: updatedAttachments,
+				updatedAt: now
+			});
+		}
+	}
+
+	return purgedCount;
+}
+
+/**
+ * 添付ファイルのBlobが削除済みかチェック
+ */
+export function isAttachmentBlobPurged(attachment: Attachment): boolean {
+	return attachment.storageType === 'indexeddb' && !!attachment.blobPurgedAt;
+}
+
+/**
+ * 仕訳に添付ファイルを追加（ハイブリッド保存）
  */
 export async function addAttachmentToJournal(
 	journalId: string,
-	params: AttachmentParams
+	params: AttachmentParams,
+	directoryHandle?: FileSystemDirectoryHandle | null
 ): Promise<Attachment> {
 	const journal = await db.journals.get(journalId);
 	if (!journal) {
 		throw new Error('仕訳が見つかりません');
 	}
 
-	const { file, documentDate, documentType, generatedName } = params;
+	const { file, documentDate, documentType, generatedName, year } = params;
 
-	// Blobとして読み込み
-	const arrayBuffer = await file.arrayBuffer();
-	const blob = new Blob([arrayBuffer], { type: file.type });
+	let attachment: Attachment;
 
-	const attachment: Attachment = {
-		id: crypto.randomUUID(),
-		journalEntryId: journalId,
-		documentDate,
-		documentType,
-		originalName: file.name,
-		generatedName,
-		mimeType: file.type,
-		size: file.size,
-		blob,
-		createdAt: new Date().toISOString()
-	};
+	if (directoryHandle) {
+		// ファイルシステムに保存
+		const { saveFileToDirectory } = await import('$lib/utils/filesystem');
+		const filePath = await saveFileToDirectory(directoryHandle, year, generatedName, file);
+
+		attachment = {
+			id: crypto.randomUUID(),
+			journalEntryId: journalId,
+			documentDate,
+			documentType,
+			originalName: file.name,
+			generatedName,
+			mimeType: file.type,
+			size: file.size,
+			storageType: 'filesystem',
+			filePath,
+			createdAt: new Date().toISOString()
+		};
+	} else {
+		// IndexedDBにBlob保存
+		const arrayBuffer = await file.arrayBuffer();
+		const blob = new Blob([arrayBuffer], { type: file.type });
+
+		attachment = {
+			id: crypto.randomUUID(),
+			journalEntryId: journalId,
+			documentDate,
+			documentType,
+			originalName: file.name,
+			generatedName,
+			mimeType: file.type,
+			size: file.size,
+			storageType: 'indexeddb',
+			blob,
+			createdAt: new Date().toISOString()
+		};
+	}
 
 	// 仕訳を更新
 	const updatedAttachments = [...journal.attachments, attachment];
@@ -443,15 +730,25 @@ export async function addAttachmentToJournal(
 }
 
 /**
- * 仕訳から添付ファイルを削除
+ * 仕訳から添付ファイルを削除（ハイブリッド対応）
  */
 export async function removeAttachmentFromJournal(
 	journalId: string,
-	attachmentId: string
+	attachmentId: string,
+	directoryHandle?: FileSystemDirectoryHandle | null
 ): Promise<void> {
 	const journal = await db.journals.get(journalId);
 	if (!journal) {
 		throw new Error('仕訳が見つかりません');
+	}
+
+	// 削除対象の添付ファイルを取得
+	const attachmentToRemove = journal.attachments.find((a) => a.id === attachmentId);
+
+	// ファイルシステムから削除（filesystem保存の場合）
+	if (attachmentToRemove?.storageType === 'filesystem' && attachmentToRemove.filePath && directoryHandle) {
+		const { deleteFileFromDirectory } = await import('$lib/utils/filesystem');
+		await deleteFileFromDirectory(directoryHandle, attachmentToRemove.filePath);
 	}
 
 	const updatedAttachments = journal.attachments.filter((a) => a.id !== attachmentId);
@@ -465,17 +762,27 @@ export async function removeAttachmentFromJournal(
 }
 
 /**
- * 添付ファイルのBlobを取得
+ * 添付ファイルのBlobを取得（ハイブリッド対応）
  */
 export async function getAttachmentBlob(
 	journalId: string,
-	attachmentId: string
+	attachmentId: string,
+	directoryHandle?: FileSystemDirectoryHandle | null
 ): Promise<Blob | null> {
 	const journal = await db.journals.get(journalId);
 	if (!journal) return null;
 
 	const attachment = journal.attachments.find((a) => a.id === attachmentId);
-	return attachment?.blob ?? null;
+	if (!attachment) return null;
+
+	// ファイルシステムから読み込み
+	if (attachment.storageType === 'filesystem' && attachment.filePath && directoryHandle) {
+		const { readFileFromDirectory } = await import('$lib/utils/filesystem');
+		return await readFileFromDirectory(directoryHandle, attachment.filePath);
+	}
+
+	// IndexedDBから取得
+	return attachment.blob ?? null;
 }
 
 // ==================== テストデータ ====================

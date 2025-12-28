@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { Calendar, BookOpen, FileSpreadsheet, Settings, Download, List } from '@lucide/svelte';
+	import { Calendar, BookOpen, FileSpreadsheet, Settings, Download, List, AlertTriangle } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
@@ -8,7 +8,8 @@
 		setSelectedYear,
 		setAvailableYears
 	} from '$lib/stores/fiscalYear.svelte.js';
-	import { getAvailableYears, initializeDatabase } from '$lib/db';
+	import { getAvailableYears, initializeDatabase, getUnexportedAttachmentCount, getStorageMode } from '$lib/db';
+	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { onMount } from 'svelte';
 
 	// 年度ストア
@@ -17,11 +18,28 @@
 	// パス比較用のヘルパー
 	const pathname = $derived(page.url.pathname as string);
 
+	// 未エクスポート警告の状態
+	let unexportedCount = $state(0);
+	let showReminder = $state(false);
+
 	// 年度リストを読み込み
 	onMount(async () => {
 		await initializeDatabase();
 		const years = await getAvailableYears();
 		setAvailableYears(years);
+
+		// Safari（File System Access API非対応）の場合のみリマインダーを表示
+		if (!supportsFileSystemAccess()) {
+			unexportedCount = await getUnexportedAttachmentCount();
+			showReminder = unexportedCount > 0;
+		} else {
+			// File System Access API対応でも、IndexedDBモードの場合はリマインダーを表示
+			const storageMode = await getStorageMode();
+			if (storageMode === 'indexeddb') {
+				unexportedCount = await getUnexportedAttachmentCount();
+				showReminder = unexportedCount > 0;
+			}
+		}
 	});
 
 	// 年度を選択して仕訳帳に遷移
@@ -165,6 +183,19 @@
 
 	<Sidebar.Footer class="border-t border-sidebar-border">
 		<Sidebar.Menu>
+			<!-- 未エクスポートリマインダー -->
+			{#if showReminder}
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton isActive={pathname === '/export'}>
+						{#snippet child({ props })}
+							<a href="/export" {...props} class="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+								<AlertTriangle class="size-4" />
+								<span class="text-xs">未エクスポート: {unexportedCount}件</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+			{/if}
 			<Sidebar.MenuItem>
 				<div class="p-2 text-xs text-muted-foreground">
 					<span>選択中: {fiscalYear.selectedYear}年度</span>

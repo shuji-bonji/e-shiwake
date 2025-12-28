@@ -45,6 +45,11 @@ export interface Vendor {
 export type EvidenceStatus = 'none' | 'paper' | 'digital';
 
 /**
+ * 証憑の保存タイプ
+ */
+export type StorageType = 'filesystem' | 'indexeddb';
+
+/**
  * 書類の種類
  */
 export type DocumentType =
@@ -90,7 +95,12 @@ export interface Attachment {
 	generatedName: string; // 自動生成されたファイル名
 	mimeType: string; // application/pdf など
 	size: number; // ファイルサイズ（bytes）
-	blob?: Blob; // IndexedDB保存用（iPad向け）
+	// 保存場所による分岐
+	storageType: StorageType; // 保存タイプ
+	blob?: Blob; // IndexedDB保存時のみ
+	filePath?: string; // ファイルシステム保存時のパス（{年度}/{ファイル名}）
+	exportedAt?: string; // エクスポート済み日時（IndexedDB保存時）
+	blobPurgedAt?: string; // Blob削除日時（容量管理用）
 	createdAt: string;
 }
 
@@ -115,7 +125,12 @@ export interface JournalEntry {
 export interface Settings {
 	fiscalYearStart: number; // 会計年度開始月（1-12、個人は通常1）
 	defaultCurrency: string; // 通貨コード（JPY）
-	outputDirectoryHandle?: FileSystemDirectoryHandle; // 保存先ディレクトリ
+	storageMode: StorageType; // 現在の保存モード
+	outputDirectoryHandle?: FileSystemDirectoryHandle; // 保存先ディレクトリ（filesystem時）
+	lastExportedAt?: string; // 最終エクスポート日時（indexeddb時）
+	// 容量管理設定
+	autoPurgeBlobAfterExport: boolean; // エクスポート後に自動削除（デフォルト: true）
+	blobRetentionDays: number; // 削除までの猶予日数（デフォルト: 30）
 	licenseKey?: string; // 有料オプション用ライセンスキー
 }
 
@@ -130,4 +145,13 @@ export interface ExportData {
 	accounts: Account[];
 	vendors: Vendor[];
 	settings: Settings;
+}
+
+/**
+ * ストレージ使用状況
+ */
+export interface StorageUsage {
+	used: number; // 使用中（bytes）
+	quota: number; // 上限（bytes）
+	percentage: number; // 使用率（0-100）
 }

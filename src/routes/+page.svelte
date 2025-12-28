@@ -15,9 +15,12 @@
 		updateJournal,
 		deleteJournal,
 		createEmptyJournal,
-		getAvailableYears
+		getAvailableYears,
+		getStorageMode,
+		getDirectoryHandle
 	} from '$lib/db';
 	import { useFiscalYear, setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
+	import { getSavedDirectoryHandle, supportsFileSystemAccess } from '$lib/utils/filesystem';
 
 	// 年度ストア
 	const fiscalYear = useFiscalYear();
@@ -26,6 +29,7 @@
 	let journals = $state<JournalEntry[]>([]);
 	let accounts = $state<Account[]>([]);
 	let vendors = $state<Vendor[]>([]);
+	let directoryHandle = $state<FileSystemDirectoryHandle | null>(null);
 	let isLoading = $state(true);
 	let deleteDialogOpen = $state(false);
 	let deletingJournalId = $state<string | null>(null);
@@ -56,6 +60,15 @@
 		await initializeDatabase();
 		const years = await getAvailableYears();
 		setAvailableYears(years);
+
+		// ディレクトリハンドルを取得（File System Access API対応時）
+		if (supportsFileSystemAccess()) {
+			const storageMode = await getStorageMode();
+			if (storageMode === 'filesystem') {
+				directoryHandle = await getSavedDirectoryHandle();
+			}
+		}
+
 		// 初期データを読み込み
 		await loadData(fiscalYear.selectedYear);
 		lastLoadedYear = fiscalYear.selectedYear;
@@ -213,6 +226,7 @@
 					{journal}
 					{accounts}
 					{vendors}
+					{directoryHandle}
 					isEditing={editingJournalId === journal.id}
 					isFlashing={flashingJournalId === journal.id}
 					onupdate={handleUpdateJournal}

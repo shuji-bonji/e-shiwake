@@ -4,20 +4,22 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
-	import { FileText } from '@lucide/svelte';
-	import type { DocumentType } from '$lib/types';
+	import { FileText, AlertTriangle } from '@lucide/svelte';
+	import type { DocumentType, Vendor } from '$lib/types';
 	import { DocumentTypeLabels } from '$lib/types';
 	import { generateAttachmentName } from '$lib/db';
+	import VendorInput from './VendorInput.svelte';
 
 	interface Props {
 		open: boolean;
 		file: File | null;
 		journalDate: string;
 		vendor: string;
+		vendors: Vendor[];
 		accountName: string;
 		amount: number;
 		suggestedDocumentType: DocumentType;
-		onconfirm: (documentDate: string, documentType: DocumentType, generatedName: string) => void;
+		onconfirm: (documentDate: string, documentType: DocumentType, generatedName: string, updatedVendor: string) => void;
 		oncancel: () => void;
 	}
 
@@ -26,6 +28,7 @@
 		file,
 		journalDate,
 		vendor,
+		vendors,
 		accountName,
 		amount,
 		suggestedDocumentType,
@@ -36,6 +39,7 @@
 	// ダイアログの状態（親から渡される値で初期化、ダイアログ内で編集可能）
 	let documentDate = $state(journalDate);
 	let documentType = $state<DocumentType>(suggestedDocumentType);
+	let editableVendor = $state(vendor);
 
 	// propsが変更されたら同期（ダイアログが開くタイミングで親が値を更新する想定）
 	$effect(() => {
@@ -46,9 +50,16 @@
 		documentType = suggestedDocumentType;
 	});
 
+	$effect(() => {
+		editableVendor = vendor;
+	});
+
+	// 取引先が未入力かどうか
+	const vendorMissing = $derived(!editableVendor.trim());
+
 	// 生成されるファイル名のプレビュー
 	const generatedName = $derived(
-		generateAttachmentName(documentDate, documentType, accountName, amount, vendor)
+		generateAttachmentName(documentDate, documentType, accountName, amount, editableVendor)
 	);
 
 	// 書類種類のオプション
@@ -58,7 +69,7 @@
 	}));
 
 	function handleConfirm() {
-		onconfirm(documentDate, documentType, generatedName);
+		onconfirm(documentDate, documentType, generatedName, editableVendor);
 		open = false;
 	}
 
@@ -117,12 +128,21 @@
 				</Select.Root>
 			</div>
 
-			<!-- 取引先（表示のみ） -->
+			<!-- 取引先 -->
 			<div class="space-y-2">
-				<Label>取引先</Label>
-				<div class="rounded-md border bg-muted/50 px-3 py-2 text-sm">
-					{vendor || '（未入力）'}
-				</div>
+				<Label for="vendor">取引先</Label>
+				<VendorInput
+					{vendors}
+					value={editableVendor}
+					onchange={(name) => editableVendor = name}
+					placeholder="取引先名を入力"
+				/>
+				{#if vendorMissing}
+					<p class="flex items-center gap-1 text-xs text-amber-600">
+						<AlertTriangle class="size-3" />
+						取引先を入力するとファイル名に反映されます
+					</p>
+				{/if}
 			</div>
 
 			<!-- 生成されるファイル名 -->

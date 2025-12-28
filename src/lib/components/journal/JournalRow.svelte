@@ -7,14 +7,17 @@
 	import VendorInput from './VendorInput.svelte';
 	import PdfDropZone from './PdfDropZone.svelte';
 	import AttachmentDialog from './AttachmentDialog.svelte';
+	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
 	import type { JournalEntry, JournalLine, Account, AccountType, EvidenceStatus, Vendor, Attachment, DocumentType } from '$lib/types';
 	import { validateJournal, addAttachmentToJournal, removeAttachmentFromJournal, getAttachmentBlob, suggestDocumentType } from '$lib/db';
+	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { cn } from '$lib/utils.js';
 
 	interface Props {
 		journal: JournalEntry;
 		accounts: Account[];
 		vendors: Vendor[];
+		directoryHandle?: FileSystemDirectoryHandle | null;
 		isEditing?: boolean;
 		isFlashing?: boolean;
 		onupdate: (journal: JournalEntry) => void;
@@ -22,7 +25,7 @@
 		onconfirm?: (id: string) => void;
 	}
 
-	let { journal, accounts, vendors, isEditing = false, isFlashing = false, onupdate, ondelete, onconfirm }: Props = $props();
+	let { journal, accounts, vendors, directoryHandle = null, isEditing = false, isFlashing = false, onupdate, ondelete, onconfirm }: Props = $props();
 
 	// バリデーション
 	const validation = $derived(validateJournal(journal));
@@ -32,6 +35,9 @@
 	// 添付ダイアログの状態
 	let attachmentDialogOpen = $state(false);
 	let pendingFile = $state<File | null>(null);
+
+	// Safari向け警告ダイアログの状態
+	let safariDialogOpen = $state(false);
 
 	// ダイアログ用の派生値
 	const mainDebitLine = $derived(journal.lines.find((l) => l.type === 'debit' && l.accountCode));
@@ -143,9 +149,42 @@
 		onupdate({ ...journal, lines: journal.lines.filter((l) => l.id !== lineId) });
 	}
 
+	// Safari判定
+	function isSafari(): boolean {
+		if (typeof navigator === 'undefined') return false;
+		const ua = navigator.userAgent;
+		// Safari判定: Safariを含み、ChromeやEdgeを含まない
+		return /Safari/.test(ua) && !/Chrome|CriOS|Edg/.test(ua);
+	}
+
+	// Safari向け警告が必要かチェック
+	function shouldShowSafariWarning(): boolean {
+		// File System Access API非対応、またはSafariの場合は警告対象
+		const needsWarning = !supportsFileSystemAccess() || isSafari();
+		if (!needsWarning) {
+			return false;
+		}
+		// 既に表示済みなら警告不要
+		if (typeof localStorage !== 'undefined' && localStorage.getItem('shownStorageWarning') === 'true') {
+			return false;
+		}
+		return true;
+	}
+
 	// 添付ファイルのドロップ → ダイアログを開く
 	function handleFileDrop(file: File) {
 		pendingFile = file;
+
+		// Safari向け：初回のみ警告ダイアログを表示
+		if (shouldShowSafariWarning()) {
+			safariDialogOpen = true;
+		} else {
+			attachmentDialogOpen = true;
+		}
+	}
+
+	// Safari警告ダイアログでOKした後、添付ダイアログを開く
+	function handleSafariDialogConfirm() {
 		attachmentDialogOpen = true;
 	}
 
@@ -153,20 +192,30 @@
 	async function handleAttachmentConfirm(
 		documentDate: string,
 		documentType: DocumentType,
-		generatedName: string
+		generatedName: string,
+		updatedVendor: string
 	) {
 		if (!pendingFile) return;
 
 		try {
-			const attachment = await addAttachmentToJournal(journal.id, {
-				file: pendingFile,
-				documentDate,
-				documentType,
-				generatedName
-			});
-			// ローカル状態を更新
+			// 仕訳の日付から年度を取得
+			const year = parseInt(journal.date.substring(0, 4), 10);
+
+			const attachment = await addAttachmentToJournal(
+				journal.id,
+				{
+					file: pendingFile,
+					documentDate,
+					documentType,
+					generatedName,
+					year
+				},
+				directoryHandle
+			);
+			// ローカル状態を更新（取引先も更新）
 			onupdate({
 				...journal,
+				vendor: updatedVendor,
 				attachments: [...journal.attachments, attachment],
 				evidenceStatus: 'digital'
 			});
@@ -186,7 +235,7 @@
 	// 添付ファイルの削除
 	async function handleRemoveAttachment(attachmentId: string) {
 		try {
-			await removeAttachmentFromJournal(journal.id, attachmentId);
+			await removeAttachmentFromJournal(journal.id, attachmentId, directoryHandle);
 			const updatedAttachments = journal.attachments.filter((a) => a.id !== attachmentId);
 			onupdate({
 				...journal,
@@ -200,7 +249,7 @@
 
 	// 添付ファイルのプレビュー
 	async function handlePreviewAttachment(attachment: Attachment) {
-		const blob = await getAttachmentBlob(journal.id, attachment.id);
+		const blob = await getAttachmentBlob(journal.id, attachment.id, directoryHandle);
 		if (blob) {
 			const url = URL.createObjectURL(blob);
 			window.open(url, '_blank');
@@ -482,12 +531,19 @@
 	</div>
 </div>
 
+<!-- Safari向け警告ダイアログ -->
+<SafariStorageDialog
+	bind:open={safariDialogOpen}
+	onconfirm={handleSafariDialogConfirm}
+/>
+
 <!-- 添付ダイアログ -->
 <AttachmentDialog
 	bind:open={attachmentDialogOpen}
 	file={pendingFile}
 	journalDate={journal.date}
 	vendor={journal.vendor}
+	{vendors}
 	accountName={mainAccountName}
 	amount={mainAmount}
 	suggestedDocumentType={suggestedDocType}
