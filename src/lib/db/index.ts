@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Account, Vendor, JournalEntry, Attachment } from '$lib/types';
+import type { Account, Vendor, JournalEntry, Attachment, DocumentType } from '$lib/types';
+import { DocumentTypeLabels } from '$lib/types';
 import { defaultAccounts } from './seed';
 
 /**
@@ -332,6 +333,149 @@ export async function searchVendors(query: string): Promise<Vendor[]> {
 
 	const lowerQuery = query.toLowerCase();
 	return db.vendors.filter((v) => v.name.toLowerCase().includes(lowerQuery)).toArray();
+}
+
+// ==================== 添付ファイル関連 ====================
+
+/**
+ * 書類の種類の短縮ラベル（ファイル名用）
+ */
+const DocumentTypeShortLabels: Record<DocumentType, string> = {
+	invoice: '請求書発行',
+	bill: '請求書',
+	receipt: '領収書',
+	contract: '契約書',
+	estimate: '見積書',
+	other: 'その他'
+};
+
+/**
+ * 添付ファイル名を自動生成
+ * 形式: {書類の日付}_{種類}_{勘定科目名}_{金額}円_{取引先名}.pdf
+ */
+export function generateAttachmentName(
+	documentDate: string,
+	documentType: DocumentType,
+	accountName: string,
+	amount: number,
+	vendor: string
+): string {
+	// ファイル名に使えない文字を置換
+	const sanitize = (str: string) => str.replace(/[\\/:*?"<>|]/g, '_').trim();
+
+	const parts = [
+		documentDate,
+		DocumentTypeShortLabels[documentType],
+		sanitize(accountName) || '未分類',
+		`${amount.toLocaleString()}円`,
+		sanitize(vendor) || '不明'
+	];
+
+	return `${parts.join('_')}.pdf`;
+}
+
+/**
+ * 勘定科目タイプから書類の種類を推測
+ */
+export function suggestDocumentType(accountType: Account['type'] | null): DocumentType {
+	if (!accountType) return 'other';
+
+	switch (accountType) {
+		case 'expense':
+			return 'receipt'; // 費用系 → 領収書
+		case 'revenue':
+			return 'invoice'; // 収益系 → 請求書（発行）
+		default:
+			return 'other';
+	}
+}
+
+/**
+ * 添付ファイルのパラメータ
+ */
+export interface AttachmentParams {
+	file: File;
+	documentDate: string;
+	documentType: DocumentType;
+	generatedName: string;
+}
+
+/**
+ * 仕訳に添付ファイルを追加
+ */
+export async function addAttachmentToJournal(
+	journalId: string,
+	params: AttachmentParams
+): Promise<Attachment> {
+	const journal = await db.journals.get(journalId);
+	if (!journal) {
+		throw new Error('仕訳が見つかりません');
+	}
+
+	const { file, documentDate, documentType, generatedName } = params;
+
+	// Blobとして読み込み
+	const arrayBuffer = await file.arrayBuffer();
+	const blob = new Blob([arrayBuffer], { type: file.type });
+
+	const attachment: Attachment = {
+		id: crypto.randomUUID(),
+		journalEntryId: journalId,
+		documentDate,
+		documentType,
+		originalName: file.name,
+		generatedName,
+		mimeType: file.type,
+		size: file.size,
+		blob,
+		createdAt: new Date().toISOString()
+	};
+
+	// 仕訳を更新
+	const updatedAttachments = [...journal.attachments, attachment];
+	await db.journals.update(journalId, {
+		attachments: updatedAttachments,
+		evidenceStatus: 'digital',
+		updatedAt: new Date().toISOString()
+	});
+
+	return attachment;
+}
+
+/**
+ * 仕訳から添付ファイルを削除
+ */
+export async function removeAttachmentFromJournal(
+	journalId: string,
+	attachmentId: string
+): Promise<void> {
+	const journal = await db.journals.get(journalId);
+	if (!journal) {
+		throw new Error('仕訳が見つかりません');
+	}
+
+	const updatedAttachments = journal.attachments.filter((a) => a.id !== attachmentId);
+	const newEvidenceStatus = updatedAttachments.length > 0 ? 'digital' : 'none';
+
+	await db.journals.update(journalId, {
+		attachments: updatedAttachments,
+		evidenceStatus: newEvidenceStatus,
+		updatedAt: new Date().toISOString()
+	});
+}
+
+/**
+ * 添付ファイルのBlobを取得
+ */
+export async function getAttachmentBlob(
+	journalId: string,
+	attachmentId: string
+): Promise<Blob | null> {
+	const journal = await db.journals.get(journalId);
+	if (!journal) return null;
+
+	const attachment = journal.attachments.find((a) => a.id === attachmentId);
+	return attachment?.blob ?? null;
 }
 
 // ==================== テストデータ ====================

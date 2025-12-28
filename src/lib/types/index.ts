@@ -45,6 +45,29 @@ export interface Vendor {
 export type EvidenceStatus = 'none' | 'paper' | 'digital';
 
 /**
+ * 書類の種類
+ */
+export type DocumentType =
+	| 'invoice' // 請求書（発行）
+	| 'bill' // 請求書（受領）
+	| 'receipt' // 領収書
+	| 'contract' // 契約書
+	| 'estimate' // 見積書
+	| 'other'; // その他
+
+/**
+ * 書類の種類の日本語ラベル
+ */
+export const DocumentTypeLabels: Record<DocumentType, string> = {
+	invoice: '請求書（発行）',
+	bill: '請求書（受領）',
+	receipt: '領収書',
+	contract: '契約書',
+	estimate: '見積書',
+	other: 'その他'
+};
+
+/**
  * 仕訳明細行
  */
 export interface JournalLine {
@@ -61,6 +84,8 @@ export interface JournalLine {
 export interface Attachment {
 	id: string; // UUID
 	journalEntryId: string; // 紐付く仕訳ID
+	documentDate: string; // 書類の日付（電帳法の取引年月日）YYYY-MM-DD
+	documentType: DocumentType; // 書類の種類
 	originalName: string; // 元のファイル名
 	generatedName: string; // 自動生成されたファイル名
 	mimeType: string; // application/pdf など

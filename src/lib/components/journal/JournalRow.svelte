@@ -5,8 +5,10 @@
 	import { Circle, FileText, Paperclip, Trash2, Plus, ArrowUp, ArrowDown, Check } from '@lucide/svelte';
 	import AccountSelect from './AccountSelect.svelte';
 	import VendorInput from './VendorInput.svelte';
-	import type { JournalEntry, JournalLine, Account, AccountType, EvidenceStatus, Vendor } from '$lib/types';
-	import { validateJournal } from '$lib/db';
+	import PdfDropZone from './PdfDropZone.svelte';
+	import AttachmentDialog from './AttachmentDialog.svelte';
+	import type { JournalEntry, JournalLine, Account, AccountType, EvidenceStatus, Vendor, Attachment, DocumentType } from '$lib/types';
+	import { validateJournal, addAttachmentToJournal, removeAttachmentFromJournal, getAttachmentBlob, suggestDocumentType } from '$lib/db';
 	import { cn } from '$lib/utils.js';
 
 	interface Props {
@@ -26,6 +28,21 @@
 	const validation = $derived(validateJournal(journal));
 	const debitLines = $derived(journal.lines.filter((l) => l.type === 'debit'));
 	const creditLines = $derived(journal.lines.filter((l) => l.type === 'credit'));
+
+	// 添付ダイアログの状態
+	let attachmentDialogOpen = $state(false);
+	let pendingFile = $state<File | null>(null);
+
+	// ダイアログ用の派生値
+	const mainDebitLine = $derived(journal.lines.find((l) => l.type === 'debit' && l.accountCode));
+	const mainAccountName = $derived(
+		mainDebitLine ? accounts.find((a) => a.code === mainDebitLine.accountCode)?.name ?? '' : ''
+	);
+	const mainAccountType = $derived(
+		mainDebitLine ? accounts.find((a) => a.code === mainDebitLine.accountCode)?.type ?? null : null
+	);
+	const mainAmount = $derived(mainDebitLine?.amount ?? 0);
+	const suggestedDocType = $derived(suggestDocumentType(mainAccountType));
 
 	// 勘定科目のタイプを取得
 	function getAccountType(code: string): AccountType | null {
@@ -125,18 +142,86 @@
 		if (journal.lines.length <= 2) return; // 最低2行は維持
 		onupdate({ ...journal, lines: journal.lines.filter((l) => l.id !== lineId) });
 	}
+
+	// 添付ファイルのドロップ → ダイアログを開く
+	function handleFileDrop(file: File) {
+		pendingFile = file;
+		attachmentDialogOpen = true;
+	}
+
+	// ダイアログで確定 → 実際に添付
+	async function handleAttachmentConfirm(
+		documentDate: string,
+		documentType: DocumentType,
+		generatedName: string
+	) {
+		if (!pendingFile) return;
+
+		try {
+			const attachment = await addAttachmentToJournal(journal.id, {
+				file: pendingFile,
+				documentDate,
+				documentType,
+				generatedName
+			});
+			// ローカル状態を更新
+			onupdate({
+				...journal,
+				attachments: [...journal.attachments, attachment],
+				evidenceStatus: 'digital'
+			});
+		} catch (error) {
+			console.error('添付ファイルの追加に失敗しました:', error);
+			alert('添付ファイルの追加に失敗しました');
+		} finally {
+			pendingFile = null;
+		}
+	}
+
+	// ダイアログでキャンセル
+	function handleAttachmentCancel() {
+		pendingFile = null;
+	}
+
+	// 添付ファイルの削除
+	async function handleRemoveAttachment(attachmentId: string) {
+		try {
+			await removeAttachmentFromJournal(journal.id, attachmentId);
+			const updatedAttachments = journal.attachments.filter((a) => a.id !== attachmentId);
+			onupdate({
+				...journal,
+				attachments: updatedAttachments,
+				evidenceStatus: updatedAttachments.length > 0 ? 'digital' : 'none'
+			});
+		} catch (error) {
+			console.error('添付ファイルの削除に失敗しました:', error);
+		}
+	}
+
+	// 添付ファイルのプレビュー
+	async function handlePreviewAttachment(attachment: Attachment) {
+		const blob = await getAttachmentBlob(journal.id, attachment.id);
+		if (blob) {
+			const url = URL.createObjectURL(blob);
+			window.open(url, '_blank');
+			// メモリリーク防止のため少し遅延してURLを解放
+			setTimeout(() => URL.revokeObjectURL(url), 1000);
+		}
+	}
 </script>
 
 <div
 	class={cn(
-		'rounded-lg border bg-card p-4 shadow-sm transition-all',
+		'flex gap-4 rounded-lg border bg-card p-4 shadow-sm transition-all',
 		isEditing && 'border-primary ring-2 ring-primary/20',
 		isFlashing && 'animate-flash',
 		!validation.isValid && (!isEditing || journal.lines.some((l) => l.amount > 0)) && 'border-destructive'
 	)}
 >
-	<!-- ヘッダー行: 証跡ステータス、日付、摘要、取引先、削除ボタン -->
-	<div class="mb-3 flex items-center gap-3">
+	<!-- メインコンテンツ -->
+	<div class="min-w-0 flex-1">
+		<!-- ヘッダー行: 証跡ステータス、日付、摘要、取引先、削除ボタン -->
+		<div class="mb-3 flex items-center gap-3">
 		<!-- 証跡ステータス -->
 		<Tooltip.Provider>
 			<Tooltip.Root>
@@ -234,6 +319,23 @@
 			<div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
 				借方
 				<span class="ml-auto font-mono">{validation.debitTotal.toLocaleString()}円</span>
+				<Tooltip.Provider>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							<Button variant="ghost" size="icon" class="size-6 text-foreground" onclick={() => addLine('debit')}>
+								<Plus class="size-4" strokeWidth={3} />
+							</Button>
+						</Tooltip.Trigger>
+						<Tooltip.Content>
+							<div class="text-xs">
+								<div class="font-medium mb-1">借方に来る科目：</div>
+								<div class="flex items-center gap-1"><ArrowUp class="size-3 text-blue-500" />資産の増加</div>
+								<div class="flex items-center gap-1"><ArrowUp class="size-3 text-red-500" />費用の発生</div>
+								<div class="flex items-center gap-1"><ArrowDown class="size-3 text-purple-500" />負債の減少</div>
+							</div>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
 			</div>
 			{#each debitLines as line (line.id)}
 				{@const accountType = getAccountType(line.accountCode)}
@@ -283,25 +385,6 @@
 					{/if}
 				</div>
 			{/each}
-			<!-- 借方追加ボタン -->
-			<Tooltip.Provider>
-				<Tooltip.Root>
-					<Tooltip.Trigger class="w-full">
-						<Button variant="outline" size="sm" class="w-full" onclick={() => addLine('debit')}>
-							<Plus class="mr-1 size-3" />
-							借方行を追加
-						</Button>
-					</Tooltip.Trigger>
-					<Tooltip.Content>
-						<div class="text-xs">
-							<div class="font-medium mb-1">借方に来る科目：</div>
-							<div class="flex items-center gap-1"><ArrowUp class="size-3 text-blue-500" />資産の増加</div>
-							<div class="flex items-center gap-1"><ArrowUp class="size-3 text-red-500" />費用の発生</div>
-							<div class="flex items-center gap-1"><ArrowDown class="size-3 text-purple-500" />負債の減少</div>
-						</div>
-					</Tooltip.Content>
-				</Tooltip.Root>
-			</Tooltip.Provider>
 		</div>
 
 		<!-- 貸方 -->
@@ -309,6 +392,23 @@
 			<div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
 				貸方
 				<span class="ml-auto font-mono">{validation.creditTotal.toLocaleString()}円</span>
+				<Tooltip.Provider>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							<Button variant="ghost" size="icon" class="size-6 text-foreground" onclick={() => addLine('credit')}>
+								<Plus class="size-4" strokeWidth={3} />
+							</Button>
+						</Tooltip.Trigger>
+						<Tooltip.Content>
+							<div class="text-xs">
+								<div class="font-medium mb-1">貸方に来る科目：</div>
+								<div class="flex items-center gap-1"><ArrowDown class="size-3 text-blue-500" />資産の減少</div>
+								<div class="flex items-center gap-1"><ArrowUp class="size-3 text-purple-500" />負債の増加</div>
+								<div class="flex items-center gap-1"><ArrowUp class="size-3 text-green-500" />収益の発生</div>
+							</div>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				</Tooltip.Provider>
 			</div>
 			{#each creditLines as line (line.id)}
 				{@const accountType = getAccountType(line.accountCode)}
@@ -358,32 +458,39 @@
 					{/if}
 				</div>
 			{/each}
-			<!-- 貸方追加ボタン -->
-			<Tooltip.Provider>
-				<Tooltip.Root>
-					<Tooltip.Trigger class="w-full">
-						<Button variant="outline" size="sm" class="w-full" onclick={() => addLine('credit')}>
-							<Plus class="mr-1 size-3" />
-							貸方行を追加
-						</Button>
-					</Tooltip.Trigger>
-					<Tooltip.Content>
-						<div class="text-xs">
-							<div class="font-medium mb-1">貸方に来る科目：</div>
-							<div class="flex items-center gap-1"><ArrowDown class="size-3 text-blue-500" />資産の減少</div>
-							<div class="flex items-center gap-1"><ArrowUp class="size-3 text-purple-500" />負債の増加</div>
-							<div class="flex items-center gap-1"><ArrowUp class="size-3 text-green-500" />収益の発生</div>
-						</div>
-					</Tooltip.Content>
-				</Tooltip.Root>
-			</Tooltip.Provider>
 		</div>
 	</div>
 
-	<!-- バリデーションエラー表示 -->
-	{#if !validation.isValid && journal.lines.some((l) => l.amount > 0)}
-		<div class="mt-3 text-sm text-destructive">
-			借方合計と貸方合計が一致しません（差額: {Math.abs(validation.debitTotal - validation.creditTotal).toLocaleString()}円）
-		</div>
-	{/if}
+		<!-- バリデーションエラー表示 -->
+		{#if !validation.isValid && journal.lines.some((l) => l.amount > 0)}
+			<div class="mt-3 text-sm text-destructive">
+				借方合計と貸方合計が一致しません（差額: {Math.abs(validation.debitTotal - validation.creditTotal).toLocaleString()}円）
+			</div>
+		{/if}
+	</div>
+
+	<!-- PDF添付エリア（右側） -->
+	<div class="w-36 shrink-0">
+		<PdfDropZone
+			attachments={journal.attachments}
+			onattach={handleFileDrop}
+			onremove={handleRemoveAttachment}
+			onpreview={handlePreviewAttachment}
+			vendorMissing={!journal.vendor.trim()}
+			vertical
+		/>
+	</div>
 </div>
+
+<!-- 添付ダイアログ -->
+<AttachmentDialog
+	bind:open={attachmentDialogOpen}
+	file={pendingFile}
+	journalDate={journal.date}
+	vendor={journal.vendor}
+	accountName={mainAccountName}
+	amount={mainAmount}
+	suggestedDocumentType={suggestedDocType}
+	onconfirm={handleAttachmentConfirm}
+	oncancel={handleAttachmentCancel}
+/>

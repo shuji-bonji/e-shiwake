@@ -2,6 +2,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Calendar, BookOpen, FileSpreadsheet, Settings, Download, List } from '@lucide/svelte';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import {
 		useFiscalYear,
 		setSelectedYear,
@@ -22,6 +23,15 @@
 		const years = await getAvailableYears();
 		setAvailableYears(years);
 	});
+
+	// 年度を選択して仕訳帳に遷移
+	function handleYearSelect(year: number) {
+		setSelectedYear(year);
+		// 仕訳帳ページ以外にいる場合は遷移
+		if (pathname !== '/') {
+			goto('/');
+		}
+	}
 </script>
 
 <Sidebar.Root>
@@ -56,7 +66,7 @@
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								isActive={fiscalYear.selectedYear === year}
-								onclick={() => setSelectedYear(year)}
+								onclick={() => handleYearSelect(year)}
 							>
 								<span>{year}</span>
 								{#if fiscalYear.selectedYear === year}

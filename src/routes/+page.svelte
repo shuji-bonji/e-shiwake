@@ -48,18 +48,27 @@
 		});
 	}
 
+	// 前回ロードした年度を追跡（重複ロード防止）
+	let lastLoadedYear = $state<number | null>(null);
+
 	// 初期化
 	onMount(async () => {
 		await initializeDatabase();
 		const years = await getAvailableYears();
 		setAvailableYears(years);
+		// 初期データを読み込み
+		await loadData(fiscalYear.selectedYear);
+		lastLoadedYear = fiscalYear.selectedYear;
 		isInitialized = true;
 	});
 
-	// 年度変更時にデータを再読み込み
+	// 年度変更時にデータを再読み込み（ページ滞在中の年度切り替え用）
 	$effect(() => {
-		if (isInitialized && fiscalYear.selectedYear) {
-			loadData(fiscalYear.selectedYear);
+		const year = fiscalYear.selectedYear;
+		// 初期化完了後、かつ年度が変わった場合のみ再読み込み
+		if (isInitialized && year && year !== lastLoadedYear) {
+			lastLoadedYear = year;
+			loadData(year);
 		}
 	});
 

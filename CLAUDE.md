@@ -125,6 +125,8 @@ interface JournalLine {
 interface Attachment {
   id: string;                    // UUID
   journalEntryId: string;        // 紐付く仕訳ID
+  documentDate: string;          // 書類の日付（電帳法の取引年月日）YYYY-MM-DD
+  documentType: DocumentType;    // 書類の種類
   originalName: string;          // 元のファイル名
   generatedName: string;         // 自動生成されたファイル名
   mimeType: string;              // application/pdf など
@@ -132,7 +134,20 @@ interface Attachment {
   blob?: Blob;                   // IndexedDB保存用（iPad向け）
   createdAt: string;
 }
+
+type DocumentType =
+  | 'invoice'    // 請求書（発行）
+  | 'bill'       // 請求書（受領）
+  | 'receipt'    // 領収書
+  | 'contract'   // 契約書
+  | 'estimate'   // 見積書
+  | 'other';     // その他
 ```
+
+**書類の日付と仕訳の日付の違い**:
+- 仕訳の日付: 会計上の認識日
+- 書類の日付: 書類に記載された日付（電帳法の「取引年月日」）
+- ほとんどのケースで一致するが、請求→入金のような場合は異なる
 
 ### Account（勘定科目マスタ）
 
@@ -513,7 +528,13 @@ interface ExportData {
 ### ファイル命名規則
 
 ```
-{YYYY-MM-DD}_{勘定科目名}_{金額}円_{取引先名}.pdf
+{書類の日付}_{種類}_{勘定科目名}_{金額}円_{取引先名}.pdf
+```
+
+例:
+```
+2024-01-15_領収書_消耗品費_3,980円_Amazon.pdf
+2024-01-15_請求書発行_売上_100,000円_クライアントA.pdf
 ```
 
 この命名規則により、ファイル名だけで検索要件をクリア。
@@ -533,7 +554,7 @@ interface ExportData {
 - [x] 勘定科目マスタ（初期データ込み）
 - [x] 勘定科目管理ページ（追加/編集/削除）
 - [x] 取引先オートコンプリート
-- [ ] PDF 紐付け + 自動リネーム
+- [x] PDF 紐付け + 自動リネーム
 - [x] 証跡ステータス管理
 - [x] IndexedDB 保存（Dexie）
 - [ ] JSON / CSV エクスポート
