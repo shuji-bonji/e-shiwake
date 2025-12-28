@@ -132,7 +132,16 @@
 			const accountMap = new Map(accounts.map((a) => [a.code, a.name]));
 
 			// CSVヘッダー
-			const headers = ['日付', '摘要', '取引先', '借方科目', '借方金額', '貸方科目', '貸方金額', '証跡'];
+			const headers = [
+				'日付',
+				'摘要',
+				'取引先',
+				'借方科目',
+				'借方金額',
+				'貸方科目',
+				'貸方金額',
+				'証跡'
+			];
 
 			// CSVデータ行を作成
 			const rows = journals.flatMap((journal) => {
@@ -269,7 +278,7 @@
 
 			importData_ = data;
 			importPreview = await getImportPreview(data);
-		} catch (e) {
+		} catch {
 			importError = 'ファイルの読み込みに失敗しました。有効なJSONファイルを選択してください。';
 		}
 	}
@@ -311,7 +320,7 @@
 
 <div class="space-y-6">
 	<div>
-		<h1 class="text-2xl font-bold flex items-center gap-2">
+		<h1 class="flex items-center gap-2 text-2xl font-bold">
 			<Database class="size-6" />
 			データ管理
 		</h1>
@@ -361,10 +370,8 @@
 							<p class="text-sm text-muted-foreground">読み込み中...</p>
 						</div>
 					{:then summary}
-						<div
-							class="rounded-lg border p-4 {exportSuccess === year ? 'border-green-500' : ''}"
-						>
-							<div class="flex items-center justify-between mb-3">
+						<div class="rounded-lg border p-4 {exportSuccess === year ? 'border-green-500' : ''}">
+							<div class="mb-3 flex items-center justify-between">
 								<div class="flex items-center gap-2">
 									<p class="font-medium">{year}年度</p>
 									{#if exportSuccess === year}
@@ -376,7 +383,7 @@
 								</p>
 							</div>
 
-							<div class="grid grid-cols-2 gap-4 text-sm mb-4">
+							<div class="mb-4 grid grid-cols-2 gap-4 text-sm">
 								<div>
 									<p class="text-muted-foreground">仕訳数</p>
 									<p class="font-semibold">{summary.journalCount}件</p>
@@ -451,10 +458,7 @@
 						onchange={handleFileSelect}
 						class="hidden"
 					/>
-					<Button
-						variant="outline"
-						onclick={() => document.getElementById('import-file')?.click()}
-					>
+					<Button variant="outline" onclick={() => document.getElementById('import-file')?.click()}>
 						<FileJson class="mr-2 size-4" />
 						ファイルを選択
 					</Button>
@@ -479,7 +483,7 @@
 
 			<!-- プレビュー表示 -->
 			{#if importPreview && !importResult}
-				<div class="rounded-lg border p-4 space-y-4">
+				<div class="space-y-4 rounded-lg border p-4">
 					<div class="flex items-center gap-2">
 						<FileJson class="size-5 text-primary" />
 						<span class="font-medium">{importPreview.fiscalYear}年度のデータ</span>
@@ -516,7 +520,7 @@
 					</div>
 
 					<!-- インポートモード選択 -->
-					<div class="space-y-2 pt-2 border-t">
+					<div class="space-y-2 border-t pt-2">
 						<Label>インポートモード</Label>
 						<RadioGroup.Root bind:value={importMode}>
 							<div class="flex items-start space-x-3">
@@ -552,7 +556,7 @@
 
 			<!-- インポート結果 -->
 			{#if importResult}
-				<div class="rounded-lg border p-4 space-y-3">
+				<div class="space-y-3 rounded-lg border p-4">
 					{#if importResult.success}
 						<div class="flex items-center gap-2 text-green-600">
 							<Check class="size-5" />
@@ -577,7 +581,7 @@
 							<X class="size-5" />
 							<span class="font-medium">インポート失敗</span>
 						</div>
-						{#each importResult.errors as error}
+						{#each importResult.errors as error, i (i)}
 							<p class="text-sm text-destructive">{error}</p>
 						{/each}
 					{/if}

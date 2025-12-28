@@ -137,7 +137,11 @@
 
 	// エクスポート済みデータを削除
 	async function handlePurgeExportedBlobs() {
-		if (!confirm('エクスポート済みの証憑データを削除しますか？\nメタデータは残りますが、PDFファイルは復元できなくなります。')) {
+		if (
+			!confirm(
+				'エクスポート済みの証憑データを削除しますか？\nメタデータは残りますが、PDFファイルは復元できなくなります。'
+			)
+		) {
 			return;
 		}
 
@@ -194,14 +198,15 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>証憑（PDF）の保存先</Card.Title>
-			<Card.Description>
-				仕訳に紐付けるPDFファイルの保存方法を選択します
-			</Card.Description>
+			<Card.Description>仕訳に紐付けるPDFファイルの保存方法を選択します</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-6">
 			{#if isFileSystemSupported}
 				<!-- File System Access API対応ブラウザ -->
-				<RadioGroup.Root value={storageMode} onValueChange={(v) => handleStorageModeChange(v as StorageType)}>
+				<RadioGroup.Root
+					value={storageMode}
+					onValueChange={(v) => handleStorageModeChange(v as StorageType)}
+				>
 					<div class="flex items-start space-x-3">
 						<RadioGroup.Item value="filesystem" id="storage-filesystem" />
 						<div class="grid gap-1.5">
@@ -216,9 +221,7 @@
 					<div class="flex items-start space-x-3">
 						<RadioGroup.Item value="indexeddb" id="storage-indexeddb" />
 						<div class="grid gap-1.5">
-							<Label for="storage-indexeddb" class="font-medium">
-								ブラウザに保存
-							</Label>
+							<Label for="storage-indexeddb" class="font-medium">ブラウザに保存</Label>
 							<p class="text-sm text-muted-foreground">
 								ブラウザのIndexedDBに保存します。定期的にエクスポートしてバックアップしてください。
 							</p>
@@ -250,9 +253,7 @@
 									{directoryHandle ? '変更' : '選択'}
 								</Button>
 								{#if directoryHandle}
-									<Button variant="ghost" onclick={handleClearDirectory}>
-										クリア
-									</Button>
+									<Button variant="ghost" onclick={handleClearDirectory}>クリア</Button>
 								{/if}
 							</div>
 						</div>
@@ -261,7 +262,9 @@
 
 				<!-- 未エクスポート警告（indexeddbモード時） -->
 				{#if storageMode === 'indexeddb' && unexportedCount > 0}
-					<div class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+					<div
+						class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950"
+					>
 						<AlertTriangle class="size-5 shrink-0 text-amber-500" />
 						<div>
 							<p class="font-medium text-amber-800 dark:text-amber-200">
@@ -289,7 +292,9 @@
 				</div>
 
 				{#if unexportedCount > 0}
-					<div class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+					<div
+						class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950"
+					>
 						<AlertTriangle class="size-5 shrink-0 text-amber-500" />
 						<div>
 							<p class="font-medium text-amber-800 dark:text-amber-200">
@@ -314,9 +319,7 @@
 					<HardDrive class="size-5" />
 					ストレージ使用量
 				</Card.Title>
-				<Card.Description>
-					ブラウザに保存されている証憑データの容量を管理します
-				</Card.Description>
+				<Card.Description>ブラウザに保存されている証憑データの容量を管理します</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-6">
 				<!-- 使用量表示 -->
@@ -327,7 +330,9 @@
 					</div>
 					<div class="h-3 w-full overflow-hidden rounded-full bg-muted">
 						<div
-							class="h-full transition-all duration-300 {isStorageWarning ? 'bg-amber-500' : 'bg-primary'}"
+							class="h-full transition-all duration-300 {isStorageWarning
+								? 'bg-amber-500'
+								: 'bg-primary'}"
 							style="width: {Math.min(recommendedPercentage, 100)}%"
 						></div>
 					</div>
@@ -341,7 +346,9 @@
 
 				<!-- 容量警告 -->
 				{#if isStorageWarning}
-					<div class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+					<div
+						class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950"
+					>
 						<AlertTriangle class="size-5 shrink-0 text-amber-500" />
 						<div>
 							<p class="font-medium text-amber-800 dark:text-amber-200">
@@ -399,11 +406,7 @@
 							Safari / iPad向けのストレージ説明を再度表示します
 						</p>
 					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={handleResetSafariWarning}
-					>
+					<Button variant="outline" size="sm" onclick={handleResetSafariWarning}>
 						<RotateCcw class="mr-2 size-4" />
 						再表示
 					</Button>
@@ -422,9 +425,7 @@
 			<div class="flex items-center justify-between">
 				<div>
 					<p class="font-medium">2024年ダミーデータ</p>
-					<p class="text-sm text-muted-foreground">
-						テスト用に2024年の仕訳データ14件を追加します
-					</p>
+					<p class="text-sm text-muted-foreground">テスト用に2024年の仕訳データ14件を追加します</p>
 				</div>
 				<Button onclick={handleSeedData} disabled={isSeeding}>
 					{isSeeding ? '追加中...' : 'データを追加'}
@@ -438,7 +439,4 @@
 </div>
 
 <!-- Safari向け説明ダイアログ -->
-<SafariStorageDialog
-	bind:open={safariDialogOpen}
-	onconfirm={() => {}}
-/>
+<SafariStorageDialog bind:open={safariDialogOpen} onconfirm={() => {}} />

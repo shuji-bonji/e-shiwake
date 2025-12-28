@@ -5,6 +5,8 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import { Toaster } from '$lib/components/ui/sonner/index.js';
+	import { toast } from 'svelte-sonner';
 	import { AlertTriangle } from '@lucide/svelte';
 	import AppSidebar from '$lib/components/layout/AppSidebar.svelte';
 	import AppHeader from '$lib/components/layout/AppHeader.svelte';
@@ -25,6 +27,9 @@
 	let showStorageWarning = $state(false);
 	let storageUsedBytes = $state(0);
 
+	// PWA更新関数を保持
+	let updateSW: ((reloadPage?: boolean) => Promise<void>) | null = null;
+
 	// PWA webmanifest link
 	const webManifest = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
@@ -35,16 +40,47 @@
 		// Service Workerを登録（本番ビルド時のみ有効）
 		if (pwaInfo) {
 			const { registerSW } = await import('virtual:pwa-register');
-			registerSW({
+			updateSW = registerSW({
 				immediate: true,
 				onRegistered(r) {
 					console.log('SW Registered:', r);
 				},
 				onRegisterError(error) {
 					console.error('SW registration error:', error);
+				},
+				onNeedRefresh() {
+					// 新しいバージョンが利用可能
+					toast.info('新しいバージョンが利用可能です', {
+						description: 'クリックして更新',
+						duration: Infinity,
+						action: {
+							label: '更新',
+							onClick: () => {
+								updateSW?.(true);
+							}
+						}
+					});
+				},
+				onOfflineReady() {
+					toast.success('オフラインで使用できます', {
+						description: 'アプリがキャッシュされました'
+					});
 				}
 			});
 		}
+
+		// オフライン/オンライン検知
+		function handleOnline() {
+			toast.success('オンラインに復帰しました');
+		}
+		function handleOffline() {
+			toast.warning('オフラインです', {
+				description: 'データはローカルに保存されます'
+			});
+		}
+		window.addEventListener('online', handleOnline);
+		window.addEventListener('offline', handleOffline);
+
 		// File System Access API対応ならチェック不要
 		if (supportsFileSystemAccess()) {
 			const storageMode = await getStorageMode();
@@ -105,3 +141,6 @@
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
+
+<!-- トースト通知 -->
+<Toaster richColors position="top-right" />

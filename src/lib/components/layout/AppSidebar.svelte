@@ -1,6 +1,14 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { Calendar, BookOpen, FileSpreadsheet, Settings, Database, List, AlertTriangle } from '@lucide/svelte';
+	import {
+		Calendar,
+		BookOpen,
+		FileSpreadsheet,
+		Settings,
+		Database,
+		List,
+		AlertTriangle
+	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
@@ -8,7 +16,12 @@
 		setSelectedYear,
 		setAvailableYears
 	} from '$lib/stores/fiscalYear.svelte.js';
-	import { getAvailableYears, initializeDatabase, getUnexportedAttachmentCount, getStorageMode } from '$lib/db';
+	import {
+		getAvailableYears,
+		initializeDatabase,
+		getUnexportedAttachmentCount,
+		getStorageMode
+	} from '$lib/db';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { onMount } from 'svelte';
 
@@ -188,7 +201,11 @@
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton isActive={pathname === '/data'}>
 						{#snippet child({ props })}
-							<a href="/data" {...props} class="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+							<a
+								href="/data"
+								{...props}
+								class="flex items-center gap-2 text-amber-600 dark:text-amber-400"
+							>
 								<AlertTriangle class="size-4" />
 								<span class="text-xs">未エクスポート: {unexportedCount}件</span>
 							</a>

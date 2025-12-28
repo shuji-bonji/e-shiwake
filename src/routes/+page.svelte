@@ -16,8 +16,7 @@
 		deleteJournal,
 		createEmptyJournal,
 		getAvailableYears,
-		getStorageMode,
-		getDirectoryHandle
+		getStorageMode
 	} from '$lib/db';
 	import { useFiscalYear, setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
 	import { getSavedDirectoryHandle, supportsFileSystemAccess } from '$lib/utils/filesystem';
@@ -210,7 +209,7 @@
 					<Plus class="size-10 text-muted-foreground" />
 				</div>
 				<h3 class="mt-4 text-lg font-semibold">仕訳がありません</h3>
-				<p class="mb-4 mt-2 text-sm text-muted-foreground">
+				<p class="mt-2 mb-4 text-sm text-muted-foreground">
 					「新規仕訳」ボタンから最初の仕訳を追加しましょう
 				</p>
 				<Button onclick={handleAddJournal}>
@@ -243,9 +242,7 @@
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title>仕訳を削除</Dialog.Title>
-			<Dialog.Description>
-				この仕訳を削除しますか？この操作は取り消せません。
-			</Dialog.Description>
+			<Dialog.Description>この仕訳を削除しますか？この操作は取り消せません。</Dialog.Description>
 		</Dialog.Header>
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (deleteDialogOpen = false)}>キャンセル</Button>

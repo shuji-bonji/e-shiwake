@@ -2,15 +2,41 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import { Circle, FileText, Paperclip, Trash2, Plus, ArrowUp, ArrowDown, Check } from '@lucide/svelte';
+	import {
+		Circle,
+		FileText,
+		Paperclip,
+		Trash2,
+		Plus,
+		ArrowUp,
+		ArrowDown,
+		Check
+	} from '@lucide/svelte';
 	import AccountSelect from './AccountSelect.svelte';
 	import VendorInput from './VendorInput.svelte';
 	import PdfDropZone from './PdfDropZone.svelte';
 	import AttachmentDialog from './AttachmentDialog.svelte';
 	import AttachmentEditDialog from './AttachmentEditDialog.svelte';
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
-	import type { JournalEntry, JournalLine, Account, AccountType, EvidenceStatus, Vendor, Attachment, DocumentType } from '$lib/types';
-	import { validateJournal, addAttachmentToJournal, removeAttachmentFromJournal, getAttachmentBlob, suggestDocumentType, updateAttachment, syncAttachmentsWithJournal } from '$lib/db';
+	import type {
+		JournalEntry,
+		JournalLine,
+		Account,
+		AccountType,
+		EvidenceStatus,
+		Vendor,
+		Attachment,
+		DocumentType
+	} from '$lib/types';
+	import {
+		validateJournal,
+		addAttachmentToJournal,
+		removeAttachmentFromJournal,
+		getAttachmentBlob,
+		suggestDocumentType,
+		updateAttachment,
+		syncAttachmentsWithJournal
+	} from '$lib/db';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { cn } from '$lib/utils.js';
 
@@ -26,7 +52,17 @@
 		onconfirm?: (id: string) => void;
 	}
 
-	let { journal, accounts, vendors, directoryHandle = null, isEditing = false, isFlashing = false, onupdate, ondelete, onconfirm }: Props = $props();
+	let {
+		journal,
+		accounts,
+		vendors,
+		directoryHandle = null,
+		isEditing = false,
+		isFlashing = false,
+		onupdate,
+		ondelete,
+		onconfirm
+	}: Props = $props();
 
 	// バリデーション
 	const validation = $derived(validateJournal(journal));
@@ -47,7 +83,9 @@
 	// ダイアログ用の派生値
 	const mainDebitLine = $derived(journal.lines.find((l) => l.type === 'debit' && l.accountCode));
 	const mainAccountType = $derived(
-		mainDebitLine ? accounts.find((a) => a.code === mainDebitLine.accountCode)?.type ?? null : null
+		mainDebitLine
+			? (accounts.find((a) => a.code === mainDebitLine.accountCode)?.type ?? null)
+			: null
 	);
 	const mainAmount = $derived(mainDebitLine?.amount ?? 0);
 	const suggestedDocType = $derived(suggestDocumentType(mainAccountType));
@@ -131,7 +169,8 @@
 		if (journal.attachments.length === 0) return;
 
 		// メイン借方行の金額を取得
-		const mainDebitAmount = journal.lines.find((l) => l.type === 'debit' && l.accountCode)?.amount ?? 0;
+		const mainDebitAmount =
+			journal.lines.find((l) => l.type === 'debit' && l.accountCode)?.amount ?? 0;
 
 		try {
 			const syncedAttachments = await syncAttachmentsWithJournal(
@@ -146,8 +185,8 @@
 			);
 			// ファイル名が変わった場合のみ更新
 			if (syncedAttachments.length > 0) {
-				const hasChanges = syncedAttachments.some((synced, i) =>
-					synced.generatedName !== journal.attachments[i]?.generatedName
+				const hasChanges = syncedAttachments.some(
+					(synced, i) => synced.generatedName !== journal.attachments[i]?.generatedName
 				);
 				if (hasChanges) {
 					onupdate({ ...journal, attachments: syncedAttachments });
@@ -199,7 +238,10 @@
 			return false;
 		}
 		// 既に表示済みなら警告不要
-		if (typeof localStorage !== 'undefined' && localStorage.getItem('shownStorageWarning') === 'true') {
+		if (
+			typeof localStorage !== 'undefined' &&
+			localStorage.getItem('shownStorageWarning') === 'true'
+		) {
 			return false;
 		}
 		return true;
@@ -346,261 +388,306 @@
 		'flex gap-4 rounded-lg border bg-card p-4 shadow-sm transition-all',
 		isEditing && 'border-primary ring-2 ring-primary/20',
 		isFlashing && 'animate-flash',
-		!validation.isValid && (!isEditing || journal.lines.some((l) => l.amount > 0)) && 'border-destructive'
+		!validation.isValid &&
+			(!isEditing || journal.lines.some((l) => l.amount > 0)) &&
+			'border-destructive'
 	)}
 >
 	<!-- メインコンテンツ -->
 	<div class="min-w-0 flex-1">
 		<!-- ヘッダー行: 証跡ステータス、日付、摘要、取引先、削除ボタン -->
 		<div class="mb-3 flex items-center gap-3">
-		<!-- 証跡ステータス -->
-		<Tooltip.Provider>
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					<button type="button" class="p-1" onclick={cycleEvidenceStatus}>
-						{#if journal.evidenceStatus === 'none'}
-							<Circle class="size-5 text-muted-foreground" />
-						{:else if journal.evidenceStatus === 'paper'}
-							<FileText class="size-5 text-amber-500" />
-						{:else}
-							<Paperclip class="size-5 text-green-500" />
-						{/if}
-					</button>
-				</Tooltip.Trigger>
-				<Tooltip.Content>
-					{#if journal.evidenceStatus === 'none'}
-						証跡なし（クリックで変更）
-					{:else if journal.evidenceStatus === 'paper'}
-						紙で保管（クリックで変更）
-					{:else}
-						電子データ紐付け済み（クリックで変更）
-					{/if}
-				</Tooltip.Content>
-			</Tooltip.Root>
-		</Tooltip.Provider>
-
-		<!-- 日付 -->
-		<Input
-			type="date"
-			value={journal.date}
-			onchange={(e) => updateField('date', e.currentTarget.value)}
-			onblur={syncAttachmentsOnBlur}
-			class="w-36"
-		/>
-
-		<!-- 摘要 -->
-		<Input
-			type="text"
-			value={journal.description}
-			oninput={(e) => updateField('description', e.currentTarget.value)}
-			onblur={syncAttachmentsOnBlur}
-			placeholder="摘要"
-			class="flex-1"
-		/>
-
-		<!-- 取引先 -->
-		<VendorInput
-			{vendors}
-			value={journal.vendor}
-			onchange={(name) => updateField('vendor', name)}
-			onblur={syncAttachmentsOnBlur}
-			placeholder="取引先"
-			class="w-40"
-		/>
-
-		<!-- 確定ボタン（編集中のみ表示） -->
-		{#if isEditing && onconfirm}
+			<!-- 証跡ステータス -->
 			<Tooltip.Provider>
 				<Tooltip.Root>
 					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<Button
-								{...props}
-								variant="default"
-								size="sm"
-								class="gap-1"
-								disabled={!validation.isValid}
-								onclick={() => onconfirm(journal.id)}
-							>
-								<Check class="size-4" />
-								確定
-							</Button>
-						{/snippet}
-					</Tooltip.Trigger>
-					{#if !validation.isValid}
-						<Tooltip.Content>
-							{#if validation.debitTotal === 0 && validation.creditTotal === 0}
-								金額を入力してください
+						<button type="button" class="p-1" onclick={cycleEvidenceStatus}>
+							{#if journal.evidenceStatus === 'none'}
+								<Circle class="size-5 text-muted-foreground" />
+							{:else if journal.evidenceStatus === 'paper'}
+								<FileText class="size-5 text-amber-500" />
 							{:else}
-								借方・貸方の合計が一致しません
+								<Paperclip class="size-5 text-green-500" />
 							{/if}
-						</Tooltip.Content>
-					{/if}
+						</button>
+					</Tooltip.Trigger>
+					<Tooltip.Content>
+						{#if journal.evidenceStatus === 'none'}
+							証跡なし（クリックで変更）
+						{:else if journal.evidenceStatus === 'paper'}
+							紙で保管（クリックで変更）
+						{:else}
+							電子データ紐付け済み（クリックで変更）
+						{/if}
+					</Tooltip.Content>
 				</Tooltip.Root>
 			</Tooltip.Provider>
-		{/if}
 
-		<!-- 削除ボタン -->
-		<Button variant="ghost" size="icon" class="text-destructive" onclick={() => ondelete(journal.id)}>
-			<Trash2 class="size-4" />
-		</Button>
-	</div>
+			<!-- 日付 -->
+			<Input
+				type="date"
+				value={journal.date}
+				onchange={(e) => updateField('date', e.currentTarget.value)}
+				onblur={syncAttachmentsOnBlur}
+				class="w-36"
+			/>
 
-	<!-- 仕訳行 -->
-	<div class="grid grid-cols-2 gap-4">
-		<!-- 借方 -->
-		<div class="space-y-2">
-			<div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-				借方
-				<span class="ml-auto font-mono">{validation.debitTotal.toLocaleString()}円</span>
+			<!-- 摘要 -->
+			<Input
+				type="text"
+				value={journal.description}
+				oninput={(e) => updateField('description', e.currentTarget.value)}
+				onblur={syncAttachmentsOnBlur}
+				placeholder="摘要"
+				class="flex-1"
+			/>
+
+			<!-- 取引先 -->
+			<VendorInput
+				{vendors}
+				value={journal.vendor}
+				onchange={(name) => updateField('vendor', name)}
+				onblur={syncAttachmentsOnBlur}
+				placeholder="取引先"
+				class="w-40"
+			/>
+
+			<!-- 確定ボタン（編集中のみ表示） -->
+			{#if isEditing && onconfirm}
 				<Tooltip.Provider>
 					<Tooltip.Root>
 						<Tooltip.Trigger>
-							<Button variant="ghost" size="icon" class="size-6 text-foreground" onclick={() => addLine('debit')}>
-								<Plus class="size-4" strokeWidth={3} />
-							</Button>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="default"
+									size="sm"
+									class="gap-1"
+									disabled={!validation.isValid}
+									onclick={() => onconfirm(journal.id)}
+								>
+									<Check class="size-4" />
+									確定
+								</Button>
+							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content>
-							<div class="text-xs">
-								<div class="font-medium mb-1">借方に来る科目：</div>
-								<div class="flex items-center gap-1"><ArrowUp class="size-3 text-blue-500" />資産の増加</div>
-								<div class="flex items-center gap-1"><ArrowUp class="size-3 text-red-500" />費用の発生</div>
-								<div class="flex items-center gap-1"><ArrowDown class="size-3 text-purple-500" />負債の減少</div>
-							</div>
-						</Tooltip.Content>
+						{#if !validation.isValid}
+							<Tooltip.Content>
+								{#if validation.debitTotal === 0 && validation.creditTotal === 0}
+									金額を入力してください
+								{:else}
+									借方・貸方の合計が一致しません
+								{/if}
+							</Tooltip.Content>
+						{/if}
 					</Tooltip.Root>
 				</Tooltip.Provider>
-			</div>
-			{#each debitLines as line (line.id)}
-				{@const accountType = getAccountType(line.accountCode)}
-				{@const indicator = getLineIndicator('debit', accountType)}
-				<div class="flex items-center gap-2">
-					<!-- 種別アイコン -->
-					<Tooltip.Provider>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								<div class={cn('flex size-8 items-center justify-center rounded', indicator.color)}>
-									{#if indicator.icon === 'up'}
-										<ArrowUp class="size-4" />
-									{:else if indicator.icon === 'down'}
-										<ArrowDown class="size-4" />
-									{:else}
-										<span class="size-4"></span>
-									{/if}
-								</div>
-							</Tooltip.Trigger>
-							{#if indicator.label}
-								<Tooltip.Content>
-									{indicator.icon === 'up' ? '増加' : '減少'}：{indicator.label}
-								</Tooltip.Content>
-							{/if}
-						</Tooltip.Root>
-					</Tooltip.Provider>
-					<AccountSelect
-						{accounts}
-						value={line.accountCode}
-						onchange={(code) => updateLine(line.id, 'accountCode', code)}
-						class="flex-1"
-					/>
-					<Input
-						type="number"
-						value={line.amount}
-						onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
-						onblur={syncAttachmentsOnBlur}
-						class={cn(
-							'w-28 text-right font-mono',
-							!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
-						)}
-						min="0"
-					/>
-					{#if debitLines.length > 1}
-						<Button variant="ghost" size="icon" class="size-8" onclick={() => removeLine(line.id)}>
-							<Trash2 class="size-3" />
-						</Button>
-					{/if}
-				</div>
-			{/each}
+			{/if}
+
+			<!-- 削除ボタン -->
+			<Button
+				variant="ghost"
+				size="icon"
+				class="text-destructive"
+				onclick={() => ondelete(journal.id)}
+			>
+				<Trash2 class="size-4" />
+			</Button>
 		</div>
 
-		<!-- 貸方 -->
-		<div class="space-y-2">
-			<div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-				貸方
-				<span class="ml-auto font-mono">{validation.creditTotal.toLocaleString()}円</span>
-				<Tooltip.Provider>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							<Button variant="ghost" size="icon" class="size-6 text-foreground" onclick={() => addLine('credit')}>
-								<Plus class="size-4" strokeWidth={3} />
-							</Button>
-						</Tooltip.Trigger>
-						<Tooltip.Content>
-							<div class="text-xs">
-								<div class="font-medium mb-1">貸方に来る科目：</div>
-								<div class="flex items-center gap-1"><ArrowDown class="size-3 text-blue-500" />資産の減少</div>
-								<div class="flex items-center gap-1"><ArrowUp class="size-3 text-purple-500" />負債の増加</div>
-								<div class="flex items-center gap-1"><ArrowUp class="size-3 text-green-500" />収益の発生</div>
-							</div>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
-			</div>
-			{#each creditLines as line (line.id)}
-				{@const accountType = getAccountType(line.accountCode)}
-				{@const indicator = getLineIndicator('credit', accountType)}
-				<div class="flex items-center gap-2">
-					<!-- 種別アイコン -->
+		<!-- 仕訳行 -->
+		<div class="grid grid-cols-2 gap-4">
+			<!-- 借方 -->
+			<div class="space-y-2">
+				<div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+					借方
+					<span class="ml-auto font-mono">{validation.debitTotal.toLocaleString()}円</span>
 					<Tooltip.Provider>
 						<Tooltip.Root>
 							<Tooltip.Trigger>
-								<div class={cn('flex size-8 items-center justify-center rounded', indicator.color)}>
-									{#if indicator.icon === 'up'}
-										<ArrowUp class="size-4" />
-									{:else if indicator.icon === 'down'}
-										<ArrowDown class="size-4" />
-									{:else}
-										<span class="size-4"></span>
-									{/if}
-								</div>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-6 text-foreground"
+									onclick={() => addLine('debit')}
+								>
+									<Plus class="size-4" strokeWidth={3} />
+								</Button>
 							</Tooltip.Trigger>
-							{#if indicator.label}
-								<Tooltip.Content>
-									{indicator.icon === 'up' ? '増加' : '減少'}：{indicator.label}
-								</Tooltip.Content>
-							{/if}
+							<Tooltip.Content>
+								<div class="text-xs">
+									<div class="mb-1 font-medium">借方に来る科目：</div>
+									<div class="flex items-center gap-1">
+										<ArrowUp class="size-3 text-blue-500" />資産の増加
+									</div>
+									<div class="flex items-center gap-1">
+										<ArrowUp class="size-3 text-red-500" />費用の発生
+									</div>
+									<div class="flex items-center gap-1">
+										<ArrowDown class="size-3 text-purple-500" />負債の減少
+									</div>
+								</div>
+							</Tooltip.Content>
 						</Tooltip.Root>
 					</Tooltip.Provider>
-					<AccountSelect
-						{accounts}
-						value={line.accountCode}
-						onchange={(code) => updateLine(line.id, 'accountCode', code)}
-						class="flex-1"
-					/>
-					<Input
-						type="number"
-						value={line.amount}
-						onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
-						onblur={syncAttachmentsOnBlur}
-						class={cn(
-							'w-28 text-right font-mono',
-							!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
-						)}
-						min="0"
-					/>
-					{#if creditLines.length > 1}
-						<Button variant="ghost" size="icon" class="size-8" onclick={() => removeLine(line.id)}>
-							<Trash2 class="size-3" />
-						</Button>
-					{/if}
 				</div>
-			{/each}
+				{#each debitLines as line (line.id)}
+					{@const accountType = getAccountType(line.accountCode)}
+					{@const indicator = getLineIndicator('debit', accountType)}
+					<div class="flex items-center gap-2">
+						<!-- 種別アイコン -->
+						<Tooltip.Provider>
+							<Tooltip.Root>
+								<Tooltip.Trigger>
+									<div
+										class={cn('flex size-8 items-center justify-center rounded', indicator.color)}
+									>
+										{#if indicator.icon === 'up'}
+											<ArrowUp class="size-4" />
+										{:else if indicator.icon === 'down'}
+											<ArrowDown class="size-4" />
+										{:else}
+											<span class="size-4"></span>
+										{/if}
+									</div>
+								</Tooltip.Trigger>
+								{#if indicator.label}
+									<Tooltip.Content>
+										{indicator.icon === 'up' ? '増加' : '減少'}：{indicator.label}
+									</Tooltip.Content>
+								{/if}
+							</Tooltip.Root>
+						</Tooltip.Provider>
+						<AccountSelect
+							{accounts}
+							value={line.accountCode}
+							onchange={(code) => updateLine(line.id, 'accountCode', code)}
+							class="flex-1"
+						/>
+						<Input
+							type="number"
+							value={line.amount}
+							onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
+							onblur={syncAttachmentsOnBlur}
+							class={cn(
+								'w-28 text-right font-mono',
+								!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
+							)}
+							min="0"
+						/>
+						{#if debitLines.length > 1}
+							<Button
+								variant="ghost"
+								size="icon"
+								class="size-8"
+								onclick={() => removeLine(line.id)}
+							>
+								<Trash2 class="size-3" />
+							</Button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+
+			<!-- 貸方 -->
+			<div class="space-y-2">
+				<div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+					貸方
+					<span class="ml-auto font-mono">{validation.creditTotal.toLocaleString()}円</span>
+					<Tooltip.Provider>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-6 text-foreground"
+									onclick={() => addLine('credit')}
+								>
+									<Plus class="size-4" strokeWidth={3} />
+								</Button>
+							</Tooltip.Trigger>
+							<Tooltip.Content>
+								<div class="text-xs">
+									<div class="mb-1 font-medium">貸方に来る科目：</div>
+									<div class="flex items-center gap-1">
+										<ArrowDown class="size-3 text-blue-500" />資産の減少
+									</div>
+									<div class="flex items-center gap-1">
+										<ArrowUp class="size-3 text-purple-500" />負債の増加
+									</div>
+									<div class="flex items-center gap-1">
+										<ArrowUp class="size-3 text-green-500" />収益の発生
+									</div>
+								</div>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
+				</div>
+				{#each creditLines as line (line.id)}
+					{@const accountType = getAccountType(line.accountCode)}
+					{@const indicator = getLineIndicator('credit', accountType)}
+					<div class="flex items-center gap-2">
+						<!-- 種別アイコン -->
+						<Tooltip.Provider>
+							<Tooltip.Root>
+								<Tooltip.Trigger>
+									<div
+										class={cn('flex size-8 items-center justify-center rounded', indicator.color)}
+									>
+										{#if indicator.icon === 'up'}
+											<ArrowUp class="size-4" />
+										{:else if indicator.icon === 'down'}
+											<ArrowDown class="size-4" />
+										{:else}
+											<span class="size-4"></span>
+										{/if}
+									</div>
+								</Tooltip.Trigger>
+								{#if indicator.label}
+									<Tooltip.Content>
+										{indicator.icon === 'up' ? '増加' : '減少'}：{indicator.label}
+									</Tooltip.Content>
+								{/if}
+							</Tooltip.Root>
+						</Tooltip.Provider>
+						<AccountSelect
+							{accounts}
+							value={line.accountCode}
+							onchange={(code) => updateLine(line.id, 'accountCode', code)}
+							class="flex-1"
+						/>
+						<Input
+							type="number"
+							value={line.amount}
+							onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
+							onblur={syncAttachmentsOnBlur}
+							class={cn(
+								'w-28 text-right font-mono',
+								!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
+							)}
+							min="0"
+						/>
+						{#if creditLines.length > 1}
+							<Button
+								variant="ghost"
+								size="icon"
+								class="size-8"
+								onclick={() => removeLine(line.id)}
+							>
+								<Trash2 class="size-3" />
+							</Button>
+						{/if}
+					</div>
+				{/each}
+			</div>
 		</div>
-	</div>
 
 		<!-- バリデーションエラー表示 -->
 		{#if !validation.isValid && journal.lines.some((l) => l.amount > 0)}
 			<div class="mt-3 text-sm text-destructive">
-				借方合計と貸方合計が一致しません（差額: {Math.abs(validation.debitTotal - validation.creditTotal).toLocaleString()}円）
+				借方合計と貸方合計が一致しません（差額: {Math.abs(
+					validation.debitTotal - validation.creditTotal
+				).toLocaleString()}円）
 			</div>
 		{/if}
 	</div>
@@ -620,10 +707,7 @@
 </div>
 
 <!-- Safari向け警告ダイアログ -->
-<SafariStorageDialog
-	bind:open={safariDialogOpen}
-	onconfirm={handleSafariDialogConfirm}
-/>
+<SafariStorageDialog bind:open={safariDialogOpen} onconfirm={handleSafariDialogConfirm} />
 
 <!-- 添付ダイアログ -->
 <AttachmentDialog

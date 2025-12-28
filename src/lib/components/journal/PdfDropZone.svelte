@@ -153,7 +153,9 @@
 							<Tooltip.Content>
 								<p class="font-medium">{attachment.generatedName}</p>
 								<p class="text-muted-foreground">元: {attachment.originalName}</p>
-								<p class="text-muted-foreground">サイズ: {(attachment.size / 1024).toFixed(1)} KB</p>
+								<p class="text-muted-foreground">
+									サイズ: {(attachment.size / 1024).toFixed(1)} KB
+								</p>
 							</Tooltip.Content>
 						</Tooltip.Root>
 					</Tooltip.Provider>

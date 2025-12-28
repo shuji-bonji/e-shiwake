@@ -16,7 +16,14 @@
 		class?: string;
 	}
 
-	let { vendors, value, onchange, onblur, placeholder = '取引先', class: className }: Props = $props();
+	let {
+		vendors,
+		value,
+		onchange,
+		onblur,
+		placeholder = '取引先',
+		class: className
+	}: Props = $props();
 
 	let open = $state(false);
 	let inputRef = $state<HTMLInputElement>(null!);
@@ -25,9 +32,7 @@
 	const filteredVendors = $derived.by(() => {
 		if (!value) return vendors.slice(0, 10); // 空の時は最新10件
 		const query = value.toLowerCase();
-		return vendors
-			.filter((v) => v.name.toLowerCase().includes(query))
-			.slice(0, 10);
+		return vendors.filter((v) => v.name.toLowerCase().includes(query)).slice(0, 10);
 	});
 
 	function handleInput(e: Event) {
@@ -93,10 +98,7 @@
 				{:else}
 					<Command.Group>
 						{#each filteredVendors as vendor (vendor.id)}
-							<Command.Item
-								value={vendor.name}
-								onSelect={() => handleSelect(vendor.name)}
-							>
+							<Command.Item value={vendor.name} onSelect={() => handleSelect(vendor.name)}>
 								<Check class={cn(value !== vendor.name && 'text-transparent')} />
 								<span class="truncate">{vendor.name}</span>
 							</Command.Item>

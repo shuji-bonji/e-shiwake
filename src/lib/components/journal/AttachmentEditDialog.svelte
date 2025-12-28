@@ -24,13 +24,7 @@
 		oncancel: () => void;
 	}
 
-	let {
-		open = $bindable(),
-		attachment,
-		vendors,
-		onconfirm,
-		oncancel
-	}: Props = $props();
+	let { open = $bindable(), attachment, vendors, onconfirm, oncancel }: Props = $props();
 
 	// 編集用の状態
 	let documentDate = $state('');
@@ -85,9 +79,7 @@
 				<Pencil class="size-5" />
 				証憑の編集
 			</Dialog.Title>
-			<Dialog.Description>
-				証憑の情報を変更すると、ファイル名も更新されます
-			</Dialog.Description>
+			<Dialog.Description>証憑の情報を変更すると、ファイル名も更新されます</Dialog.Description>
 		</Dialog.Header>
 
 		{#if attachment}
@@ -101,11 +93,7 @@
 				<!-- 書類の日付 -->
 				<div class="space-y-2">
 					<Label for="documentDate">書類の日付</Label>
-					<Input
-						id="documentDate"
-						type="date"
-						bind:value={documentDate}
-					/>
+					<Input id="documentDate" type="date" bind:value={documentDate} />
 				</div>
 
 				<!-- 書類の種類 -->
@@ -126,11 +114,7 @@
 				<!-- 仕訳名（摘要） -->
 				<div class="space-y-2">
 					<Label>仕訳名</Label>
-					<Input
-						type="text"
-						bind:value={description}
-						placeholder="仕訳の摘要"
-					/>
+					<Input type="text" bind:value={description} placeholder="仕訳の摘要" />
 				</div>
 
 				<!-- 金額 -->
@@ -154,7 +138,7 @@
 					<VendorInput
 						{vendors}
 						value={vendor}
-						onchange={(name) => vendor = name}
+						onchange={(name) => (vendor = name)}
 						placeholder="取引先名"
 					/>
 				</div>
@@ -162,13 +146,11 @@
 				<!-- 生成されるファイル名 -->
 				<div class="space-y-2">
 					<Label>保存されるファイル名</Label>
-					<div class="rounded-md border bg-muted/50 px-3 py-2 text-sm font-mono break-all">
+					<div class="rounded-md border bg-muted/50 px-3 py-2 font-mono text-sm break-all">
 						{generatedName}
 					</div>
 					{#if attachment.generatedName !== generatedName}
-						<p class="text-xs text-amber-600">
-							ファイル名が変更されます
-						</p>
+						<p class="text-xs text-amber-600">ファイル名が変更されます</p>
 					{/if}
 				</div>
 			</div>

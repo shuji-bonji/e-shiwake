@@ -1,5 +1,13 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Account, Vendor, JournalEntry, Attachment, DocumentType, StorageType, ExportData } from '$lib/types';
+import type {
+	Account,
+	Vendor,
+	JournalEntry,
+	Attachment,
+	DocumentType,
+	StorageType,
+	ExportData
+} from '$lib/types';
 import { defaultAccounts } from './seed';
 
 /**
@@ -153,10 +161,7 @@ export async function generateNextCode(type: Account['type']): Promise<string> {
 	const minCode = prefix * 1000 + 100; // 例: 1100, 2100, ...
 	const maxCode = prefix * 1000 + 199; // 例: 1199, 2199, ...
 
-	const accounts = await db.accounts
-		.where('type')
-		.equals(type)
-		.toArray();
+	const accounts = await db.accounts.where('type').equals(type).toArray();
 
 	// ユーザー追加科目のコードのみ抽出してソート
 	const codes = accounts
@@ -680,7 +685,8 @@ export async function addAttachmentToJournal(
 		throw new Error('仕訳が見つかりません');
 	}
 
-	const { file, documentDate, documentType, generatedName, year, description, amount, vendor } = params;
+	const { file, documentDate, documentType, generatedName, year, description, amount, vendor } =
+		params;
 
 	let attachment: Attachment;
 
@@ -756,7 +762,11 @@ export async function removeAttachmentFromJournal(
 	const attachmentToRemove = journal.attachments.find((a) => a.id === attachmentId);
 
 	// ファイルシステムから削除（filesystem保存の場合）
-	if (attachmentToRemove?.storageType === 'filesystem' && attachmentToRemove.filePath && directoryHandle) {
+	if (
+		attachmentToRemove?.storageType === 'filesystem' &&
+		attachmentToRemove.filePath &&
+		directoryHandle
+	) {
 		const { deleteFileFromDirectory } = await import('$lib/utils/filesystem');
 		await deleteFileFromDirectory(directoryHandle, attachmentToRemove.filePath);
 	}
@@ -1176,25 +1186,17 @@ export async function getImportPreview(data: ExportData): Promise<{
 	newVendorCount: number;
 }> {
 	// 既存の仕訳ID一覧
-	const existingJournalIds = new Set(
-		(await db.journals.toArray()).map((j) => j.id)
-	);
+	const existingJournalIds = new Set((await db.journals.toArray()).map((j) => j.id));
 
 	// 既存の勘定科目コード一覧
-	const existingAccountCodes = new Set(
-		(await db.accounts.toArray()).map((a) => a.code)
-	);
+	const existingAccountCodes = new Set((await db.accounts.toArray()).map((a) => a.code));
 
 	// 既存の取引先名一覧
-	const existingVendorNames = new Set(
-		(await db.vendors.toArray()).map((v) => v.name)
-	);
+	const existingVendorNames = new Set((await db.vendors.toArray()).map((v) => v.name));
 
 	// 新規追加される件数をカウント
 	const newJournals = data.journals.filter((j) => !existingJournalIds.has(j.id));
-	const newAccounts = data.accounts.filter(
-		(a) => !a.isSystem && !existingAccountCodes.has(a.code)
-	);
+	const newAccounts = data.accounts.filter((a) => !a.isSystem && !existingAccountCodes.has(a.code));
 	const newVendors = data.vendors.filter((v) => !existingVendorNames.has(v.name));
 
 	return {

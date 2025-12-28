@@ -38,7 +38,9 @@
 				証憑は一時的にブラウザ内に保存されます。
 			</p>
 
-			<div class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950">
+			<div
+				class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950"
+			>
 				<AlertTriangle class="mt-0.5 size-4 shrink-0 text-amber-500" />
 				<p class="text-sm text-amber-800 dark:text-amber-200">
 					電子帳簿保存法の要件を満たすため、<br />

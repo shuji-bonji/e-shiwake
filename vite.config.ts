@@ -12,7 +12,7 @@ export default defineConfig({
 			srcDir: 'src',
 			mode: 'production',
 			strategies: 'generateSW',
-			registerType: 'autoUpdate',
+			registerType: 'prompt', // ユーザーに更新を通知
 			manifest: {
 				name: 'e-shiwake - 電子仕訳',
 				short_name: 'e-shiwake',

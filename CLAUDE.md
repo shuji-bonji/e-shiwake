@@ -77,15 +77,15 @@ Svelte MCP server を利用可能。Svelte 5 と SvelteKit のドキュメント
 
 ```typescript
 interface JournalEntry {
-  id: string;                    // UUID
-  date: string;                  // 取引日 YYYY-MM-DD（電帳法: 取引年月日）
-  lines: JournalLine[];          // 仕訳明細行（複数行対応）
-  vendor: string;                // 取引先名（電帳法: 取引先名）
-  description: string;           // 摘要
-  evidenceStatus: 'none' | 'paper' | 'digital';  // 証跡ステータス
-  attachments: Attachment[];     // 紐付けられた証憑
-  createdAt: string;             // 作成日時 ISO8601
-  updatedAt: string;             // 更新日時 ISO8601
+	id: string; // UUID
+	date: string; // 取引日 YYYY-MM-DD（電帳法: 取引年月日）
+	lines: JournalLine[]; // 仕訳明細行（複数行対応）
+	vendor: string; // 取引先名（電帳法: 取引先名）
+	description: string; // 摘要
+	evidenceStatus: 'none' | 'paper' | 'digital'; // 証跡ステータス
+	attachments: Attachment[]; // 紐付けられた証憑
+	createdAt: string; // 作成日時 ISO8601
+	updatedAt: string; // 更新日時 ISO8601
 }
 ```
 
@@ -93,11 +93,11 @@ interface JournalEntry {
 
 ```typescript
 interface JournalLine {
-  id: string;                    // UUID
-  type: 'debit' | 'credit';      // 借方 or 貸方
-  accountCode: string;           // 勘定科目コード
-  amount: number;                // 金額（電帳法: 取引金額）
-  memo?: string;                 // 行メモ（按分理由など）
+	id: string; // UUID
+	type: 'debit' | 'credit'; // 借方 or 貸方
+	accountCode: string; // 勘定科目コード
+	amount: number; // 金額（電帳法: 取引金額）
+	memo?: string; // 行メモ（按分理由など）
 }
 ```
 
@@ -123,40 +123,42 @@ interface JournalLine {
 
 ```typescript
 interface Attachment {
-  id: string;                    // UUID
-  journalEntryId: string;        // 紐付く仕訳ID
-  documentDate: string;          // 書類の日付（電帳法の取引年月日）YYYY-MM-DD
-  documentType: DocumentType;    // 書類の種類
-  originalName: string;          // 元のファイル名
-  generatedName: string;         // 自動生成されたファイル名
-  mimeType: string;              // application/pdf など
-  size: number;                  // ファイルサイズ（bytes）
-  // ファイル名生成用メタデータ（リネーム時に使用）
-  description: string;           // 摘要（仕訳名）
-  amount: number;                // 金額
-  vendor: string;                // 取引先
-  // 保存場所による分岐
-  storageType: 'filesystem' | 'indexeddb';  // 保存タイプ
-  blob?: Blob;                   // IndexedDB保存時のみ
-  filePath?: string;             // ファイルシステム保存時のパス（{年度}/{ファイル名}）
-  createdAt: string;
+	id: string; // UUID
+	journalEntryId: string; // 紐付く仕訳ID
+	documentDate: string; // 書類の日付（電帳法の取引年月日）YYYY-MM-DD
+	documentType: DocumentType; // 書類の種類
+	originalName: string; // 元のファイル名
+	generatedName: string; // 自動生成されたファイル名
+	mimeType: string; // application/pdf など
+	size: number; // ファイルサイズ（bytes）
+	// ファイル名生成用メタデータ（リネーム時に使用）
+	description: string; // 摘要（仕訳名）
+	amount: number; // 金額
+	vendor: string; // 取引先
+	// 保存場所による分岐
+	storageType: 'filesystem' | 'indexeddb'; // 保存タイプ
+	blob?: Blob; // IndexedDB保存時のみ
+	filePath?: string; // ファイルシステム保存時のパス（{年度}/{ファイル名}）
+	createdAt: string;
 }
 
 type DocumentType =
-  | 'invoice'    // 請求書（発行）
-  | 'bill'       // 請求書（受領）
-  | 'receipt'    // 領収書
-  | 'contract'   // 契約書
-  | 'estimate'   // 見積書
-  | 'other';     // その他
+	| 'invoice' // 請求書（発行）
+	| 'bill' // 請求書（受領）
+	| 'receipt' // 領収書
+	| 'contract' // 契約書
+	| 'estimate' // 見積書
+	| 'other'; // その他
 ```
 
 **書類の日付と仕訳の日付の違い**:
+
 - 仕訳の日付: 会計上の認識日
 - 書類の日付: 書類に記載された日付（電帳法の「取引年月日」）
 - ほとんどのケースで一致するが、請求→入金のような場合は異なる
 
 **仕訳との連動**:
+
 - 仕訳の日付・摘要・金額・取引先を変更すると、紐付いている証憑のファイル名も自動更新される
 - 証憑側で個別に編集することも可能（編集ダイアログから）
 
@@ -164,19 +166,19 @@ type DocumentType =
 
 ```typescript
 interface Account {
-  code: string;                  // 勘定科目コード（4桁、例: "1001", "5005"）
-  name: string;                  // 勘定科目名（例: "現金", "旅費交通費"）
-  type: AccountType;             // 5カテゴリ
-  isSystem: boolean;             // システム初期データか、ユーザー追加か
-  createdAt: string;
+	code: string; // 勘定科目コード（4桁、例: "1001", "5005"）
+	name: string; // 勘定科目名（例: "現金", "旅費交通費"）
+	type: AccountType; // 5カテゴリ
+	isSystem: boolean; // システム初期データか、ユーザー追加か
+	createdAt: string;
 }
 
 type AccountType =
-  | 'asset'      // 資産
-  | 'liability'  // 負債
-  | 'equity'     // 純資産（資本）
-  | 'revenue'    // 収益
-  | 'expense';   // 費用
+	| 'asset' // 資産
+	| 'liability' // 負債
+	| 'equity' // 純資産（資本）
+	| 'revenue' // 収益
+	| 'expense'; // 費用
 ```
 
 **勘定科目コード体系（4桁）**:
@@ -187,13 +189,14 @@ type AccountType =
    1桁目   2桁目 3-4桁目
 ```
 
-| 桁 | 意味 | 値 |
-|----|------|-----|
-| 1桁目 | カテゴリ | 1:資産, 2:負債, 3:純資産, 4:収益, 5:費用 |
-| 2桁目 | 区分 | 0:システム, 1:ユーザー追加 |
-| 3-4桁目 | 連番 | 01-99 |
+| 桁      | 意味     | 値                                       |
+| ------- | -------- | ---------------------------------------- |
+| 1桁目   | カテゴリ | 1:資産, 2:負債, 3:純資産, 4:収益, 5:費用 |
+| 2桁目   | 区分     | 0:システム, 1:ユーザー追加               |
+| 3-4桁目 | 連番     | 01-99                                    |
 
 **例**:
+
 - `1001` = 資産・システム・01番（現金）
 - `5005` = 費用・システム・05番（旅費交通費）
 - `5101` = 費用・ユーザー追加・01番
@@ -209,9 +212,9 @@ type AccountType =
 
 ```typescript
 interface Vendor {
-  id: string;
-  name: string;                  // 取引先名
-  createdAt: string;
+	id: string;
+	name: string; // 取引先名
+	createdAt: string;
 }
 ```
 
@@ -219,10 +222,10 @@ interface Vendor {
 
 ```typescript
 interface Settings {
-  fiscalYearStart: number;       // 会計年度開始月（1-12、個人は通常1）
-  defaultCurrency: string;       // 通貨コード（JPY）
-  outputDirectoryHandle?: FileSystemDirectoryHandle;  // 保存先ディレクトリ
-  licenseKey?: string;           // ライセンスキー（将来用）
+	fiscalYearStart: number; // 会計年度開始月（1-12、個人は通常1）
+	defaultCurrency: string; // 通貨コード（JPY）
+	outputDirectoryHandle?: FileSystemDirectoryHandle; // 保存先ディレクトリ
+	licenseKey?: string; // ライセンスキー（将来用）
 }
 ```
 
@@ -233,12 +236,12 @@ interface Settings {
 ```typescript
 // 年度判定（個人事業主は1月〜12月）
 function getFiscalYear(date: string, fiscalYearStart: number): number {
-  const d = new Date(date);
-  const month = d.getMonth() + 1;
-  const year = d.getFullYear();
+	const d = new Date(date);
+	const month = d.getMonth() + 1;
+	const year = d.getFullYear();
 
-  // 開始月より前なら前年度
-  return month < fiscalYearStart ? year - 1 : year;
+	// 開始月より前なら前年度
+	return month < fiscalYearStart ? year - 1 : year;
 }
 ```
 
@@ -367,15 +370,16 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 
 複式簿記では、勘定科目の種別によって借方・貸方に来る条件が決まっている。
 
-| 種別 | 増加 | 減少 |
-|------|------|------|
-| 資産 | 借方 | 貸方 |
-| 負債 | 貸方 | 借方 |
+| 種別   | 増加 | 減少 |
+| ------ | ---- | ---- |
+| 資産   | 借方 | 貸方 |
+| 負債   | 貸方 | 借方 |
 | 純資産 | 貸方 | 借方 |
-| 収益 | 貸方 | ― |
-| 費用 | 借方 | ― |
+| 収益   | 貸方 | ―    |
+| 費用   | 借方 | ―    |
 
 **種別アイコンの意味**:
+
 - ⬆ = 増加
 - ⬇ = 減少
 
@@ -394,6 +398,7 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 | ⬆収益 | 収益の発生（売上が立った、など） |
 
 **色分け**:
+
 - 資産: 青（text-blue-500）
 - 負債/純資産: 紫（text-purple-500）
 - 収益: 緑（text-green-500）
@@ -431,11 +436,13 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 - 添付ファイル横の編集アイコンから証憑情報を編集可能
 
 **証憑編集ダイアログ**:
+
 - 書類の日付、書類の種類、仕訳名（摘要）、金額、取引先を編集可能
 - 編集するとファイル名も自動更新される
 - ファイルシステム保存の場合、実ファイルもリネームされる
 
 **仕訳変更時の自動同期**:
+
 - 仕訳の日付・摘要・取引先・金額を変更すると、紐付いた証憑のファイル名も自動更新
 
 ### 4. 勘定科目管理
@@ -487,24 +494,24 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 
 **エクスポート形式**:
 
-| 形式 | 内容                            | 用途                             | 状態 |
-| ---- | ------------------------------- | -------------------------------- | ---- |
-| JSON | 仕訳 + 勘定科目 + 取引先 + 設定 | バックアップ、移行               | ✅ |
-| CSV  | 仕訳のみ（フラット形式）        | 他ソフト連携                     | ✅ |
-| 証憑DL | IndexedDB内の証憑PDFを個別DL  | iPad向けバックアップ             | ✅ |
-| ZIP  | JSON + PDF 証憑同梱             | 完全バックアップ、年次アーカイブ | 未実装 |
+| 形式   | 内容                            | 用途                             | 状態   |
+| ------ | ------------------------------- | -------------------------------- | ------ |
+| JSON   | 仕訳 + 勘定科目 + 取引先 + 設定 | バックアップ、移行               | ✅     |
+| CSV    | 仕訳のみ（フラット形式）        | 他ソフト連携                     | ✅     |
+| 証憑DL | IndexedDB内の証憑PDFを個別DL    | iPad向けバックアップ             | ✅     |
+| ZIP    | JSON + PDF 証憑同梱             | 完全バックアップ、年次アーカイブ | 未実装 |
 
 **JSONエクスポート構造**:
 
 ```typescript
 interface ExportData {
-  version: string;           // データフォーマットバージョン
-  exportedAt: string;        // エクスポート日時
-  fiscalYear: number;        // 会計年度
-  journals: JournalEntry[];
-  accounts: Account[];
-  vendors: Vendor[];
-  settings: Settings;
+	version: string; // データフォーマットバージョン
+	exportedAt: string; // エクスポート日時
+	fiscalYear: number; // 会計年度
+	journals: JournalEntry[];
+	accounts: Account[];
+	vendors: Vendor[];
+	settings: Settings;
 }
 ```
 
@@ -569,6 +576,7 @@ interface ExportData {
 ```
 
 例:
+
 ```
 2024-01-15_領収書_USBケーブル購入_3,980円_Amazon.pdf
 2024-01-15_請求書発行_システム開発_100,000円_クライアントA.pdf
@@ -577,6 +585,7 @@ interface ExportData {
 この命名規則により、ファイル名だけで検索要件をクリア。
 
 **自動更新**:
+
 - 仕訳の日付・摘要・金額・取引先を変更すると、紐付いた証憑のファイル名も連動して更新
 - ファイルシステム保存の場合、実ファイルもリネームされる
 
@@ -590,23 +599,26 @@ interface ExportData {
 ### ストレージモードとデータ移行
 
 現在、証憑の保存先として2つのモードがある：
+
 - **filesystem**: デスクトップ向け（File System Access API）
 - **indexeddb**: iPad/Safari向け（ブラウザ内保存）
 
 **課題**:
 
-| シナリオ | 問題点 |
-|----------|--------|
+| シナリオ                               | 問題点                             |
+| -------------------------------------- | ---------------------------------- |
 | Chrome(filesystem) → Safari(indexeddb) | `filePath`のみでファイル実体がない |
-| Safari(indexeddb) → Chrome(filesystem) | blobがなく、ファイルも存在しない |
-| 端末移行時 | 証憑PDFが引き継がれない |
+| Safari(indexeddb) → Chrome(filesystem) | blobがなく、ファイルも存在しない   |
+| 端末移行時                             | 証憑PDFが引き継がれない            |
 
 **現状の対応**:
+
 - JSONエクスポートは「仕訳データのみ」と割り切る
 - 証憑PDFは手動でフォルダごとコピー
 - データ管理ページに注意書きを表示
 
 **将来の改善案**:
+
 - ZIPエクスポート実装（JSON + PDF同梱）
 - インポート時にPDFも復元可能に
 
@@ -638,10 +650,11 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 - [x] ダークモード / ライトモード / システム設定 切り替え
 
 **実装詳細**:
+
 - `@vite-pwa/sveltekit` を使用したService Worker自動生成
 - Workboxによるアセットキャッシング（precache）
 - テーマ設定はlocalStorageに保存、システム設定への追従対応
-- iOS Safari対応（apple-mobile-web-app-*メタタグ）
+- iOS Safari対応（apple-mobile-web-app-\*メタタグ）
 
 ### Phase 2: 帳簿機能
 
@@ -662,6 +675,7 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 - [ ] 多通貨対応
 
 **なぜ最後か**:
+
 - i18nは全テキストに影響し、後から追加すると大規模な改修が必要
 - ただし、ベースアプリが安定してからの方が効率的
 - 多通貨は日本のフリーランス向けでは優先度低

@@ -19,7 +19,12 @@
 		description: string;
 		amount: number;
 		suggestedDocumentType: DocumentType;
-		onconfirm: (documentDate: string, documentType: DocumentType, generatedName: string, updatedVendor: string) => void;
+		onconfirm: (
+			documentDate: string,
+			documentType: DocumentType,
+			generatedName: string,
+			updatedVendor: string
+		) => void;
 		oncancel: () => void;
 	}
 
@@ -83,9 +88,7 @@
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title>証憑を添付</Dialog.Title>
-			<Dialog.Description>
-				書類の情報を入力してください
-			</Dialog.Description>
+			<Dialog.Description>書類の情報を入力してください</Dialog.Description>
 		</Dialog.Header>
 
 		<div class="space-y-4 py-4">
@@ -103,14 +106,8 @@
 			<!-- 書類の日付 -->
 			<div class="space-y-2">
 				<Label for="documentDate">書類の日付</Label>
-				<Input
-					id="documentDate"
-					type="date"
-					bind:value={documentDate}
-				/>
-				<p class="text-xs text-muted-foreground">
-					書類に記載された日付（電帳法の取引年月日）
-				</p>
+				<Input id="documentDate" type="date" bind:value={documentDate} />
+				<p class="text-xs text-muted-foreground">書類に記載された日付（電帳法の取引年月日）</p>
 			</div>
 
 			<!-- 書類の種類 -->
@@ -134,7 +131,7 @@
 				<VendorInput
 					{vendors}
 					value={editableVendor}
-					onchange={(name) => editableVendor = name}
+					onchange={(name) => (editableVendor = name)}
 					placeholder="取引先名を入力"
 				/>
 				{#if vendorMissing}
@@ -148,7 +145,7 @@
 			<!-- 生成されるファイル名 -->
 			<div class="space-y-2">
 				<Label>保存されるファイル名</Label>
-				<div class="rounded-md border bg-muted/50 px-3 py-2 text-sm font-mono break-all">
+				<div class="rounded-md border bg-muted/50 px-3 py-2 font-mono text-sm break-all">
 					{generatedName}
 				</div>
 			</div>

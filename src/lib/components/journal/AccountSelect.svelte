@@ -15,8 +15,13 @@
 		class?: string;
 	}
 
-	let { accounts, value, onchange, placeholder = '勘定科目を選択', class: className }: Props =
-		$props();
+	let {
+		accounts,
+		value,
+		onchange,
+		placeholder = '勘定科目を選択',
+		class: className
+	}: Props = $props();
 
 	let open = $state(false);
 	let triggerRef = $state<HTMLButtonElement>(null!);
