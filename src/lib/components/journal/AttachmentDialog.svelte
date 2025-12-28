@@ -41,22 +41,18 @@
 		oncancel
 	}: Props = $props();
 
-	// ダイアログの状態（親から渡される値で初期化、ダイアログ内で編集可能）
-	let documentDate = $state(journalDate);
-	let documentType = $state<DocumentType>(suggestedDocumentType);
-	let editableVendor = $state(vendor);
+	// ダイアログの状態（ダイアログ内で編集可能）
+	let documentDate = $state('');
+	let documentType = $state<DocumentType>('receipt');
+	let editableVendor = $state('');
 
-	// propsが変更されたら同期（ダイアログが開くタイミングで親が値を更新する想定）
+	// ダイアログが開いたときに親の値で初期化
 	$effect(() => {
-		documentDate = journalDate;
-	});
-
-	$effect(() => {
-		documentType = suggestedDocumentType;
-	});
-
-	$effect(() => {
-		editableVendor = vendor;
+		if (open) {
+			documentDate = journalDate;
+			documentType = suggestedDocumentType;
+			editableVendor = vendor;
+		}
 	});
 
 	// 取引先が未入力かどうか

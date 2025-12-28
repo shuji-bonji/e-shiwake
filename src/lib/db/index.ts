@@ -207,17 +207,16 @@ export async function getJournalsByYear(year: number): Promise<JournalEntry[]> {
 
 /**
  * 利用可能な年度の取得（仕訳データから抽出）
- * 仕訳がない場合は現在年度のみ返す
+ * 現在年度は常に含める（新規仕訳追加のため）
  */
 export async function getAvailableYears(): Promise<number[]> {
+	const currentYear = new Date().getFullYear();
 	const journals = await db.journals.toArray();
 
-	if (journals.length === 0) {
-		return [new Date().getFullYear()];
-	}
+	// 現在年度は常に含める
+	const years = new Set<number>([currentYear]);
 
-	// 仕訳の日付から年度を抽出してユニークにする
-	const years = new Set<number>();
+	// 仕訳の日付から年度を抽出
 	for (const journal of journals) {
 		const year = parseInt(journal.date.substring(0, 4), 10);
 		if (!isNaN(year)) {

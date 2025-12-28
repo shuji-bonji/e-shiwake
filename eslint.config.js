@@ -27,6 +27,15 @@ export default defineConfig(
 		}
 	},
 	{
+		files: ['**/*.svelte'],
+		rules: {
+			// このアプリはbaseパスを使用しないため、絶対パスでのナビゲーションは問題なし
+			'svelte/no-navigation-without-resolve': 'off',
+			// PWAマニフェストなど信頼できるソースからの@htmlは許可
+			'svelte/no-at-html-tags': 'warn'
+		}
+	},
+	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 
 		languageOptions: {
