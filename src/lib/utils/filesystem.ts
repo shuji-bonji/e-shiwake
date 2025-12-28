@@ -195,3 +195,43 @@ export async function deleteFileFromDirectory(
 export function getDirectoryDisplayName(handle: FileSystemDirectoryHandle): string {
 	return handle.name;
 }
+
+/**
+ * ファイルをリネーム
+ * @param rootHandle ルートディレクトリハンドル
+ * @param oldFilePath 旧ファイルの相対パス（{年度}/{ファイル名}）
+ * @param newFileName 新しいファイル名
+ * @returns 新しいファイルの相対パス
+ */
+export async function renameFileInDirectory(
+	rootHandle: FileSystemDirectoryHandle,
+	oldFilePath: string,
+	newFileName: string
+): Promise<string> {
+	const [year, ...fileNameParts] = oldFilePath.split('/');
+	const oldFileName = fileNameParts.join('/');
+
+	// 同じファイル名なら何もしない
+	if (oldFileName === newFileName) {
+		return oldFilePath;
+	}
+
+	const yearDir = await rootHandle.getDirectoryHandle(year);
+
+	// 旧ファイルを読み込み
+	const oldFileHandle = await yearDir.getFileHandle(oldFileName);
+	const oldFile = await oldFileHandle.getFile();
+	const oldData = await oldFile.arrayBuffer();
+
+	// 新ファイルを作成して書き込み
+	const newFileHandle = await yearDir.getFileHandle(newFileName, { create: true });
+	const writable = await newFileHandle.createWritable();
+	await writable.write(oldData);
+	await writable.close();
+
+	// 旧ファイルを削除
+	await yearDir.removeEntry(oldFileName);
+
+	// 新しい相対パスを返す
+	return `${year}/${newFileName}`;
+}

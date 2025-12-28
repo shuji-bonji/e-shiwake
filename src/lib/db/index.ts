@@ -371,12 +371,12 @@ const DocumentTypeShortLabels: Record<DocumentType, string> = {
 
 /**
  * 添付ファイル名を自動生成
- * 形式: {書類の日付}_{種類}_{勘定科目名}_{金額}円_{取引先名}.pdf
+ * 形式: {書類の日付}_{種類}_{摘要}_{金額}円_{取引先名}.pdf
  */
 export function generateAttachmentName(
 	documentDate: string,
 	documentType: DocumentType,
-	accountName: string,
+	description: string,
 	amount: number,
 	vendor: string
 ): string {
@@ -386,7 +386,7 @@ export function generateAttachmentName(
 	const parts = [
 		documentDate,
 		DocumentTypeShortLabels[documentType],
-		sanitize(accountName) || '未分類',
+		sanitize(description) || '未分類',
 		`${amount.toLocaleString()}円`,
 		sanitize(vendor) || '不明'
 	];
@@ -419,6 +419,10 @@ export interface AttachmentParams {
 	documentType: DocumentType;
 	generatedName: string;
 	year: number; // 保存先の年度ディレクトリ
+	// ファイル名生成用メタデータ
+	description: string;
+	amount: number;
+	vendor: string;
 }
 
 // ==================== 設定関連 ====================
@@ -676,7 +680,7 @@ export async function addAttachmentToJournal(
 		throw new Error('仕訳が見つかりません');
 	}
 
-	const { file, documentDate, documentType, generatedName, year } = params;
+	const { file, documentDate, documentType, generatedName, year, description, amount, vendor } = params;
 
 	let attachment: Attachment;
 
@@ -694,6 +698,9 @@ export async function addAttachmentToJournal(
 			generatedName,
 			mimeType: file.type,
 			size: file.size,
+			description,
+			amount,
+			vendor,
 			storageType: 'filesystem',
 			filePath,
 			createdAt: new Date().toISOString()
@@ -712,6 +719,9 @@ export async function addAttachmentToJournal(
 			generatedName,
 			mimeType: file.type,
 			size: file.size,
+			description,
+			amount,
+			vendor,
 			storageType: 'indexeddb',
 			blob,
 			createdAt: new Date().toISOString()
@@ -783,6 +793,172 @@ export async function getAttachmentBlob(
 
 	// IndexedDBから取得
 	return attachment.blob ?? null;
+}
+
+/**
+ * 証憑のメタデータを更新してリネーム
+ */
+export interface AttachmentUpdateParams {
+	documentDate?: string;
+	documentType?: DocumentType;
+	description?: string;
+	amount?: number;
+	vendor?: string;
+}
+
+export async function updateAttachment(
+	journalId: string,
+	attachmentId: string,
+	updates: AttachmentUpdateParams,
+	directoryHandle?: FileSystemDirectoryHandle | null
+): Promise<Attachment> {
+	const journal = await db.journals.get(journalId);
+	if (!journal) {
+		throw new Error('仕訳が見つかりません');
+	}
+
+	const attachmentIndex = journal.attachments.findIndex((a) => a.id === attachmentId);
+	if (attachmentIndex === -1) {
+		throw new Error('添付ファイルが見つかりません');
+	}
+
+	const attachment = journal.attachments[attachmentIndex];
+
+	// 更新後の値をマージ
+	const newDocumentDate = updates.documentDate ?? attachment.documentDate;
+	const newDocumentType = updates.documentType ?? attachment.documentType;
+	const newDescription = updates.description ?? attachment.description;
+	const newAmount = updates.amount ?? attachment.amount;
+	const newVendor = updates.vendor ?? attachment.vendor;
+
+	// 新しいファイル名を生成
+	const newGeneratedName = generateAttachmentName(
+		newDocumentDate,
+		newDocumentType,
+		newDescription,
+		newAmount,
+		newVendor
+	);
+
+	// ファイルシステム保存の場合、実ファイルをリネーム
+	let newFilePath = attachment.filePath;
+	if (attachment.storageType === 'filesystem' && attachment.filePath && directoryHandle) {
+		// ファイル名が変わる場合のみリネーム
+		if (newGeneratedName !== attachment.generatedName) {
+			const { renameFileInDirectory } = await import('$lib/utils/filesystem');
+			newFilePath = await renameFileInDirectory(
+				directoryHandle,
+				attachment.filePath,
+				newGeneratedName
+			);
+		}
+	}
+
+	// 更新された添付ファイル
+	const updatedAttachment: Attachment = {
+		...attachment,
+		documentDate: newDocumentDate,
+		documentType: newDocumentType,
+		description: newDescription,
+		amount: newAmount,
+		vendor: newVendor,
+		generatedName: newGeneratedName,
+		filePath: newFilePath
+	};
+
+	// 仕訳の添付ファイルリストを更新
+	const updatedAttachments = [...journal.attachments];
+	updatedAttachments[attachmentIndex] = updatedAttachment;
+
+	await db.journals.update(journalId, {
+		attachments: updatedAttachments,
+		updatedAt: new Date().toISOString()
+	});
+
+	return updatedAttachment;
+}
+
+/**
+ * 仕訳のメタデータ変更に連動して証憑を更新
+ * 仕訳の日付・摘要・金額・取引先が変わった場合にファイル名も更新
+ * 注意: DB保存は行わない（呼び出し元で onupdate を通じて保存）
+ */
+export async function syncAttachmentsWithJournal(
+	currentAttachments: Attachment[],
+	updates: {
+		date?: string;
+		description?: string;
+		amount?: number;
+		vendor?: string;
+	},
+	directoryHandle?: FileSystemDirectoryHandle | null
+): Promise<Attachment[]> {
+	if (currentAttachments.length === 0) {
+		return [];
+	}
+
+	const updatedAttachments: Attachment[] = [];
+
+	for (const attachment of currentAttachments) {
+		// 更新する値をマージ
+		const newDocumentDate = updates.date ?? attachment.documentDate;
+		const newDescription = updates.description ?? attachment.description;
+		const newAmount = updates.amount ?? attachment.amount;
+		const newVendor = updates.vendor ?? attachment.vendor;
+
+		// 値が変わっていなければスキップ
+		if (
+			newDocumentDate === attachment.documentDate &&
+			newDescription === attachment.description &&
+			newAmount === attachment.amount &&
+			newVendor === attachment.vendor
+		) {
+			updatedAttachments.push(attachment);
+			continue;
+		}
+
+		// 新しいファイル名を生成
+		const newGeneratedName = generateAttachmentName(
+			newDocumentDate,
+			attachment.documentType,
+			newDescription,
+			newAmount,
+			newVendor
+		);
+
+		// ファイルシステム保存の場合、実ファイルをリネーム
+		let newFilePath = attachment.filePath;
+		if (attachment.storageType === 'filesystem' && attachment.filePath && directoryHandle) {
+			if (newGeneratedName !== attachment.generatedName) {
+				const { renameFileInDirectory } = await import('$lib/utils/filesystem');
+				try {
+					newFilePath = await renameFileInDirectory(
+						directoryHandle,
+						attachment.filePath,
+						newGeneratedName
+					);
+				} catch (error) {
+					console.error('ファイルリネームに失敗:', error);
+					// リネーム失敗してもメタデータは更新続行
+				}
+			}
+		}
+
+		// 更新された添付ファイル
+		const updatedAttachment: Attachment = {
+			...attachment,
+			documentDate: newDocumentDate,
+			description: newDescription,
+			amount: newAmount,
+			vendor: newVendor,
+			generatedName: newGeneratedName,
+			filePath: newFilePath
+		};
+
+		updatedAttachments.push(updatedAttachment);
+	}
+
+	return updatedAttachments;
 }
 
 // ==================== テストデータ ====================

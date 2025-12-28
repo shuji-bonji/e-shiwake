@@ -7,9 +7,10 @@
 	import VendorInput from './VendorInput.svelte';
 	import PdfDropZone from './PdfDropZone.svelte';
 	import AttachmentDialog from './AttachmentDialog.svelte';
+	import AttachmentEditDialog from './AttachmentEditDialog.svelte';
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
 	import type { JournalEntry, JournalLine, Account, AccountType, EvidenceStatus, Vendor, Attachment, DocumentType } from '$lib/types';
-	import { validateJournal, addAttachmentToJournal, removeAttachmentFromJournal, getAttachmentBlob, suggestDocumentType } from '$lib/db';
+	import { validateJournal, addAttachmentToJournal, removeAttachmentFromJournal, getAttachmentBlob, suggestDocumentType, updateAttachment, syncAttachmentsWithJournal } from '$lib/db';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { cn } from '$lib/utils.js';
 
@@ -39,11 +40,12 @@
 	// Safari向け警告ダイアログの状態
 	let safariDialogOpen = $state(false);
 
+	// 証憑編集ダイアログの状態
+	let editDialogOpen = $state(false);
+	let editingAttachment = $state<Attachment | null>(null);
+
 	// ダイアログ用の派生値
 	const mainDebitLine = $derived(journal.lines.find((l) => l.type === 'debit' && l.accountCode));
-	const mainAccountName = $derived(
-		mainDebitLine ? accounts.find((a) => a.code === mainDebitLine.accountCode)?.name ?? '' : ''
-	);
 	const mainAccountType = $derived(
 		mainDebitLine ? accounts.find((a) => a.code === mainDebitLine.accountCode)?.type ?? null : null
 	);
@@ -120,16 +122,55 @@
 	}
 
 	// フィールド更新
-	function updateField<K extends keyof JournalEntry>(field: K, value: JournalEntry[K]) {
-		onupdate({ ...journal, [field]: value });
+	async function updateField<K extends keyof JournalEntry>(field: K, value: JournalEntry[K]) {
+		const updatedJournal = { ...journal, [field]: value };
+
+		// 証憑がある場合、関連フィールドの変更で証憑も同期
+		if (journal.attachments.length > 0 && (field === 'date' || field === 'description' || field === 'vendor')) {
+			try {
+				const syncedAttachments = await syncAttachmentsWithJournal(
+					journal.attachments,
+					{ [field]: value as string },
+					directoryHandle
+				);
+				if (syncedAttachments.length > 0) {
+					updatedJournal.attachments = syncedAttachments;
+				}
+			} catch (error) {
+				console.error('証憑の同期に失敗:', error);
+			}
+		}
+
+		onupdate(updatedJournal);
 	}
 
 	// 仕訳行の更新
-	function updateLine(lineId: string, field: keyof JournalLine, value: string | number) {
+	async function updateLine(lineId: string, field: keyof JournalLine, value: string | number) {
 		const newLines = journal.lines.map((line) =>
 			line.id === lineId ? { ...line, [field]: value } : line
 		);
-		onupdate({ ...journal, lines: newLines });
+		const updatedJournal = { ...journal, lines: newLines };
+
+		// 金額が変更された場合、メイン借方行の金額で証憑も同期
+		if (journal.attachments.length > 0 && field === 'amount') {
+			const mainLine = newLines.find((l) => l.type === 'debit' && l.accountCode);
+			if (mainLine && mainLine.id === lineId) {
+				try {
+					const syncedAttachments = await syncAttachmentsWithJournal(
+						journal.attachments,
+						{ amount: value as number },
+						directoryHandle
+					);
+					if (syncedAttachments.length > 0) {
+						updatedJournal.attachments = syncedAttachments;
+					}
+				} catch (error) {
+					console.error('証憑の同期に失敗:', error);
+				}
+			}
+		}
+
+		onupdate(updatedJournal);
 	}
 
 	// 仕訳行の追加
@@ -208,7 +249,10 @@
 					documentDate,
 					documentType,
 					generatedName,
-					year
+					year,
+					description: journal.description,
+					amount: mainAmount,
+					vendor: updatedVendor
 				},
 				directoryHandle
 			);
@@ -256,6 +300,51 @@
 			// メモリリーク防止のため少し遅延してURLを解放
 			setTimeout(() => URL.revokeObjectURL(url), 1000);
 		}
+	}
+
+	// 添付ファイルの編集ダイアログを開く
+	function handleEditAttachment(attachment: Attachment) {
+		editingAttachment = attachment;
+		editDialogOpen = true;
+	}
+
+	// 添付ファイルの編集を確定
+	async function handleEditConfirm(updates: {
+		documentDate: string;
+		documentType: DocumentType;
+		description: string;
+		amount: number;
+		vendor: string;
+	}) {
+		if (!editingAttachment) return;
+
+		try {
+			const updatedAttachment = await updateAttachment(
+				journal.id,
+				editingAttachment.id,
+				updates,
+				directoryHandle
+			);
+
+			// ローカル状態を更新
+			const updatedAttachments = journal.attachments.map((a) =>
+				a.id === updatedAttachment.id ? updatedAttachment : a
+			);
+			onupdate({
+				...journal,
+				attachments: updatedAttachments
+			});
+		} catch (error) {
+			console.error('添付ファイルの更新に失敗しました:', error);
+			alert('添付ファイルの更新に失敗しました');
+		} finally {
+			editingAttachment = null;
+		}
+	}
+
+	// 添付ファイルの編集をキャンセル
+	function handleEditCancel() {
+		editingAttachment = null;
 	}
 </script>
 
@@ -525,6 +614,7 @@
 			onattach={handleFileDrop}
 			onremove={handleRemoveAttachment}
 			onpreview={handlePreviewAttachment}
+			onedit={handleEditAttachment}
 			vendorMissing={!journal.vendor.trim()}
 			vertical
 		/>
@@ -544,9 +634,18 @@
 	journalDate={journal.date}
 	vendor={journal.vendor}
 	{vendors}
-	accountName={mainAccountName}
+	description={journal.description}
 	amount={mainAmount}
 	suggestedDocumentType={suggestedDocType}
 	onconfirm={handleAttachmentConfirm}
 	oncancel={handleAttachmentCancel}
+/>
+
+<!-- 証憑編集ダイアログ -->
+<AttachmentEditDialog
+	bind:open={editDialogOpen}
+	attachment={editingAttachment}
+	{vendors}
+	onconfirm={handleEditConfirm}
+	oncancel={handleEditCancel}
 />

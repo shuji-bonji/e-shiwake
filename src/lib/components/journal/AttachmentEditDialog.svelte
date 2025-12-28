@@ -1,0 +1,182 @@
+<script lang="ts">
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
+	import { FileText, Pencil } from '@lucide/svelte';
+	import type { Attachment, DocumentType, Vendor } from '$lib/types';
+	import { DocumentTypeLabels } from '$lib/types';
+	import { generateAttachmentName } from '$lib/db';
+	import VendorInput from './VendorInput.svelte';
+
+	interface Props {
+		open: boolean;
+		attachment: Attachment | null;
+		vendors: Vendor[];
+		onconfirm: (updates: {
+			documentDate: string;
+			documentType: DocumentType;
+			description: string;
+			amount: number;
+			vendor: string;
+		}) => void;
+		oncancel: () => void;
+	}
+
+	let {
+		open = $bindable(),
+		attachment,
+		vendors,
+		onconfirm,
+		oncancel
+	}: Props = $props();
+
+	// 編集用の状態
+	let documentDate = $state('');
+	let documentType = $state<DocumentType>('receipt');
+	let description = $state('');
+	let amount = $state(0);
+	let vendor = $state('');
+
+	// attachmentが変更されたら状態を同期
+	$effect(() => {
+		if (attachment) {
+			documentDate = attachment.documentDate;
+			documentType = attachment.documentType;
+			description = attachment.description;
+			amount = attachment.amount;
+			vendor = attachment.vendor;
+		}
+	});
+
+	// 生成されるファイル名のプレビュー
+	const generatedName = $derived(
+		generateAttachmentName(documentDate, documentType, description, amount, vendor)
+	);
+
+	// 書類種類のオプション
+	const documentTypeOptions = Object.entries(DocumentTypeLabels).map(([value, label]) => ({
+		value: value as DocumentType,
+		label
+	}));
+
+	function handleConfirm() {
+		onconfirm({
+			documentDate,
+			documentType,
+			description,
+			amount,
+			vendor
+		});
+		open = false;
+	}
+
+	function handleCancel() {
+		oncancel();
+		open = false;
+	}
+</script>
+
+<Dialog.Root bind:open>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title class="flex items-center gap-2">
+				<Pencil class="size-5" />
+				証憑の編集
+			</Dialog.Title>
+			<Dialog.Description>
+				証憑の情報を変更すると、ファイル名も更新されます
+			</Dialog.Description>
+		</Dialog.Header>
+
+		{#if attachment}
+			<div class="space-y-4 py-4">
+				<!-- 元のファイル名 -->
+				<div class="flex items-center gap-2 rounded-md bg-muted p-2 text-sm">
+					<FileText class="size-4 text-red-500" />
+					<span class="truncate">{attachment.originalName}</span>
+				</div>
+
+				<!-- 書類の日付 -->
+				<div class="space-y-2">
+					<Label for="documentDate">書類の日付</Label>
+					<Input
+						id="documentDate"
+						type="date"
+						bind:value={documentDate}
+					/>
+				</div>
+
+				<!-- 書類の種類 -->
+				<div class="space-y-2">
+					<Label>書類の種類</Label>
+					<Select.Root type="single" bind:value={documentType}>
+						<Select.Trigger class="w-full">
+							{DocumentTypeLabels[documentType]}
+						</Select.Trigger>
+						<Select.Content>
+							{#each documentTypeOptions as option (option.value)}
+								<Select.Item value={option.value}>{option.label}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+
+				<!-- 仕訳名（摘要） -->
+				<div class="space-y-2">
+					<Label>仕訳名</Label>
+					<Input
+						type="text"
+						bind:value={description}
+						placeholder="仕訳の摘要"
+					/>
+				</div>
+
+				<!-- 金額 -->
+				<div class="space-y-2">
+					<Label for="amount">金額</Label>
+					<div class="flex items-center gap-2">
+						<Input
+							id="amount"
+							type="number"
+							bind:value={amount}
+							min="0"
+							class="text-right font-mono"
+						/>
+						<span class="text-sm text-muted-foreground">円</span>
+					</div>
+				</div>
+
+				<!-- 取引先 -->
+				<div class="space-y-2">
+					<Label>取引先</Label>
+					<VendorInput
+						{vendors}
+						value={vendor}
+						onchange={(name) => vendor = name}
+						placeholder="取引先名"
+					/>
+				</div>
+
+				<!-- 生成されるファイル名 -->
+				<div class="space-y-2">
+					<Label>保存されるファイル名</Label>
+					<div class="rounded-md border bg-muted/50 px-3 py-2 text-sm font-mono break-all">
+						{generatedName}
+					</div>
+					{#if attachment.generatedName !== generatedName}
+						<p class="text-xs text-amber-600">
+							ファイル名が変更されます
+						</p>
+					{/if}
+				</div>
+			</div>
+		{/if}
+
+		<Dialog.Footer>
+			<Button variant="outline" onclick={handleCancel}>キャンセル</Button>
+			<Button onclick={handleConfirm}>保存</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>

@@ -95,6 +95,10 @@ export interface Attachment {
 	generatedName: string; // 自動生成されたファイル名
 	mimeType: string; // application/pdf など
 	size: number; // ファイルサイズ（bytes）
+	// ファイル名生成用メタデータ（リネーム時に使用）
+	description: string; // 摘要（仕訳名）
+	amount: number; // 金額
+	vendor: string; // 取引先
 	// 保存場所による分岐
 	storageType: StorageType; // 保存タイプ
 	blob?: Blob; // IndexedDB保存時のみ

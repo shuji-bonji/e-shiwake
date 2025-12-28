@@ -16,7 +16,7 @@
 		journalDate: string;
 		vendor: string;
 		vendors: Vendor[];
-		accountName: string;
+		description: string;
 		amount: number;
 		suggestedDocumentType: DocumentType;
 		onconfirm: (documentDate: string, documentType: DocumentType, generatedName: string, updatedVendor: string) => void;
@@ -29,7 +29,7 @@
 		journalDate,
 		vendor,
 		vendors,
-		accountName,
+		description,
 		amount,
 		suggestedDocumentType,
 		onconfirm,
@@ -59,7 +59,7 @@
 
 	// 生成されるファイル名のプレビュー
 	const generatedName = $derived(
-		generateAttachmentName(documentDate, documentType, accountName, amount, editableVendor)
+		generateAttachmentName(documentDate, documentType, description, amount, editableVendor)
 	);
 
 	// 書類種類のオプション

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Upload, FileText, X } from '@lucide/svelte';
+	import { Upload, FileText, X, Pencil } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { cn } from '$lib/utils.js';
@@ -10,6 +10,7 @@
 		onattach: (file: File) => void;
 		onremove: (attachmentId: string) => void;
 		onpreview: (attachment: Attachment) => void;
+		onedit?: (attachment: Attachment) => void;
 		disabled?: boolean;
 		vendorMissing?: boolean;
 		vertical?: boolean;
@@ -20,6 +21,7 @@
 		onattach,
 		onremove,
 		onpreview,
+		onedit = undefined,
 		disabled = false,
 		vendorMissing = false,
 		vertical = false
@@ -155,6 +157,16 @@
 							</Tooltip.Content>
 						</Tooltip.Root>
 					</Tooltip.Provider>
+					{#if onedit}
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-5 shrink-0"
+							onclick={() => onedit(attachment)}
+						>
+							<Pencil class="size-3" />
+						</Button>
+					{/if}
 					<Button
 						variant="ghost"
 						size="icon"
