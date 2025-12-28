@@ -156,3 +156,150 @@ export async function generateNextCode(type: Account['type']): Promise<string> {
 
 	return String(nextCode);
 }
+
+// ==================== 仕訳関連 ====================
+
+/**
+ * 仕訳の取得（年度別、日付降順）
+ */
+export async function getJournalsByYear(year: number): Promise<JournalEntry[]> {
+	const startDate = `${year}-01-01`;
+	const endDate = `${year}-12-31`;
+
+	return db.journals
+		.where('date')
+		.between(startDate, endDate, true, true)
+		.reverse()
+		.sortBy('date');
+}
+
+/**
+ * 仕訳の取得（ID指定）
+ */
+export async function getJournalById(id: string): Promise<JournalEntry | undefined> {
+	return db.journals.get(id);
+}
+
+/**
+ * 仕訳の追加
+ */
+export async function addJournal(
+	journal: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string> {
+	const now = new Date().toISOString();
+	const id = crypto.randomUUID();
+
+	await db.journals.add({
+		...journal,
+		id,
+		createdAt: now,
+		updatedAt: now
+	});
+
+	// 取引先を自動登録
+	if (journal.vendor) {
+		await ensureVendorExists(journal.vendor);
+	}
+
+	return id;
+}
+
+/**
+ * 仕訳の更新
+ */
+export async function updateJournal(
+	id: string,
+	updates: Partial<Omit<JournalEntry, 'id' | 'createdAt'>>
+): Promise<void> {
+	const now = new Date().toISOString();
+
+	await db.journals.update(id, {
+		...updates,
+		updatedAt: now
+	});
+
+	// 取引先を自動登録
+	if (updates.vendor) {
+		await ensureVendorExists(updates.vendor);
+	}
+}
+
+/**
+ * 仕訳の削除
+ */
+export async function deleteJournal(id: string): Promise<void> {
+	await db.journals.delete(id);
+}
+
+/**
+ * 空の仕訳を作成
+ */
+export function createEmptyJournal(): Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'> {
+	return {
+		date: new Date().toISOString().slice(0, 10),
+		lines: [
+			{ id: crypto.randomUUID(), type: 'debit', accountCode: '', amount: 0 },
+			{ id: crypto.randomUUID(), type: 'credit', accountCode: '', amount: 0 }
+		],
+		vendor: '',
+		description: '',
+		evidenceStatus: 'none',
+		attachments: []
+	};
+}
+
+/**
+ * 仕訳のバリデーション（借方合計 === 貸方合計）
+ */
+export function validateJournal(journal: Pick<JournalEntry, 'lines'>): {
+	isValid: boolean;
+	debitTotal: number;
+	creditTotal: number;
+} {
+	const debitTotal = journal.lines
+		.filter((line) => line.type === 'debit')
+		.reduce((sum, line) => sum + line.amount, 0);
+
+	const creditTotal = journal.lines
+		.filter((line) => line.type === 'credit')
+		.reduce((sum, line) => sum + line.amount, 0);
+
+	return {
+		isValid: debitTotal === creditTotal && debitTotal > 0,
+		debitTotal,
+		creditTotal
+	};
+}
+
+// ==================== 取引先関連 ====================
+
+/**
+ * 取引先の存在確認と自動登録
+ */
+async function ensureVendorExists(name: string): Promise<void> {
+	const existing = await db.vendors.where('name').equals(name).first();
+	if (!existing) {
+		await db.vendors.add({
+			id: crypto.randomUUID(),
+			name,
+			createdAt: new Date().toISOString()
+		});
+	}
+}
+
+/**
+ * 全取引先の取得
+ */
+export async function getAllVendors(): Promise<Vendor[]> {
+	return db.vendors.orderBy('name').toArray();
+}
+
+/**
+ * 取引先の検索（部分一致）
+ */
+export async function searchVendors(query: string): Promise<Vendor[]> {
+	if (!query) return getAllVendors();
+
+	const lowerQuery = query.toLowerCase();
+	return db.vendors.filter((v) => v.name.toLowerCase().includes(lowerQuery)).toArray();
+}
