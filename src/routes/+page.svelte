@@ -9,6 +9,7 @@
 		initializeDatabase,
 		getAllAccounts,
 		getJournalsByYear,
+		getJournalById,
 		addJournal,
 		updateJournal,
 		deleteJournal,
@@ -21,9 +22,26 @@
 	let isLoading = $state(true);
 	let deleteDialogOpen = $state(false);
 	let deletingJournalId = $state<string | null>(null);
+	let editingJournalId = $state<string | null>(null); // 新規追加で編集中の仕訳ID
+	let flashingJournalId = $state<string | null>(null); // フラッシュ表示中の仕訳ID
 
 	// 現在の年度（後でサイドバーの選択と連動）
 	const currentYear = new Date().getFullYear();
+
+	// 仕訳をソート（編集中は常に上、それ以外は日付降順）
+	function sortJournals(list: JournalEntry[], editingId: string | null = null): JournalEntry[] {
+		return [...list].sort((a, b) => {
+			// 編集中の仕訳は常に最上部
+			if (editingId) {
+				if (a.id === editingId) return -1;
+				if (b.id === editingId) return 1;
+			}
+			// それ以外は日付降順、同日内は作成日時降順
+			const dateCompare = b.date.localeCompare(a.date);
+			if (dateCompare !== 0) return dateCompare;
+			return b.createdAt.localeCompare(a.createdAt);
+		});
+	}
 
 	// 初期化
 	onMount(async () => {
@@ -46,17 +64,51 @@
 	// 新規仕訳の追加
 	async function handleAddJournal() {
 		const emptyJournal = createEmptyJournal();
-		await addJournal(emptyJournal);
-		await loadData();
+		const newId = await addJournal(emptyJournal);
+		// 新規仕訳を取得してローカル状態に追加
+		const newJournal = await getJournalById(newId);
+		if (newJournal) {
+			editingJournalId = newId; // 編集中としてマーク
+			journals = sortJournals([newJournal, ...journals], newId);
+		}
 	}
 
 	// 仕訳の更新
 	async function handleUpdateJournal(journal: JournalEntry) {
 		// Svelte 5のリアクティブプロキシを除去してプレーンオブジェクトに変換
 		const plainJournal = JSON.parse(JSON.stringify(journal)) as JournalEntry;
+
+		// 既存仕訳の場合、日付変更でソート位置が変わったらフラッシュ
+		const isExisting = editingJournalId !== journal.id;
+		const oldJournal = journals.find((j) => j.id === journal.id);
+		const dateChanged = oldJournal && oldJournal.date !== plainJournal.date;
+
 		await updateJournal(plainJournal.id, plainJournal);
-		// ローカル状態も更新（再読み込みなしで即時反映）
-		journals = journals.map((j) => (j.id === journal.id ? plainJournal : j));
+		// ローカル状態も更新し、日付順にソート（編集中は上に固定）
+		const updated = journals.map((j) => (j.id === journal.id ? plainJournal : j));
+		journals = sortJournals(updated, editingJournalId);
+
+		// 既存仕訳で日付が変わったらフラッシュ
+		if (isExisting && dateChanged) {
+			flashJournal(journal.id);
+		}
+	}
+
+	// フラッシュ表示（一定時間後にクリア）
+	function flashJournal(id: string) {
+		flashingJournalId = id;
+		setTimeout(() => {
+			flashingJournalId = null;
+		}, 1000);
+	}
+
+	// 編集確定（ソート位置へ移動）
+	function handleConfirmJournal(id: string) {
+		if (editingJournalId === id) {
+			editingJournalId = null;
+			journals = sortJournals(journals, null);
+			flashJournal(id);
+		}
 	}
 
 	// 削除確認ダイアログを開く
@@ -120,8 +172,11 @@
 				<JournalRow
 					{journal}
 					{accounts}
+					isEditing={editingJournalId === journal.id}
+					isFlashing={flashingJournalId === journal.id}
 					onupdate={handleUpdateJournal}
 					ondelete={openDeleteDialog}
+					onconfirm={handleConfirmJournal}
 				/>
 			{/each}
 		</div>

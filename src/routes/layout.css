@@ -119,3 +119,25 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* フラッシュアニメーション（ソート後のハイライト） */
+:root {
+  --flash-highlight: oklch(0.95 0.08 90); /* 黄色っぽいハイライト */
+}
+
+.dark {
+  --flash-highlight: oklch(0.35 0.08 90);
+}
+
+@keyframes flash {
+  0%, 100% {
+    background-color: var(--card);
+  }
+  30%, 70% {
+    background-color: var(--flash-highlight);
+  }
+}
+
+.animate-flash {
+  animation: flash 0.8s ease-in-out;
+}

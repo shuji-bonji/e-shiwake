@@ -166,11 +166,17 @@ export async function getJournalsByYear(year: number): Promise<JournalEntry[]> {
 	const startDate = `${year}-01-01`;
 	const endDate = `${year}-12-31`;
 
-	return db.journals
+	const journals = await db.journals
 		.where('date')
 		.between(startDate, endDate, true, true)
-		.reverse()
-		.sortBy('date');
+		.toArray();
+
+	// 日付降順（新しい順）でソート、同日内は作成日時降順
+	return journals.sort((a, b) => {
+		const dateCompare = b.date.localeCompare(a.date);
+		if (dateCompare !== 0) return dateCompare;
+		return b.createdAt.localeCompare(a.createdAt);
+	});
 }
 
 /**
