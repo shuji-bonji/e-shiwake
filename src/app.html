@@ -1,8 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="#0f172a" />
+		<meta name="description" content="フリーランス・個人事業主向けの仕訳入力+証憑管理PWA" />
+
+		<!-- PWA: マニフェストは+layout.svelteで動的に挿入 -->
+		<link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/favicon.svg" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon-192x192.png" />
+
+		<!-- iOS Safari 対応 -->
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="e-shiwake" />
+
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

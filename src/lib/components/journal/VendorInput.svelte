@@ -11,11 +11,12 @@
 		vendors: Vendor[];
 		value: string;
 		onchange: (name: string) => void;
+		onblur?: () => void;
 		placeholder?: string;
 		class?: string;
 	}
 
-	let { vendors, value, onchange, placeholder = '取引先', class: className }: Props = $props();
+	let { vendors, value, onchange, onblur, placeholder = '取引先', class: className }: Props = $props();
 
 	let open = $state(false);
 	let inputRef = $state<HTMLInputElement>(null!);
@@ -55,6 +56,8 @@
 		// 少し遅延させてクリックイベントを先に処理
 		setTimeout(() => {
 			open = false;
+			// 親コンポーネントのonblurを呼び出し（証憑同期など）
+			onblur?.();
 		}, 200);
 	}
 </script>

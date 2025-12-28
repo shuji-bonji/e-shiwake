@@ -627,18 +627,21 @@ interface ExportData {
 - [x] 証憑ダウンロード（iPad向け）
 - [x] JSON インポート
 
-### Phase 1.5: PWA & UX強化
+### Phase 1.5: PWA & UX強化 ✅ 完了
 
 PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固める。
 
-- [ ] PWA対応（Service Worker, Web App Manifest）
-- [ ] オフライン動作
-- [ ] インストール可能（Add to Home Screen）
-- [ ] ダークモード / ライトモード切り替え
+- [x] PWA対応（@vite-pwa/sveltekit + Workbox）
+- [x] Service Worker（自動生成 + キャッシング戦略）
+- [x] Web App Manifest（アイコン、メタ情報）
+- [x] インストール可能（Add to Home Screen）
+- [x] ダークモード / ライトモード / システム設定 切り替え
 
-**なぜこのタイミングか**:
-- PWAはオフライン動作の基盤であり、機能追加前に整備すべき
-- ダークモードは全画面に影響するため、画面数が少ないうちに対応
+**実装詳細**:
+- `@vite-pwa/sveltekit` を使用したService Worker自動生成
+- Workboxによるアセットキャッシング（precache）
+- テーマ設定はlocalStorageに保存、システム設定への追従対応
+- iOS Safari対応（apple-mobile-web-app-*メタタグ）
 
 ### Phase 2: 帳簿機能
 

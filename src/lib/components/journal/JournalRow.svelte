@@ -121,56 +121,49 @@
 		onupdate({ ...journal, evidenceStatus: nextStatus });
 	}
 
-	// フィールド更新
-	async function updateField<K extends keyof JournalEntry>(field: K, value: JournalEntry[K]) {
-		const updatedJournal = { ...journal, [field]: value };
-
-		// 証憑がある場合、関連フィールドの変更で証憑も同期
-		if (journal.attachments.length > 0 && (field === 'date' || field === 'description' || field === 'vendor')) {
-			try {
-				const syncedAttachments = await syncAttachmentsWithJournal(
-					journal.attachments,
-					{ [field]: value as string },
-					directoryHandle
-				);
-				if (syncedAttachments.length > 0) {
-					updatedJournal.attachments = syncedAttachments;
-				}
-			} catch (error) {
-				console.error('証憑の同期に失敗:', error);
-			}
-		}
-
-		onupdate(updatedJournal);
+	// フィールド更新（即時、証憑同期なし）
+	function updateField<K extends keyof JournalEntry>(field: K, value: JournalEntry[K]) {
+		onupdate({ ...journal, [field]: value });
 	}
 
-	// 仕訳行の更新
-	async function updateLine(lineId: string, field: keyof JournalLine, value: string | number) {
+	// 証憑同期（blurタイミングで呼ばれる）
+	async function syncAttachmentsOnBlur() {
+		if (journal.attachments.length === 0) return;
+
+		// メイン借方行の金額を取得
+		const mainDebitAmount = journal.lines.find((l) => l.type === 'debit' && l.accountCode)?.amount ?? 0;
+
+		try {
+			const syncedAttachments = await syncAttachmentsWithJournal(
+				journal.attachments,
+				{
+					date: journal.date,
+					description: journal.description,
+					vendor: journal.vendor,
+					amount: mainDebitAmount
+				},
+				directoryHandle
+			);
+			// ファイル名が変わった場合のみ更新
+			if (syncedAttachments.length > 0) {
+				const hasChanges = syncedAttachments.some((synced, i) =>
+					synced.generatedName !== journal.attachments[i]?.generatedName
+				);
+				if (hasChanges) {
+					onupdate({ ...journal, attachments: syncedAttachments });
+				}
+			}
+		} catch (error) {
+			console.error('証憑の同期に失敗:', error);
+		}
+	}
+
+	// 仕訳行の更新（即時、証憑同期はblurで実行）
+	function updateLine(lineId: string, field: keyof JournalLine, value: string | number) {
 		const newLines = journal.lines.map((line) =>
 			line.id === lineId ? { ...line, [field]: value } : line
 		);
-		const updatedJournal = { ...journal, lines: newLines };
-
-		// 金額が変更された場合、メイン借方行の金額で証憑も同期
-		if (journal.attachments.length > 0 && field === 'amount') {
-			const mainLine = newLines.find((l) => l.type === 'debit' && l.accountCode);
-			if (mainLine && mainLine.id === lineId) {
-				try {
-					const syncedAttachments = await syncAttachmentsWithJournal(
-						journal.attachments,
-						{ amount: value as number },
-						directoryHandle
-					);
-					if (syncedAttachments.length > 0) {
-						updatedJournal.attachments = syncedAttachments;
-					}
-				} catch (error) {
-					console.error('証憑の同期に失敗:', error);
-				}
-			}
-		}
-
-		onupdate(updatedJournal);
+		onupdate({ ...journal, lines: newLines });
 	}
 
 	// 仕訳行の追加
@@ -391,6 +384,7 @@
 			type="date"
 			value={journal.date}
 			onchange={(e) => updateField('date', e.currentTarget.value)}
+			onblur={syncAttachmentsOnBlur}
 			class="w-36"
 		/>
 
@@ -399,6 +393,7 @@
 			type="text"
 			value={journal.description}
 			oninput={(e) => updateField('description', e.currentTarget.value)}
+			onblur={syncAttachmentsOnBlur}
 			placeholder="摘要"
 			class="flex-1"
 		/>
@@ -408,6 +403,7 @@
 			{vendors}
 			value={journal.vendor}
 			onchange={(name) => updateField('vendor', name)}
+			onblur={syncAttachmentsOnBlur}
 			placeholder="取引先"
 			class="w-40"
 		/>
@@ -510,6 +506,7 @@
 						type="number"
 						value={line.amount}
 						onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
+						onblur={syncAttachmentsOnBlur}
 						class={cn(
 							'w-28 text-right font-mono',
 							!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
@@ -583,6 +580,7 @@
 						type="number"
 						value={line.amount}
 						onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
+						onblur={syncAttachmentsOnBlur}
 						class={cn(
 							'w-28 text-right font-mono',
 							!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'

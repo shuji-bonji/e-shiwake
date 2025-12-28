@@ -16,6 +16,8 @@
 		WARNING_THRESHOLD
 	} from '$lib/utils/storage';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
+	import { initializeTheme } from '$lib/stores/theme.svelte.js';
+	import { pwaInfo } from 'virtual:pwa-info';
 
 	let { children } = $props();
 
@@ -23,7 +25,26 @@
 	let showStorageWarning = $state(false);
 	let storageUsedBytes = $state(0);
 
+	// PWA webmanifest link
+	const webManifest = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
+
 	onMount(async () => {
+		// テーマを初期化
+		initializeTheme();
+
+		// Service Workerを登録（本番ビルド時のみ有効）
+		if (pwaInfo) {
+			const { registerSW } = await import('virtual:pwa-register');
+			registerSW({
+				immediate: true,
+				onRegistered(r) {
+					console.log('SW Registered:', r);
+				},
+				onRegisterError(error) {
+					console.error('SW registration error:', error);
+				}
+			});
+		}
 		// File System Access API対応ならチェック不要
 		if (supportsFileSystemAccess()) {
 			const storageMode = await getStorageMode();
@@ -51,6 +72,8 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 	<title>e-shiwake - 電子仕訳</title>
+	<!-- PWA manifest（ビルド時に挿入） -->
+	{@html webManifest}
 </svelte:head>
 
 <Sidebar.Provider>
