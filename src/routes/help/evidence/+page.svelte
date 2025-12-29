@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { HelpSection, HelpNote, HelpTable } from '$lib/components/help';
+	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
 </script>
 
 <div>
@@ -20,12 +20,14 @@
 			<li>紐付け完了後、証跡アイコンが変わります</li>
 		</ol>
 		<HelpNote type="info">
-			<p>紐付け後、ファイルは電帳法準拠の命名規則で自動リネームされます。</p>
+			<p>
+				ドラッグ＆ドロップしたPDFは<strong>コピー</strong>されて保存されます。元のファイルは変更されません。
+			</p>
 		</HelpNote>
 	</HelpSection>
 
 	<HelpSection title="ファイル命名規則">
-		<p>紐付けられたファイルは以下の形式で自動リネームされます：</p>
+		<p>コピーされたファイルは、以下の形式で自動的に名前が付けられます。</p>
 		<code class="mt-2 block rounded bg-muted p-3 text-sm">
 			{'{日付}_{種類}_{勘定科目}_{金額}円_{取引先}.pdf'}
 		</code>

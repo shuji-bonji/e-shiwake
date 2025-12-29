@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { HelpSection, HelpNote, HelpTable } from '$lib/components/help';
+	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
 </script>
 
 <div>
@@ -34,7 +34,7 @@
 	</HelpSection>
 
 	<HelpSection title="科目コード体系">
-		<p>科目コードは4桁で構成されています：</p>
+		<p>科目コードは4桁で構成されています。</p>
 		<code class="mt-2 block rounded bg-muted p-3 text-sm">
 			[カテゴリ][区分][連番]<br />
 			&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;↓<br />
@@ -67,7 +67,7 @@
 	</HelpSection>
 
 	<HelpSection title="システム科目とカスタム科目">
-		<p>科目一覧では、バッジで区別されています：</p>
+		<p>科目一覧では、バッジで区別されています。</p>
 		<ul class="ml-4 list-disc space-y-1">
 			<li><strong>システム</strong>：初期登録されている科目</li>
 			<li><strong>カスタム</strong>：ユーザーが追加した科目</li>

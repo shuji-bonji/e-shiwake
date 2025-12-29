@@ -25,7 +25,7 @@
 			rows={[
 				['JSON', '仕訳・勘定科目・取引先・設定', 'バックアップ、移行'],
 				['CSV', '仕訳のみ（フラット形式）', '他ソフトとの連携'],
-				['ZIP', 'JSON + PDF証憑', '完全バックアップ（有料）']
+				['ZIP', 'JSON + PDF証憑', '完全バックアップ、年次アーカイブ']
 			]}
 		/>
 		<HelpNote type="tip">
@@ -47,7 +47,7 @@
 	</HelpSection>
 
 	<HelpSection title="年度アーカイブ">
-		<p>過去の年度データをZIP形式でアーカイブできます（有料機能）。</p>
+		<p>過去の年度データをZIP形式でアーカイブできます。</p>
 		<ul class="ml-4 list-disc space-y-1">
 			<li>仕訳データ（JSON）</li>
 			<li>紐付けられたPDF証憑</li>

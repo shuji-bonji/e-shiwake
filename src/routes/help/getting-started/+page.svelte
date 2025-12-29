@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { HelpSection, HelpNote } from '$lib/components/help';
+	import { HelpNote, HelpSection } from '$lib/components/help';
 </script>
 
 <div>
@@ -7,7 +7,7 @@
 
 	<HelpSection title="e-shiwake とは">
 		<p>e-shiwake（電子仕訳）は、フリーランス・個人事業主向けの仕訳入力＆証憑管理アプリです。</p>
-		<p>以下の特徴があります：</p>
+		<p>以下の特徴があります。</p>
 		<ul class="ml-4 list-disc space-y-1">
 			<li><strong>ローカルファースト</strong>：サーバー不要、データはブラウザ内に保存</li>
 			<li><strong>電帳法対応</strong>：日本の電子帳簿保存法の検索要件に準拠</li>
@@ -29,19 +29,21 @@
 		<ol class="ml-4 list-decimal space-y-2">
 			<li>
 				<strong>年度を選択</strong>
-				<p class="text-sm">サイドバーから対象の会計年度を選択します</p>
+				<p class="text-sm">サイドバーから対象の会計年度を選択します。</p>
 			</li>
 			<li>
 				<strong>仕訳を入力</strong>
-				<p class="text-sm">「新規仕訳」ボタンから仕訳を追加します</p>
+				<p class="text-sm">「新規仕訳」ボタンから仕訳を追加します。</p>
 			</li>
 			<li>
 				<strong>証憑を紐付け</strong>
-				<p class="text-sm">PDFファイルをドラッグ＆ドロップで仕訳に紐付けます</p>
+				<p class="text-sm">
+					PDFファイルをドラッグ＆ドロップで仕訳に紐付けます（元ファイルはそのまま残ります）。
+				</p>
 			</li>
 			<li>
 				<strong>データをエクスポート</strong>
-				<p class="text-sm">必要に応じてJSON/CSV形式でエクスポートします</p>
+				<p class="text-sm">必要に応じてJSON/CSV形式でエクスポートします。</p>
 			</li>
 		</ol>
 	</HelpSection>
@@ -66,7 +68,7 @@
 			<li>Firefox（最新版）</li>
 		</ul>
 		<p class="mt-2 text-sm">
-			※ 一部の機能（ファイル保存先の選択など）はChrome/Edgeでのみ利用可能です
+			※ 一部の機能（証憑PDFファイル保存先の選択など）はChrome/Edgeでのみ利用可能です
 		</p>
 	</HelpSection>
 </div>

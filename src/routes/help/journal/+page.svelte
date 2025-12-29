@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { HelpSection, HelpNote, HelpTable } from '$lib/components/help';
+	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
 </script>
 
 <div>
@@ -10,7 +10,7 @@
 			<li>画面右上の「新規仕訳」ボタンをクリック</li>
 			<li>仕訳リストの最下部に空の仕訳行が追加されます</li>
 			<li>
-				各フィールドを入力します：
+				各フィールドを入力します。
 				<ul class="mt-1 ml-4 list-disc">
 					<li>日付（取引日）</li>
 					<li>摘要（取引の内容）</li>
@@ -73,7 +73,7 @@
 			]}
 		/>
 		<HelpNote type="info">
-			<p>種別アイコンで増減がわかります：⬆ = 増加、⬇ = 減少</p>
+			<p>種別アイコンで増減がわかります。⬆ = 増加、⬇ = 減少</p>
 		</HelpNote>
 	</HelpSection>
 

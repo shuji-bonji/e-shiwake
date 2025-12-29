@@ -598,7 +598,7 @@ interface ExportData {
 
 ### ストレージモードとデータ移行
 
-現在、証憑の保存先として2つのモードがある：
+現在、証憑の保存先として2つのモードがある。
 
 - **filesystem**: デスクトップ向け（File System Access API）
 - **indexeddb**: iPad/Safari向け（ブラウザ内保存）

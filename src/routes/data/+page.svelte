@@ -1,42 +1,42 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import * as RadioGroup from '$lib/components/ui/radio-group/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import {
-		Download,
-		FileJson,
-		FileSpreadsheet,
-		Archive,
-		AlertTriangle,
-		Check,
-		Upload,
-		X,
-		Database,
-		Trash2
-	} from '@lucide/svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import * as RadioGroup from '$lib/components/ui/radio-group/index.js';
 	import {
-		initializeDatabase,
-		getAvailableYears,
-		getJournalsByYear,
+		deleteYearData,
 		getAllAccounts,
 		getAllVendors,
-		getUnexportedAttachmentCount,
+		getAvailableYears,
+		getImportPreview,
+		getJournalsByYear,
 		getStorageMode,
+		getUnexportedAttachmentCount,
+		importData,
+		initializeDatabase,
 		setLastExportedAt,
 		validateExportData,
-		getImportPreview,
-		importData,
-		deleteYearData,
 		type ImportMode,
 		type ImportResult
 	} from '$lib/db';
 	import { setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
 	import type { ExportData, StorageType } from '$lib/types';
+	import {
+		AlertTriangle,
+		Archive,
+		Check,
+		Database,
+		Download,
+		FileJson,
+		FileSpreadsheet,
+		Trash2,
+		Upload,
+		X
+	} from '@lucide/svelte';
+	import { onMount } from 'svelte';
 
 	// エクスポート関連の状態
 	let availableYears = $state<number[]>([]);
@@ -701,7 +701,7 @@
 				{deletingYear}年度のデータを削除
 			</AlertDialog.Title>
 			<AlertDialog.Description class="space-y-3">
-				<p>以下のデータが完全に削除されます：</p>
+				<p>以下のデータが完全に削除されます。</p>
 				{#if deletingYearSummary}
 					<ul class="list-inside list-disc space-y-1 text-foreground">
 						<li>仕訳 {deletingYearSummary.journalCount}件</li>

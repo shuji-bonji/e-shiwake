@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { HelpSection, HelpNote, HelpTable } from '$lib/components/help';
+	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
 </script>
 
 <div>
@@ -8,7 +8,7 @@
 	<HelpSection title="PWAとは">
 		<p>
 			PWA（Progressive Web App）は、Webサイトをアプリのようにインストールして使える技術です。
-			e-shiwakeはPWA対応しており、以下のメリットがあります：
+			e-shiwakeはPWA対応しており、以下のメリットがあります。
 		</p>
 		<ul class="ml-4 list-disc space-y-1">
 			<li>ホーム画面から直接起動</li>

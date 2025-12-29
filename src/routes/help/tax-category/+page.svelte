@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { HelpSection, HelpNote, HelpTable } from '$lib/components/help';
+	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
 </script>
 
 <div>
@@ -58,7 +58,7 @@
 	</HelpSection>
 
 	<HelpSection title="勘定科目のデフォルト区分">
-		<p>科目の種類によって、適切なデフォルト区分が自動設定されます：</p>
+		<p>科目の種類によって、適切なデフォルト区分が自動設定されます。</p>
 		<HelpTable
 			headers={['科目種別', 'デフォルト区分']}
 			rows={[
