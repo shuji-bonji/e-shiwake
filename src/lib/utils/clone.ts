@@ -44,6 +44,7 @@ export function cloneJournal(journal: JournalEntry): JournalEntry {
 			type: line.type,
 			accountCode: line.accountCode,
 			amount: line.amount,
+			taxCategory: line.taxCategory,
 			memo: line.memo
 		})),
 		vendor: journal.vendor,

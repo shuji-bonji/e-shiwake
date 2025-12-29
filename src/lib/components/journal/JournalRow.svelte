@@ -448,7 +448,7 @@
 
 <div
 	class={cn(
-		'flex flex-col gap-4 rounded-lg border bg-card p-4 shadow-sm transition-all md:flex-row',
+		'flex flex-col gap-4 rounded-lg border bg-card p-4 shadow-sm transition-all journal:flex-row',
 		isEditing && 'border-primary ring-2 ring-primary/20',
 		isFlashing && 'animate-flash',
 		!validation.isValid &&
@@ -459,7 +459,7 @@
 	<!-- メインコンテンツ -->
 	<div class="min-w-0 flex-1">
 		<!-- ヘッダー行: モバイル2段、デスクトップ1行 -->
-		<div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+		<div class="mb-3 flex flex-col gap-2 journal:flex-row journal:items-center journal:gap-3">
 			<!-- 証跡ステータス + 日付 + 摘要 -->
 			<div class="flex min-w-0 flex-1 items-center gap-2">
 				<!-- 証跡ステータス -->
@@ -509,7 +509,7 @@
 			</div>
 
 			<!-- 取引先 + ボタン類 -->
-			<div class="flex items-center gap-2 pl-8 md:pl-0">
+			<div class="flex items-center gap-2 pl-8 journal:pl-0">
 				<!-- 取引先 -->
 				<VendorInput
 					{vendors}
@@ -604,7 +604,7 @@
 					{@const accountType = getAccountType(line.accountCode)}
 					{@const indicator = getLineIndicator('debit', accountType)}
 					<!-- モバイル: 2段、デスクトップ: 1行 -->
-					<div class="flex flex-col gap-1 md:flex-row md:items-center md:gap-2">
+					<div class="flex flex-col gap-1 journal:flex-row journal:items-center journal:gap-2">
 						<!-- 種別アイコン + 勘定科目 -->
 						<div class="flex min-w-0 flex-1 items-center gap-2">
 							<Tooltip.Provider>
@@ -637,7 +637,7 @@
 							/>
 						</div>
 						<!-- 税区分 + 金額 + 削除ボタン -->
-						<div class="flex items-center gap-1 pl-9 md:pl-0">
+						<div class="flex items-center gap-1 pl-9 journal:pl-0">
 							<TaxCategorySelect
 								value={line.taxCategory}
 								onchange={(cat) => updateLine(line.id, 'taxCategory', cat)}
@@ -649,7 +649,7 @@
 								onblur={syncAttachmentsOnBlur}
 								placeholder="金額"
 								class={cn(
-									'w-full text-right font-mono md:w-24',
+									'w-full text-right font-mono journal:w-24',
 									!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
 								)}
 								min="0"
@@ -707,7 +707,7 @@
 					{@const accountType = getAccountType(line.accountCode)}
 					{@const indicator = getLineIndicator('credit', accountType)}
 					<!-- モバイル: 2段、デスクトップ: 1行 -->
-					<div class="flex flex-col gap-1 md:flex-row md:items-center md:gap-2">
+					<div class="flex flex-col gap-1 journal:flex-row journal:items-center journal:gap-2">
 						<!-- 種別アイコン + 勘定科目 -->
 						<div class="flex min-w-0 flex-1 items-center gap-2">
 							<Tooltip.Provider>
@@ -740,7 +740,7 @@
 							/>
 						</div>
 						<!-- 税区分 + 金額 + 削除ボタン -->
-						<div class="flex items-center gap-1 pl-9 md:pl-0">
+						<div class="flex items-center gap-1 pl-9 journal:pl-0">
 							<TaxCategorySelect
 								value={line.taxCategory}
 								onchange={(cat) => updateLine(line.id, 'taxCategory', cat)}
@@ -752,7 +752,7 @@
 								onblur={syncAttachmentsOnBlur}
 								placeholder="金額"
 								class={cn(
-									'w-full text-right font-mono md:w-24',
+									'w-full text-right font-mono journal:w-24',
 									!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
 								)}
 								min="0"
@@ -784,7 +784,7 @@
 	</div>
 
 	<!-- PDF添付エリア（デスクトップ: 右側、モバイル: 下部） -->
-	<div class="w-full md:w-36 md:shrink-0">
+	<div class="w-full journal:w-24 journal:shrink-0">
 		<PdfDropZone
 			attachments={journal.attachments}
 			onattach={handleFileDrop}
