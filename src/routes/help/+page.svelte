@@ -7,7 +7,8 @@
 		FolderCog,
 		Database,
 		Smartphone,
-		Keyboard
+		Keyboard,
+		BookA
 	} from '@lucide/svelte';
 
 	const sections = [
@@ -58,6 +59,12 @@
 			label: 'ショートカット',
 			icon: Keyboard,
 			description: 'キーボードショートカット一覧'
+		},
+		{
+			href: '/help/glossary',
+			label: '用語集',
+			icon: BookA,
+			description: '簿記・会計用語の解説'
 		}
 	];
 </script>

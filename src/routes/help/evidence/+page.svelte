@@ -21,7 +21,8 @@
 		</ol>
 		<HelpNote type="info">
 			<p>
-				ドラッグ＆ドロップしたPDFは<strong>コピー</strong>されて保存されます。元のファイルは変更されません。
+				ドラッグ＆ドロップしたPDFは<strong>コピー</strong
+				>されて保存されます。元のファイルは変更されません。
 			</p>
 		</HelpNote>
 	</HelpSection>

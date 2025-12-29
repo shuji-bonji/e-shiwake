@@ -12,7 +12,8 @@
 		FolderCog,
 		Database,
 		Smartphone,
-		Keyboard
+		Keyboard,
+		BookA
 	} from '@lucide/svelte';
 	import { cn } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
@@ -31,7 +32,8 @@
 		{ href: '/help/accounts', label: '勘定科目管理', icon: FolderCog },
 		{ href: '/help/data-management', label: 'データ管理', icon: Database },
 		{ href: '/help/pwa', label: 'PWA・オフライン', icon: Smartphone },
-		{ href: '/help/shortcuts', label: 'ショートカット', icon: Keyboard }
+		{ href: '/help/shortcuts', label: 'ショートカット', icon: Keyboard },
+		{ href: '/help/glossary', label: '用語集', icon: BookA }
 	];
 
 	const currentPath = $derived($page.url.pathname);
