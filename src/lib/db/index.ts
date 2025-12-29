@@ -8,7 +8,7 @@ import type {
 	StorageType,
 	ExportData
 } from '$lib/types';
-import { defaultAccounts } from './seed';
+import { defaultAccounts, getDefaultTaxCategory } from './seed';
 
 /**
  * 設定レコード（キーバリュー形式）
@@ -48,6 +48,27 @@ class EShiwakeDatabase extends Dexie {
 			attachments: 'id, journalEntryId',
 			settings: 'key'
 		});
+
+		// Version 3: 消費税区分対応
+		this.version(3)
+			.stores({
+				accounts: 'code, name, type, isSystem',
+				vendors: 'id, name',
+				journals: 'id, date, vendor, evidenceStatus',
+				attachments: 'id, journalEntryId',
+				settings: 'key'
+			})
+			.upgrade(async (tx) => {
+				// 既存の勘定科目にデフォルト消費税区分を設定
+				await tx
+					.table('accounts')
+					.toCollection()
+					.modify((account: Account) => {
+						if (!account.defaultTaxCategory) {
+							account.defaultTaxCategory = getDefaultTaxCategory(account.type, account.code);
+						}
+					});
+			});
 	}
 }
 

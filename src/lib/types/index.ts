@@ -20,6 +20,49 @@ export const AccountTypeLabels: Record<AccountType, string> = {
 };
 
 /**
+ * 消費税率
+ */
+export type TaxRate = 10 | 8 | 0;
+
+/**
+ * 消費税区分
+ */
+export type TaxCategory =
+	| 'sales_10' // 課税売上10%
+	| 'sales_8' // 課税売上8%（軽減税率）
+	| 'purchase_10' // 課税仕入10%
+	| 'purchase_8' // 課税仕入8%（軽減税率）
+	| 'exempt' // 非課税
+	| 'out_of_scope' // 不課税
+	| 'na'; // 対象外（事業主勘定等）
+
+/**
+ * 消費税区分のラベル
+ */
+export const TaxCategoryLabels: Record<TaxCategory, string> = {
+	sales_10: '課売10%',
+	sales_8: '課売8%',
+	purchase_10: '課仕10%',
+	purchase_8: '課仕8%',
+	exempt: '非課税',
+	out_of_scope: '不課税',
+	na: '対象外'
+};
+
+/**
+ * 消費税区分の短縮ラベル（UI用）
+ */
+export const TaxCategoryShortLabels: Record<TaxCategory, string> = {
+	sales_10: '売10',
+	sales_8: '売8',
+	purchase_10: '仕10',
+	purchase_8: '仕8',
+	exempt: '非課',
+	out_of_scope: '不課',
+	na: '−'
+};
+
+/**
  * 勘定科目
  */
 export interface Account {
@@ -27,6 +70,7 @@ export interface Account {
 	name: string; // 勘定科目名（例: "現金", "旅費交通費"）
 	type: AccountType; // 5カテゴリ
 	isSystem: boolean; // システム初期データか、ユーザー追加か
+	defaultTaxCategory?: TaxCategory; // デフォルト消費税区分
 	createdAt: string; // 作成日時 ISO8601
 }
 
@@ -80,6 +124,7 @@ export interface JournalLine {
 	type: 'debit' | 'credit'; // 借方 or 貸方
 	accountCode: string; // 勘定科目コード
 	amount: number; // 金額（電帳法: 取引金額）
+	taxCategory?: TaxCategory; // 消費税区分
 	memo?: string; // 行メモ（按分理由など）
 }
 

@@ -14,6 +14,7 @@
 		Check
 	} from '@lucide/svelte';
 	import AccountSelect from './AccountSelect.svelte';
+	import TaxCategorySelect from './TaxCategorySelect.svelte';
 	import VendorInput from './VendorInput.svelte';
 	import PdfDropZone from './PdfDropZone.svelte';
 	import AttachmentDialog from './AttachmentDialog.svelte';
@@ -27,7 +28,8 @@
 		EvidenceStatus,
 		Vendor,
 		Attachment,
-		DocumentType
+		DocumentType,
+		TaxCategory
 	} from '$lib/types';
 	import {
 		validateJournal,
@@ -98,6 +100,11 @@
 	// 勘定科目のタイプを取得
 	function getAccountType(code: string): AccountType | null {
 		return accounts.find((a) => a.code === code)?.type ?? null;
+	}
+
+	// 勘定科目のデフォルト税区分を取得
+	function getAccountDefaultTaxCategory(code: string): TaxCategory | undefined {
+		return accounts.find((a) => a.code === code)?.defaultTaxCategory;
 	}
 
 	/**
@@ -239,9 +246,24 @@
 	}
 
 	// 仕訳行の更新（即時、証憑同期はblurで実行）
-	function updateLine(lineId: string, field: keyof JournalLine, value: string | number) {
+	function updateLine(
+		lineId: string,
+		field: keyof JournalLine,
+		value: string | number | TaxCategory | undefined
+	) {
 		const newLines = journal.lines.map((line) =>
 			line.id === lineId ? { ...line, [field]: value } : line
+		);
+		onupdate({ ...journal, lines: newLines });
+	}
+
+	// 勘定科目変更時（デフォルト税区分も自動設定）
+	function handleAccountChange(lineId: string, accountCode: string) {
+		const defaultTaxCategory = getAccountDefaultTaxCategory(accountCode);
+		const newLines = journal.lines.map((line) =>
+			line.id === lineId
+				? { ...line, accountCode, taxCategory: line.taxCategory ?? defaultTaxCategory }
+				: line
 		);
 		onupdate({ ...journal, lines: newLines });
 	}
@@ -610,12 +632,16 @@
 							<AccountSelect
 								{accounts}
 								value={line.accountCode}
-								onchange={(code) => updateLine(line.id, 'accountCode', code)}
+								onchange={(code) => handleAccountChange(line.id, code)}
 								class="min-w-0 flex-1"
 							/>
 						</div>
-						<!-- 金額 + 削除ボタン -->
-						<div class="flex items-center gap-2 pl-9 md:pl-0">
+						<!-- 税区分 + 金額 + 削除ボタン -->
+						<div class="flex items-center gap-1 pl-9 md:pl-0">
+							<TaxCategorySelect
+								value={line.taxCategory}
+								onchange={(cat) => updateLine(line.id, 'taxCategory', cat)}
+							/>
 							<Input
 								type="number"
 								value={line.amount}
@@ -623,7 +649,7 @@
 								onblur={syncAttachmentsOnBlur}
 								placeholder="金額"
 								class={cn(
-									'w-full text-right font-mono md:w-28',
+									'w-full text-right font-mono md:w-24',
 									!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
 								)}
 								min="0"
@@ -709,12 +735,16 @@
 							<AccountSelect
 								{accounts}
 								value={line.accountCode}
-								onchange={(code) => updateLine(line.id, 'accountCode', code)}
+								onchange={(code) => handleAccountChange(line.id, code)}
 								class="min-w-0 flex-1"
 							/>
 						</div>
-						<!-- 金額 + 削除ボタン -->
-						<div class="flex items-center gap-2 pl-9 md:pl-0">
+						<!-- 税区分 + 金額 + 削除ボタン -->
+						<div class="flex items-center gap-1 pl-9 md:pl-0">
+							<TaxCategorySelect
+								value={line.taxCategory}
+								onchange={(cat) => updateLine(line.id, 'taxCategory', cat)}
+							/>
 							<Input
 								type="number"
 								value={line.amount}
@@ -722,7 +752,7 @@
 								onblur={syncAttachmentsOnBlur}
 								placeholder="金額"
 								class={cn(
-									'w-full text-right font-mono md:w-28',
+									'w-full text-right font-mono md:w-24',
 									!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
 								)}
 								min="0"
