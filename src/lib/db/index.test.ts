@@ -24,6 +24,7 @@ import {
 	addJournal,
 	updateJournal,
 	deleteJournal,
+	deleteYearData,
 	createEmptyJournal,
 	validateJournal,
 	// 取引先
@@ -32,8 +33,10 @@ import {
 	// 添付ファイル
 	generateAttachmentName,
 	suggestDocumentType,
-	// インポート
-	validateExportData
+	// インポート/エクスポート
+	validateExportData,
+	importData,
+	getImportPreview
 } from './index';
 
 /**
@@ -796,6 +799,342 @@ describe('インポート/エクスポート', () => {
 					vendors: []
 				})
 			).toBe(false);
+		});
+	});
+
+	describe('deleteYearData', () => {
+		beforeEach(async () => {
+			await clearAllTables();
+			await initializeDatabase();
+		});
+
+		afterEach(async () => {
+			await clearAllTables();
+		});
+
+		it('指定した年度の仕訳を削除できる', async () => {
+			// 2024年の仕訳を追加
+			await addJournal({
+				date: '2024-03-15',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 1000 },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 1000 }
+				],
+				vendor: 'A社',
+				description: '2024年仕訳1',
+				evidenceStatus: 'none',
+				attachments: []
+			});
+
+			await addJournal({
+				date: '2024-06-20',
+				lines: [
+					{ id: '3', type: 'debit', accountCode: '5006', amount: 2000 },
+					{ id: '4', type: 'credit', accountCode: '1002', amount: 2000 }
+				],
+				vendor: 'B社',
+				description: '2024年仕訳2',
+				evidenceStatus: 'none',
+				attachments: []
+			});
+
+			// 2025年の仕訳を追加
+			await addJournal({
+				date: '2025-01-10',
+				lines: [
+					{ id: '5', type: 'debit', accountCode: '5006', amount: 3000 },
+					{ id: '6', type: 'credit', accountCode: '1002', amount: 3000 }
+				],
+				vendor: 'C社',
+				description: '2025年仕訳',
+				evidenceStatus: 'none',
+				attachments: []
+			});
+
+			// 2024年のデータを削除
+			const result = await deleteYearData(2024);
+
+			expect(result.journalCount).toBe(2);
+			expect(result.attachmentCount).toBe(0);
+
+			// 2024年の仕訳がなくなっていることを確認
+			const journals2024 = await getJournalsByYear(2024);
+			expect(journals2024).toHaveLength(0);
+
+			// 2025年の仕訳は残っていることを確認
+			const journals2025 = await getJournalsByYear(2025);
+			expect(journals2025).toHaveLength(1);
+			expect(journals2025[0].description).toBe('2025年仕訳');
+		});
+
+		it('仕訳がない年度は0件で返る', async () => {
+			const result = await deleteYearData(2020);
+
+			expect(result.journalCount).toBe(0);
+			expect(result.attachmentCount).toBe(0);
+		});
+	});
+
+	// テスト用のデフォルト設定
+	const testSettings = {
+		fiscalYearStart: 1,
+		defaultCurrency: 'JPY',
+		storageMode: 'indexeddb' as const,
+		autoPurgeBlobAfterExport: true,
+		blobRetentionDays: 30
+	};
+
+	describe('getImportPreview', () => {
+		beforeEach(async () => {
+			await clearAllTables();
+			await initializeDatabase();
+		});
+
+		afterEach(async () => {
+			await clearAllTables();
+		});
+
+		it('インポートプレビューを取得できる', async () => {
+			const exportData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [
+					{
+						id: 'journal-1',
+						date: '2024-01-15',
+						lines: [
+							{ id: '1', type: 'debit' as const, accountCode: '5006', amount: 1000 },
+							{ id: '2', type: 'credit' as const, accountCode: '1002', amount: 1000 }
+						],
+						vendor: '新規取引先',
+						description: 'テスト仕訳',
+						evidenceStatus: 'none' as const,
+						attachments: [],
+						createdAt: '2024-01-15T00:00:00.000Z',
+						updatedAt: '2024-01-15T00:00:00.000Z'
+					}
+				],
+				accounts: [
+					{
+						code: '5200',
+						name: 'カスタム科目',
+						type: 'expense' as const,
+						isSystem: false,
+						createdAt: '2024-01-15T00:00:00.000Z'
+					}
+				],
+				vendors: [{ id: 'v1', name: '新規取引先', createdAt: '2024-01-15T00:00:00.000Z' }],
+				settings: testSettings
+			};
+
+			const preview = await getImportPreview(exportData);
+
+			expect(preview.fiscalYear).toBe(2024);
+			expect(preview.journalCount).toBe(1);
+			expect(preview.newJournalCount).toBe(1);
+			expect(preview.accountCount).toBe(1);
+			expect(preview.newAccountCount).toBe(1);
+			expect(preview.vendorCount).toBe(1);
+			expect(preview.newVendorCount).toBe(1);
+		});
+
+		it('既存データがある場合は新規カウントが正しい', async () => {
+			// 既存の仕訳を追加
+			await addJournal({
+				date: '2024-02-01',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 500 },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 500 }
+				],
+				vendor: '既存取引先',
+				description: '既存仕訳',
+				evidenceStatus: 'none',
+				attachments: []
+			});
+
+			const exportData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [
+					{
+						id: 'new-journal',
+						date: '2024-01-15',
+						lines: [
+							{ id: '1', type: 'debit' as const, accountCode: '5006', amount: 1000 },
+							{ id: '2', type: 'credit' as const, accountCode: '1002', amount: 1000 }
+						],
+						vendor: '既存取引先',
+						description: 'インポート仕訳',
+						evidenceStatus: 'none' as const,
+						attachments: [],
+						createdAt: '2024-01-15T00:00:00.000Z',
+						updatedAt: '2024-01-15T00:00:00.000Z'
+					}
+				],
+				accounts: [],
+				vendors: [{ id: 'v1', name: '既存取引先', createdAt: '2024-01-15T00:00:00.000Z' }],
+				settings: testSettings
+			};
+
+			const preview = await getImportPreview(exportData);
+
+			expect(preview.journalCount).toBe(1);
+			expect(preview.newJournalCount).toBe(1);
+			expect(preview.vendorCount).toBe(1);
+			expect(preview.newVendorCount).toBe(0); // 既存取引先なので0
+		});
+	});
+
+	describe('importData', () => {
+		beforeEach(async () => {
+			await clearAllTables();
+			await initializeDatabase();
+		});
+
+		afterEach(async () => {
+			await clearAllTables();
+		});
+
+		it('マージモードでインポートできる', async () => {
+			// 既存の仕訳を追加
+			const existingId = await addJournal({
+				date: '2024-02-01',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 500 },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 500 }
+				],
+				vendor: '既存取引先',
+				description: '既存仕訳',
+				evidenceStatus: 'none',
+				attachments: []
+			});
+
+			const exportData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [
+					{
+						id: 'new-journal',
+						date: '2024-01-15',
+						lines: [
+							{ id: '1', type: 'debit' as const, accountCode: '5006', amount: 1000 },
+							{ id: '2', type: 'credit' as const, accountCode: '1002', amount: 1000 }
+						],
+						vendor: '新規取引先',
+						description: 'インポート仕訳',
+						evidenceStatus: 'none' as const,
+						attachments: [],
+						createdAt: '2024-01-15T00:00:00.000Z',
+						updatedAt: '2024-01-15T00:00:00.000Z'
+					}
+				],
+				accounts: [],
+				vendors: [],
+				settings: testSettings
+			};
+
+			const result = await importData(exportData, 'merge');
+
+			expect(result.success).toBe(true);
+			expect(result.journalsImported).toBe(1);
+
+			// 既存の仕訳が残っていることを確認
+			const existingJournal = await getJournalById(existingId);
+			expect(existingJournal).toBeDefined();
+			expect(existingJournal?.description).toBe('既存仕訳');
+
+			// 新規仕訳がインポートされていることを確認
+			const journals = await getJournalsByYear(2024);
+			expect(journals).toHaveLength(2);
+		});
+
+		it('上書きモードでインポートできる', async () => {
+			// 既存の仕訳を追加
+			await addJournal({
+				date: '2024-02-01',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 500 },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 500 }
+				],
+				vendor: '既存取引先',
+				description: '既存仕訳',
+				evidenceStatus: 'none',
+				attachments: []
+			});
+
+			const exportData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [
+					{
+						id: 'new-journal',
+						date: '2024-01-15',
+						lines: [
+							{ id: '1', type: 'debit' as const, accountCode: '5006', amount: 1000 },
+							{ id: '2', type: 'credit' as const, accountCode: '1002', amount: 1000 }
+						],
+						vendor: '新規取引先',
+						description: 'インポート仕訳',
+						evidenceStatus: 'none' as const,
+						attachments: [],
+						createdAt: '2024-01-15T00:00:00.000Z',
+						updatedAt: '2024-01-15T00:00:00.000Z'
+					}
+				],
+				accounts: [],
+				vendors: [],
+				settings: testSettings
+			};
+
+			const result = await importData(exportData, 'overwrite');
+
+			expect(result.success).toBe(true);
+			expect(result.journalsImported).toBe(1);
+
+			// 既存の仕訳が削除されていることを確認
+			const journals = await getJournalsByYear(2024);
+			expect(journals).toHaveLength(1);
+			expect(journals[0].description).toBe('インポート仕訳');
+		});
+
+		it('勘定科目と取引先もインポートされる', async () => {
+			const exportData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [],
+				accounts: [
+					{
+						code: '5200',
+						name: 'カスタム科目',
+						type: 'expense' as const,
+						isSystem: false,
+						createdAt: '2024-01-15T00:00:00.000Z'
+					}
+				],
+				vendors: [{ id: 'v1', name: '新規取引先', createdAt: '2024-01-15T00:00:00.000Z' }],
+				settings: testSettings
+			};
+
+			const result = await importData(exportData, 'merge');
+
+			expect(result.success).toBe(true);
+			expect(result.accountsImported).toBe(1);
+			expect(result.vendorsImported).toBe(1);
+
+			// 勘定科目がインポートされていることを確認
+			const account = await db.accounts.get('5200');
+			expect(account).toBeDefined();
+			expect(account?.name).toBe('カスタム科目');
+
+			// 取引先がインポートされていることを確認
+			const vendors = await getAllVendors();
+			const found = vendors.find((v) => v.name === '新規取引先');
+			expect(found).toBeDefined();
 		});
 	});
 });
