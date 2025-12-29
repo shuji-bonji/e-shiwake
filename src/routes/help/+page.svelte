@@ -44,9 +44,9 @@
 		},
 		{
 			href: '/help/data-management',
-			label: 'データ管理',
+			label: '設定・データ管理',
 			icon: Database,
-			description: 'エクスポート・インポート・バックアップ'
+			description: '証憑保存設定・エクスポート・インポート・バックアップ'
 		},
 		{
 			href: '/help/pwa',

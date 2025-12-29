@@ -30,7 +30,7 @@
 		{ href: '/help/tax-category', label: '消費税区分', icon: Receipt },
 		{ href: '/help/evidence', label: '証憑管理', icon: Paperclip },
 		{ href: '/help/accounts', label: '勘定科目管理', icon: FolderCog },
-		{ href: '/help/data-management', label: 'データ管理', icon: Database },
+		{ href: '/help/data-management', label: '設定・データ管理', icon: Database },
 		{ href: '/help/pwa', label: 'PWA・オフライン', icon: Smartphone },
 		{ href: '/help/shortcuts', label: 'ショートカット', icon: Keyboard },
 		{ href: '/help/glossary', label: '用語集', icon: BookA }

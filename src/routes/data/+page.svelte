@@ -6,18 +6,25 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as RadioGroup from '$lib/components/ui/radio-group/index.js';
+	import { Switch } from '$lib/components/ui/switch/index.js';
 	import {
 		deleteYearData,
 		getAllAccounts,
 		getAllVendors,
+		getAutoPurgeBlobSetting,
 		getAvailableYears,
+		getBlobRetentionDays,
 		getImportPreview,
 		getJournalsByYear,
 		getStorageMode,
 		getUnexportedAttachmentCount,
 		importData,
 		initializeDatabase,
+		purgeAllExportedBlobs,
+		seedTestData2024,
+		setAutoPurgeBlobSetting,
 		setLastExportedAt,
+		setStorageMode,
 		validateExportData,
 		type ImportMode,
 		type ImportResult
@@ -25,28 +32,68 @@
 	import { setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
 	import type { ExportData, StorageType } from '$lib/types';
 	import {
+		clearDirectoryHandle,
+		getDirectoryDisplayName,
+		getSavedDirectoryHandle,
+		pickDirectory,
+		saveDirectoryHandle,
+		supportsFileSystemAccess
+	} from '$lib/utils/filesystem';
+	import {
+		formatBytes,
+		getRecommendedUsagePercentage,
+		getStorageUsage,
+		RECOMMENDED_QUOTA,
+		WARNING_THRESHOLD
+	} from '$lib/utils/storage';
+	import type { StorageUsage } from '$lib/types';
+	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
+	import {
 		AlertTriangle,
 		Archive,
 		Check,
-		Database,
 		Download,
 		FileJson,
 		FileSpreadsheet,
+		Folder,
+		FolderOpen,
+		HardDrive,
+		RotateCcw,
+		Settings,
 		Trash2,
 		Upload,
 		X
 	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
 
-	// エクスポート関連の状態
+	// === 証憑保存設定 ===
+	let storageMode = $state<StorageType>('indexeddb');
+	let directoryHandle = $state<FileSystemDirectoryHandle | null>(null);
+	let directoryName = $state<string | null>(null);
+	let isFileSystemSupported = $state(false);
+
+	// === 容量管理設定 ===
+	let storageUsage = $state<StorageUsage>({ used: 0, quota: 0, percentage: 0 });
+	let autoPurgeEnabled = $state(true);
+	let retentionDays = $state(30);
+	let isPurging = $state(false);
+	let purgeResult = $state<string | null>(null);
+
+	// Safari向け説明ダイアログ
+	let safariDialogOpen = $state(false);
+
+	// 派生値
+	const recommendedPercentage = $derived(getRecommendedUsagePercentage(storageUsage.used));
+	const isStorageWarning = $derived(recommendedPercentage >= WARNING_THRESHOLD);
+
+	// === エクスポート関連 ===
 	let availableYears = $state<number[]>([]);
 	let isLoading = $state(true);
-	let storageMode = $state<StorageType>('indexeddb');
 	let unexportedCount = $state(0);
 	let exportingYear = $state<number | null>(null);
 	let exportSuccess = $state<number | null>(null);
 
-	// インポート関連の状態
+	// === インポート関連 ===
 	let importFile = $state<File | null>(null);
 	let importData_ = $state<ExportData | null>(null);
 	let importPreview = $state<{
@@ -63,7 +110,7 @@
 	let importResult = $state<ImportResult | null>(null);
 	let importError = $state<string | null>(null);
 
-	// 年度削除関連の状態
+	// === 年度削除関連 ===
 	let deleteDialogOpen = $state(false);
 	let deletingYear = $state<number | null>(null);
 	let deletingYearSummary = $state<{ journalCount: number; attachmentCount: number } | null>(null);
@@ -71,16 +118,113 @@
 	let deleteConfirmInput = $state('');
 	let isDeleting = $state(false);
 
+	// === 開発用ツール ===
+	let isSeeding = $state(false);
+	let seedResult = $state<string | null>(null);
+
 	// 初期化
 	onMount(async () => {
 		await initializeDatabase();
-		availableYears = await getAvailableYears();
+
+		// File System Access APIのサポート確認
+		isFileSystemSupported = supportsFileSystemAccess();
+
+		// 現在の保存モードを取得
 		storageMode = await getStorageMode();
+
+		// ディレクトリハンドルを取得
+		if (isFileSystemSupported) {
+			directoryHandle = await getSavedDirectoryHandle();
+			if (directoryHandle) {
+				directoryName = getDirectoryDisplayName(directoryHandle);
+			}
+		}
+
+		// 未エクスポートの添付ファイル数を取得
 		unexportedCount = await getUnexportedAttachmentCount();
+
+		// ストレージ使用量を取得
+		storageUsage = await getStorageUsage();
+
+		// 容量管理設定を取得
+		autoPurgeEnabled = await getAutoPurgeBlobSetting();
+		retentionDays = await getBlobRetentionDays();
+
+		// 年度リスト
+		availableYears = await getAvailableYears();
 		isLoading = false;
 	});
 
-	// JSONエクスポートデータを作成
+	// === 保存モード関連 ===
+	async function handleStorageModeChange(mode: StorageType) {
+		storageMode = mode;
+		await setStorageMode(mode);
+
+		if (mode === 'filesystem' && !directoryHandle) {
+			await handleSelectDirectory();
+		}
+	}
+
+	async function handleSelectDirectory() {
+		const handle = await pickDirectory();
+		if (handle) {
+			directoryHandle = handle;
+			directoryName = getDirectoryDisplayName(handle);
+			await saveDirectoryHandle(handle);
+
+			if (storageMode !== 'filesystem') {
+				storageMode = 'filesystem';
+				await setStorageMode('filesystem');
+			}
+		}
+	}
+
+	async function handleClearDirectory() {
+		await clearDirectoryHandle();
+		directoryHandle = null;
+		directoryName = null;
+		storageMode = 'indexeddb';
+		await setStorageMode('indexeddb');
+	}
+
+	// === 容量管理関連 ===
+	async function handleAutoPurgeChange(enabled: boolean) {
+		autoPurgeEnabled = enabled;
+		await setAutoPurgeBlobSetting(enabled);
+	}
+
+	async function handlePurgeExportedBlobs() {
+		if (
+			!confirm(
+				'エクスポート済みの証憑データを削除しますか？\nメタデータは残りますが、PDFファイルは復元できなくなります。'
+			)
+		) {
+			return;
+		}
+
+		isPurging = true;
+		purgeResult = null;
+		try {
+			const count = await purgeAllExportedBlobs();
+			if (count > 0) {
+				purgeResult = `${count}件の証憑データを削除しました`;
+				storageUsage = await getStorageUsage();
+			} else {
+				purgeResult = '削除可能なデータがありません';
+			}
+		} catch (error) {
+			purgeResult = `エラー: ${error instanceof Error ? error.message : '不明なエラー'}`;
+		} finally {
+			isPurging = false;
+		}
+	}
+
+	function handleResetSafariWarning() {
+		localStorage.removeItem('shownStorageWarning');
+		safariDialogOpen = true;
+	}
+
+	// === エクスポート関連 ===
 	async function createExportData(year: number): Promise<ExportData> {
 		const [journals, accounts, vendors] = await Promise.all([
 			getJournalsByYear(year),
@@ -88,7 +232,6 @@
 			getAllVendors()
 		]);
 
-		// Blobは除外してJSONに含める
 		const journalsWithoutBlob = journals.map((journal) => ({
 			...journal,
 			attachments: journal.attachments.map((att) => {
@@ -115,7 +258,6 @@
 		};
 	}
 
-	// JSONエクスポート
 	async function handleExportJSON(year: number) {
 		exportingYear = year;
 		try {
@@ -135,7 +277,6 @@
 		}
 	}
 
-	// CSVエクスポート
 	async function handleExportCSV(year: number) {
 		exportingYear = year;
 		try {
@@ -144,7 +285,6 @@
 
 			const accountMap = new Map(accounts.map((a) => [a.code, a.name]));
 
-			// CSVヘッダー
 			const headers = [
 				'日付',
 				'摘要',
@@ -156,7 +296,6 @@
 				'証跡'
 			];
 
-			// CSVデータ行を作成
 			const rows = journals.flatMap((journal) => {
 				const debitLines = journal.lines.filter((l) => l.type === 'debit');
 				const creditLines = journal.lines.filter((l) => l.type === 'credit');
@@ -184,7 +323,6 @@
 				});
 			});
 
-			// CSVを生成（BOM付きでExcel対応）
 			const csvContent =
 				'\uFEFF' +
 				[headers.join(','), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(','))].join(
@@ -205,7 +343,6 @@
 		}
 	}
 
-	// 証憑一括エクスポート（iPad向け）
 	async function handleExportAttachments(year: number) {
 		exportingYear = year;
 		try {
@@ -214,12 +351,9 @@
 
 			for (const journal of journals) {
 				for (const attachment of journal.attachments) {
-					// IndexedDBに保存されている未エクスポートの添付ファイルのみ
 					if (attachment.storageType === 'indexeddb' && attachment.blob) {
 						downloadBlob(attachment.blob, attachment.generatedName);
 						exportedCount++;
-
-						// ダウンロード間隔を空ける（ブラウザ制限対策）
 						await new Promise((resolve) => setTimeout(resolve, 500));
 					}
 				}
@@ -245,7 +379,6 @@
 		}
 	}
 
-	// Blobをダウンロード
 	function downloadBlob(blob: Blob, filename: string) {
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -257,7 +390,6 @@
 		URL.revokeObjectURL(url);
 	}
 
-	// 年度のデータ概要を取得
 	async function getYearSummary(
 		year: number
 	): Promise<{ journalCount: number; attachmentCount: number }> {
@@ -266,7 +398,7 @@
 		return { journalCount: journals.length, attachmentCount };
 	}
 
-	// インポートファイル選択
+	// === インポート関連 ===
 	async function handleFileSelect(event: Event) {
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
@@ -296,7 +428,6 @@
 		}
 	}
 
-	// インポート実行
 	async function handleImport() {
 		if (!importData_) return;
 
@@ -309,7 +440,6 @@
 			importResult = result;
 
 			if (result.success) {
-				// 年度リストを更新
 				const years = await getAvailableYears();
 				setAvailableYears(years);
 				availableYears = years;
@@ -321,7 +451,6 @@
 		}
 	}
 
-	// インポートをクリア
 	function handleClearImport() {
 		importFile = null;
 		importData_ = null;
@@ -330,7 +459,7 @@
 		importError = null;
 	}
 
-	// 削除ダイアログを開く
+	// === 年度削除関連 ===
 	async function openDeleteDialog(year: number) {
 		deletingYear = year;
 		deletingYearSummary = await getYearSummary(year);
@@ -339,12 +468,10 @@
 		deleteDialogOpen = true;
 	}
 
-	// 削除確認の入力が完了しているか
 	const canDelete = $derived(
 		deleteConfirmChecked && deletingYear !== null && deleteConfirmInput === String(deletingYear)
 	);
 
-	// 年度削除を実行
 	async function handleDeleteYear() {
 		if (!deletingYear || !canDelete) return;
 
@@ -352,12 +479,10 @@
 		try {
 			await deleteYearData(deletingYear);
 
-			// 年度リストを更新
 			const years = await getAvailableYears();
 			setAvailableYears(years);
 			availableYears = years;
 
-			// ダイアログを閉じる
 			deleteDialogOpen = false;
 			deletingYear = null;
 			deletingYearSummary = null;
@@ -368,32 +493,245 @@
 			isDeleting = false;
 		}
 	}
+
+	// === 開発用ツール ===
+	async function handleSeedData() {
+		isSeeding = true;
+		seedResult = null;
+		try {
+			await initializeDatabase();
+			const count = await seedTestData2024();
+			seedResult = `${count}件の仕訳を追加しました`;
+			const years = await getAvailableYears();
+			setAvailableYears(years);
+			availableYears = years;
+		} catch (error) {
+			seedResult = `エラー: ${error instanceof Error ? error.message : '不明なエラー'}`;
+		} finally {
+			isSeeding = false;
+		}
+	}
 </script>
 
 <div class="space-y-6">
 	<div>
 		<h1 class="flex items-center gap-2 text-2xl font-bold">
-			<Database class="size-6" />
-			データ管理
+			<Settings class="size-6" />
+			設定・データ管理
 		</h1>
-		<p class="text-sm text-muted-foreground">データのエクスポート・インポートを行います</p>
+		<p class="text-sm text-muted-foreground">証憑の保存設定とデータのエクスポート・インポート</p>
 	</div>
 
-	<!-- 未エクスポート警告（IndexedDBモード時） -->
-	{#if storageMode === 'indexeddb' && unexportedCount > 0}
-		<div
-			class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950"
-		>
-			<AlertTriangle class="size-5 shrink-0 text-amber-500" />
-			<div>
-				<p class="font-medium text-amber-800 dark:text-amber-200">
-					{unexportedCount}件の証憑が未エクスポートです
-				</p>
-				<p class="text-sm text-amber-700 dark:text-amber-300">
-					ブラウザのデータは予期せず消える可能性があります。証憑ファイルをダウンロードしてバックアップしてください。
-				</p>
-			</div>
-		</div>
+	<!-- 証憑保存先設定 -->
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>証憑（PDF）の保存先</Card.Title>
+			<Card.Description>仕訳に紐付けるPDFファイルの保存方法を選択します</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-6">
+			{#if isFileSystemSupported}
+				<RadioGroup.Root
+					value={storageMode}
+					onValueChange={(v) => handleStorageModeChange(v as StorageType)}
+				>
+					<div class="flex items-start space-x-3">
+						<RadioGroup.Item value="filesystem" id="storage-filesystem" />
+						<div class="grid gap-1.5">
+							<Label for="storage-filesystem" class="font-medium">
+								ローカルフォルダに保存（推奨）
+							</Label>
+							<p class="text-sm text-muted-foreground">
+								選択したフォルダに年度別で自動保存します。バックアップが容易で、他のソフトからもアクセス可能です。
+							</p>
+						</div>
+					</div>
+					<div class="flex items-start space-x-3">
+						<RadioGroup.Item value="indexeddb" id="storage-indexeddb" />
+						<div class="grid gap-1.5">
+							<Label for="storage-indexeddb" class="font-medium">ブラウザに保存</Label>
+							<p class="text-sm text-muted-foreground">
+								ブラウザのIndexedDBに保存します。定期的にエクスポートしてバックアップしてください。
+							</p>
+						</div>
+					</div>
+				</RadioGroup.Root>
+
+				{#if storageMode === 'filesystem'}
+					<div class="rounded-lg border p-4">
+						<div class="flex items-center justify-between">
+							<div class="flex items-center gap-3">
+								{#if directoryHandle}
+									<FolderOpen class="size-5 text-green-500" />
+									<div>
+										<p class="font-medium">{directoryName}</p>
+										<p class="text-sm text-muted-foreground">保存先フォルダ</p>
+									</div>
+								{:else}
+									<Folder class="size-5 text-muted-foreground" />
+									<div>
+										<p class="font-medium text-muted-foreground">未設定</p>
+										<p class="text-sm text-muted-foreground">保存先フォルダを選択してください</p>
+									</div>
+								{/if}
+							</div>
+							<div class="flex gap-2">
+								<Button variant="outline" onclick={handleSelectDirectory}>
+									{directoryHandle ? '変更' : '選択'}
+								</Button>
+								{#if directoryHandle}
+									<Button variant="ghost" onclick={handleClearDirectory}>クリア</Button>
+								{/if}
+							</div>
+						</div>
+					</div>
+				{/if}
+
+				{#if storageMode === 'indexeddb' && unexportedCount > 0}
+					<div
+						class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950"
+					>
+						<AlertTriangle class="size-5 shrink-0 text-amber-500" />
+						<div>
+							<p class="font-medium text-amber-800 dark:text-amber-200">
+								{unexportedCount}件の証憑が未エクスポートです
+							</p>
+							<p class="text-sm text-amber-700 dark:text-amber-300">
+								ブラウザのデータは予期せず消える可能性があります。エクスポートでバックアップしてください。
+							</p>
+						</div>
+					</div>
+				{/if}
+			{:else}
+				<div class="rounded-lg border p-4">
+					<div class="flex items-start gap-3">
+						<Folder class="size-5 text-muted-foreground" />
+						<div>
+							<p class="font-medium">ブラウザに保存</p>
+							<p class="text-sm text-muted-foreground">
+								このブラウザではローカルフォルダへの保存に対応していません。
+								PDFはブラウザ内に保存されます。
+							</p>
+						</div>
+					</div>
+				</div>
+
+				{#if unexportedCount > 0}
+					<div
+						class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950"
+					>
+						<AlertTriangle class="size-5 shrink-0 text-amber-500" />
+						<div>
+							<p class="font-medium text-amber-800 dark:text-amber-200">
+								{unexportedCount}件の証憑が未エクスポートです
+							</p>
+							<p class="text-sm text-amber-700 dark:text-amber-300">
+								iPadやiPhoneではブラウザのデータが予期せず消える可能性があります。
+								定期的にバックアップしてください。
+							</p>
+						</div>
+					</div>
+				{/if}
+			{/if}
+		</Card.Content>
+	</Card.Root>
+
+	<!-- ストレージ使用量（IndexedDBモード時のみ） -->
+	{#if storageMode === 'indexeddb' || !isFileSystemSupported}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2">
+					<HardDrive class="size-5" />
+					ストレージ使用量
+				</Card.Title>
+				<Card.Description>ブラウザに保存されている証憑データの容量を管理します</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-6">
+				<div class="space-y-2">
+					<div class="flex items-center justify-between text-sm">
+						<span>使用中: {formatBytes(storageUsage.used)}</span>
+						<span>推奨上限: {formatBytes(RECOMMENDED_QUOTA)}</span>
+					</div>
+					<div class="h-3 w-full overflow-hidden rounded-full bg-muted">
+						<div
+							class="h-full transition-all duration-300 {isStorageWarning
+								? 'bg-amber-500'
+								: 'bg-primary'}"
+							style="width: {Math.min(recommendedPercentage, 100)}%"
+						></div>
+					</div>
+					<p class="text-sm text-muted-foreground">
+						{recommendedPercentage.toFixed(0)}% 使用中
+						{#if storageUsage.quota > 0}
+							（ブラウザ上限: {formatBytes(storageUsage.quota)}）
+						{/if}
+					</p>
+				</div>
+
+				{#if isStorageWarning}
+					<div
+						class="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950"
+					>
+						<AlertTriangle class="size-5 shrink-0 text-amber-500" />
+						<div>
+							<p class="font-medium text-amber-800 dark:text-amber-200">
+								ストレージ使用量が多くなっています
+							</p>
+							<p class="text-sm text-amber-700 dark:text-amber-300">
+								エクスポートしてから古いデータを削除すると容量を確保できます。
+							</p>
+						</div>
+					</div>
+				{/if}
+
+				<div class="flex items-center justify-between rounded-lg border p-4">
+					<div class="space-y-0.5">
+						<Label for="auto-purge" class="font-medium">エクスポート後に自動削除</Label>
+						<p class="text-sm text-muted-foreground">
+							エクスポートから{retentionDays}日後に証憑データを削除します
+						</p>
+					</div>
+					<Switch
+						id="auto-purge"
+						checked={autoPurgeEnabled}
+						onCheckedChange={handleAutoPurgeChange}
+					/>
+				</div>
+
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="font-medium">エクスポート済みデータを削除</p>
+						<p class="text-sm text-muted-foreground">
+							エクスポート済みの証憑データを削除して容量を確保します
+						</p>
+					</div>
+					<Button
+						variant="destructive"
+						size="sm"
+						onclick={handlePurgeExportedBlobs}
+						disabled={isPurging}
+					>
+						<Trash2 class="mr-2 size-4" />
+						{isPurging ? '削除中...' : '削除'}
+					</Button>
+				</div>
+				{#if purgeResult}
+					<p class="text-sm text-muted-foreground">{purgeResult}</p>
+				{/if}
+
+				<div class="flex items-center justify-between border-t pt-6">
+					<div>
+						<p class="font-medium">ブラウザ保存の説明を再表示</p>
+						<p class="text-sm text-muted-foreground">
+							Safari / iPad向けのストレージ説明を再度表示します
+						</p>
+					</div>
+					<Button variant="outline" size="sm" onclick={handleResetSafariWarning}>
+						<RotateCcw class="mr-2 size-4" />
+						再表示
+					</Button>
+				</div>
+			</Card.Content>
+		</Card.Root>
 	{/if}
 
 	<!-- エクスポートセクション -->
@@ -510,7 +848,6 @@
 			<Card.Description>エクスポートしたJSONファイルからデータを復元します</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-6">
-			<!-- ファイル選択 -->
 			<div class="space-y-2">
 				<Label for="import-file">JSONファイルを選択</Label>
 				<div class="flex items-center gap-2">
@@ -534,7 +871,6 @@
 				</div>
 			</div>
 
-			<!-- エラー表示 -->
 			{#if importError}
 				<div
 					class="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
@@ -544,7 +880,6 @@
 				</div>
 			{/if}
 
-			<!-- プレビュー表示 -->
 			{#if importPreview && !importResult}
 				<div class="space-y-4 rounded-lg border p-4">
 					<div class="flex items-center gap-2">
@@ -582,7 +917,6 @@
 						</div>
 					</div>
 
-					<!-- インポートモード選択 -->
 					<div class="space-y-2 border-t pt-2">
 						<Label>インポートモード</Label>
 						<RadioGroup.Root bind:value={importMode}>
@@ -607,7 +941,6 @@
 						</RadioGroup.Root>
 					</div>
 
-					<!-- インポートボタン -->
 					<div class="pt-2">
 						<Button onclick={handleImport} disabled={isImporting}>
 							<Upload class="mr-2 size-4" />
@@ -617,7 +950,6 @@
 				</div>
 			{/if}
 
-			<!-- インポート結果 -->
 			{#if importResult}
 				<div class="space-y-3 rounded-lg border p-4">
 					{#if importResult.success}
@@ -660,7 +992,7 @@
 		</Card.Content>
 	</Card.Root>
 
-	<!-- 説明 -->
+	<!-- データ形式について -->
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">データ形式について</Card.Title>
@@ -684,6 +1016,28 @@
 				<p class="font-medium text-foreground">完全バックアップ（準備中）</p>
 				<p>JSON + 証憑PDFをZIPにまとめてダウンロード。年次アーカイブに最適です。</p>
 			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<!-- 開発用ツール -->
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>開発用ツール</Card.Title>
+			<Card.Description>テスト用のデータ操作</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-4">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="font-medium">2024年ダミーデータ</p>
+					<p class="text-sm text-muted-foreground">テスト用に2024年の仕訳データ14件を追加します</p>
+				</div>
+				<Button onclick={handleSeedData} disabled={isSeeding}>
+					{isSeeding ? '追加中...' : 'データを追加'}
+				</Button>
+			</div>
+			{#if seedResult}
+				<p class="text-sm text-muted-foreground">{seedResult}</p>
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
@@ -718,7 +1072,6 @@
 		</AlertDialog.Header>
 
 		<div class="space-y-4 py-4">
-			<!-- チェックボックス確認 -->
 			<div class="flex items-start gap-3">
 				<Checkbox
 					id="delete-confirm-check"
@@ -730,7 +1083,6 @@
 				</Label>
 			</div>
 
-			<!-- 年度入力確認 -->
 			<div class="space-y-2">
 				<Label for="delete-confirm-input" class="text-sm">
 					削除を確定するには「{deletingYear}」と入力：
@@ -757,3 +1109,6 @@
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
+
+<!-- Safari向け説明ダイアログ -->
+<SafariStorageDialog bind:open={safariDialogOpen} onconfirm={() => {}} />

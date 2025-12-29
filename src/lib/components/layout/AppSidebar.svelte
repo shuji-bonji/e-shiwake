@@ -5,7 +5,6 @@
 		BookOpen,
 		FileSpreadsheet,
 		Settings,
-		Database,
 		List,
 		AlertTriangle,
 		CircleHelp
@@ -152,11 +151,11 @@
 
 		<Sidebar.Separator />
 
-		<!-- 管理セクション -->
+		<!-- 設定セクション -->
 		<Sidebar.Group>
 			<Sidebar.GroupLabel>
 				<Settings class="size-4" />
-				管理
+				設定
 			</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
@@ -171,21 +170,11 @@
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/settings'}>
-							{#snippet child({ props })}
-								<a href="/settings" {...props}>
-									<Settings class="size-4" />
-									<span>設定</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
 						<Sidebar.MenuButton isActive={pathname === '/data'}>
 							{#snippet child({ props })}
 								<a href="/data" {...props}>
-									<Database class="size-4" />
-									<span>データ管理</span>
+									<Settings class="size-4" />
+									<span>設定・データ管理</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
