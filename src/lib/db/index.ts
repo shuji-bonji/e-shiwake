@@ -290,6 +290,39 @@ export async function deleteJournal(id: string): Promise<void> {
 }
 
 /**
+ * 年度の全データを削除
+ * 仕訳とそれに紐づく添付ファイルを削除
+ */
+export async function deleteYearData(
+	year: number
+): Promise<{ journalCount: number; attachmentCount: number }> {
+	// 対象年度の仕訳を取得
+	const startDate = `${year}-01-01`;
+	const endDate = `${year}-12-31`;
+
+	const journals = await db.journals
+		.where('date')
+		.between(startDate, endDate, true, true)
+		.toArray();
+
+	let attachmentCount = 0;
+
+	// 仕訳ごとに添付ファイルを削除
+	for (const journal of journals) {
+		for (const attachment of journal.attachments) {
+			await db.attachments.delete(attachment.id);
+			attachmentCount++;
+		}
+	}
+
+	// 仕訳を削除
+	const journalIds = journals.map((j) => j.id);
+	await db.journals.bulkDelete(journalIds);
+
+	return { journalCount: journals.length, attachmentCount };
+}
+
+/**
  * 空の仕訳を作成
  */
 export function createEmptyJournal(): Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'> {

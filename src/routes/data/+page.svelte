@@ -13,8 +13,12 @@
 		Check,
 		Upload,
 		X,
-		Database
+		Database,
+		Trash2
 	} from '@lucide/svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import {
 		initializeDatabase,
 		getAvailableYears,
@@ -27,6 +31,7 @@
 		validateExportData,
 		getImportPreview,
 		importData,
+		deleteYearData,
 		type ImportMode,
 		type ImportResult
 	} from '$lib/db';
@@ -57,6 +62,14 @@
 	let isImporting = $state(false);
 	let importResult = $state<ImportResult | null>(null);
 	let importError = $state<string | null>(null);
+
+	// 年度削除関連の状態
+	let deleteDialogOpen = $state(false);
+	let deletingYear = $state<number | null>(null);
+	let deletingYearSummary = $state<{ journalCount: number; attachmentCount: number } | null>(null);
+	let deleteConfirmChecked = $state(false);
+	let deleteConfirmInput = $state('');
+	let isDeleting = $state(false);
 
 	// 初期化
 	onMount(async () => {
@@ -316,6 +329,45 @@
 		importResult = null;
 		importError = null;
 	}
+
+	// 削除ダイアログを開く
+	async function openDeleteDialog(year: number) {
+		deletingYear = year;
+		deletingYearSummary = await getYearSummary(year);
+		deleteConfirmChecked = false;
+		deleteConfirmInput = '';
+		deleteDialogOpen = true;
+	}
+
+	// 削除確認の入力が完了しているか
+	const canDelete = $derived(
+		deleteConfirmChecked && deletingYear !== null && deleteConfirmInput === String(deletingYear)
+	);
+
+	// 年度削除を実行
+	async function handleDeleteYear() {
+		if (!deletingYear || !canDelete) return;
+
+		isDeleting = true;
+		try {
+			await deleteYearData(deletingYear);
+
+			// 年度リストを更新
+			const years = await getAvailableYears();
+			setAvailableYears(years);
+			availableYears = years;
+
+			// ダイアログを閉じる
+			deleteDialogOpen = false;
+			deletingYear = null;
+			deletingYearSummary = null;
+		} catch (error) {
+			console.error('年度削除エラー:', error);
+			alert('削除に失敗しました');
+		} finally {
+			isDeleting = false;
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -378,9 +430,20 @@
 										<Check class="size-5 text-green-500" />
 									{/if}
 								</div>
-								<p class="text-sm text-muted-foreground">
-									{year}/1/1 - {year}/12/31
-								</p>
+								<div class="flex items-center gap-2">
+									<p class="text-sm text-muted-foreground">
+										{year}/1/1 - {year}/12/31
+									</p>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="size-7 text-muted-foreground hover:text-destructive"
+										onclick={() => openDeleteDialog(year)}
+									>
+										<Trash2 class="size-4" />
+										<span class="sr-only">年度を削除</span>
+									</Button>
+								</div>
 							</div>
 
 							<div class="mb-4 grid grid-cols-2 gap-4 text-sm">
@@ -628,3 +691,69 @@
 		電子帳簿保存法により、証憑は7年間の保存が必要です。定期的にバックアップを行ってください。
 	</p>
 </div>
+
+<!-- 年度削除確認ダイアログ -->
+<AlertDialog.Root bind:open={deleteDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title class="flex items-center gap-2">
+				<AlertTriangle class="size-5 text-destructive" />
+				{deletingYear}年度のデータを削除
+			</AlertDialog.Title>
+			<AlertDialog.Description class="space-y-3">
+				<p>以下のデータが完全に削除されます：</p>
+				{#if deletingYearSummary}
+					<ul class="list-inside list-disc space-y-1 text-foreground">
+						<li>仕訳 {deletingYearSummary.journalCount}件</li>
+						<li>証憑 {deletingYearSummary.attachmentCount}ファイル</li>
+					</ul>
+				{/if}
+				<div
+					class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+				>
+					<AlertTriangle class="mt-0.5 size-4 shrink-0" />
+					<p class="text-sm">電帳法により7年間の保存が必要です</p>
+				</div>
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+
+		<div class="space-y-4 py-4">
+			<!-- チェックボックス確認 -->
+			<div class="flex items-start gap-3">
+				<Checkbox
+					id="delete-confirm-check"
+					checked={deleteConfirmChecked}
+					onCheckedChange={(v) => (deleteConfirmChecked = !!v)}
+				/>
+				<Label for="delete-confirm-check" class="text-sm leading-relaxed">
+					エクスポート済みであることを確認しました
+				</Label>
+			</div>
+
+			<!-- 年度入力確認 -->
+			<div class="space-y-2">
+				<Label for="delete-confirm-input" class="text-sm">
+					削除を確定するには「{deletingYear}」と入力：
+				</Label>
+				<Input
+					id="delete-confirm-input"
+					bind:value={deleteConfirmInput}
+					placeholder={String(deletingYear)}
+					class="max-w-32"
+				/>
+			</div>
+		</div>
+
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>キャンセル</AlertDialog.Cancel>
+			<Button
+				variant="destructive"
+				onclick={handleDeleteYear}
+				disabled={!canDelete || isDeleting}
+				class="bg-destructive/80 text-white hover:bg-destructive/70"
+			>
+				{isDeleting ? '削除中...' : '削除'}
+			</Button>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
