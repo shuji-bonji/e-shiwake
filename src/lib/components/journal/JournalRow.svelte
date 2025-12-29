@@ -2,6 +2,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import {
 		Circle,
 		FileText,
@@ -80,6 +81,10 @@
 	let editDialogOpen = $state(false);
 	let editingAttachment = $state<Attachment | null>(null);
 
+	// 証跡ステータス変更確認ダイアログの状態
+	let evidenceChangeDialogOpen = $state(false);
+	let pendingEvidenceStatus = $state<EvidenceStatus | null>(null);
+
 	// ダイアログ用の派生値
 	const mainDebitLine = $derived(journal.lines.find((l) => l.type === 'debit' && l.accountCode));
 	const mainAccountType = $derived(
@@ -156,7 +161,43 @@
 		const statusOrder: EvidenceStatus[] = ['none', 'paper', 'digital'];
 		const currentIndex = statusOrder.indexOf(journal.evidenceStatus);
 		const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
+
+		// 電子証憑から他に切り替える場合、添付ファイルがあれば確認ダイアログを表示
+		if (journal.evidenceStatus === 'digital' && journal.attachments.length > 0) {
+			pendingEvidenceStatus = nextStatus;
+			evidenceChangeDialogOpen = true;
+			return;
+		}
+
 		onupdate({ ...journal, evidenceStatus: nextStatus });
+	}
+
+	// 証跡ステータス変更を確定（添付ファイルを削除）
+	async function confirmEvidenceStatusChange() {
+		if (pendingEvidenceStatus === null) return;
+
+		try {
+			// 全ての添付ファイルを削除
+			for (const attachment of journal.attachments) {
+				await removeAttachmentFromJournal(journal.id, attachment.id, directoryHandle);
+			}
+
+			// ステータスを更新
+			onupdate({
+				...journal,
+				attachments: [],
+				evidenceStatus: pendingEvidenceStatus
+			});
+		} catch (error) {
+			console.error('添付ファイルの削除に失敗しました:', error);
+		} finally {
+			pendingEvidenceStatus = null;
+		}
+	}
+
+	// 証跡ステータス変更をキャンセル
+	function cancelEvidenceStatusChange() {
+		pendingEvidenceStatus = null;
 	}
 
 	// フィールド更新（即時、証憑同期なし）
@@ -751,3 +792,25 @@
 	onconfirm={handleEditConfirm}
 	oncancel={handleEditCancel}
 />
+
+<!-- 証跡ステータス変更確認ダイアログ -->
+<AlertDialog.Root bind:open={evidenceChangeDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>添付ファイルを削除しますか？</AlertDialog.Title>
+			<AlertDialog.Description>
+				電子証憑から他のステータスに変更すると、紐付けられている添付ファイル（{journal.attachments
+					.length}件）が削除されます。この操作は取り消せません。
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={cancelEvidenceStatusChange}>キャンセル</AlertDialog.Cancel>
+			<AlertDialog.Action
+				class="bg-destructive/80 text-white hover:bg-destructive/70"
+				onclick={confirmEvidenceStatusChange}
+			>
+				削除して変更
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
