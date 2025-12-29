@@ -7,7 +7,8 @@
 		Settings,
 		Database,
 		List,
-		AlertTriangle
+		AlertTriangle,
+		CircleHelp
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -196,6 +197,17 @@
 
 	<Sidebar.Footer class="border-t border-sidebar-border">
 		<Sidebar.Menu>
+			<!-- ヘルプ -->
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton isActive={pathname.startsWith('/help')}>
+					{#snippet child({ props })}
+						<a href="/help" {...props}>
+							<CircleHelp class="size-4" />
+							<span>ヘルプ</span>
+						</a>
+					{/snippet}
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
 			<!-- 未エクスポートリマインダー -->
 			{#if showReminder}
 				<Sidebar.MenuItem>
