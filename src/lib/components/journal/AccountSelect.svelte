@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import * as Popover from '$lib/components/ui/popover/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { ChevronsUpDown, Receipt, Wallet, TrendingUp, CreditCard, Gem } from '@lucide/svelte';
 	import { cn } from '$lib/utils.js';
@@ -63,11 +63,12 @@
 	}
 </script>
 
-<Popover.Root bind:open>
-	<Popover.Trigger bind:ref={triggerRef}>
+<Dialog.Root bind:open>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Button
 				{...props}
+				bind:ref={triggerRef}
 				variant="outline"
 				role="combobox"
 				aria-expanded={open}
@@ -81,28 +82,35 @@
 				<ChevronsUpDown class="ml-2 size-4 shrink-0 opacity-50" />
 			</Button>
 		{/snippet}
-	</Popover.Trigger>
-	<Popover.Content class="w-80 p-0" align="start">
-		<div class="max-h-80 overflow-y-auto p-2">
+	</Dialog.Trigger>
+	<Dialog.Content class="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-4">
+		<Dialog.Header class="sr-only">
+			<Dialog.Title>勘定科目を選択</Dialog.Title>
+		</Dialog.Header>
+		<!-- 勘定科目管理ページと同じレイアウト -->
+		<div class="space-y-4">
 			{#each categoryOrder as type (type)}
 				{@const accountsInCategory = groupedAccounts[type]}
 				{@const Icon = categoryIcons[type]}
 				{#if accountsInCategory.length > 0}
-					<div class="mb-3 last:mb-0">
+					<div>
 						<!-- カテゴリヘッダー -->
-						<div class="mb-1.5 flex items-center gap-1.5 bg-muted px-2 py-1">
-							<Icon class="size-3.5 text-muted-foreground" />
-							<span class="text-xs font-semibold">{AccountTypeLabels[type]}</span>
+						<div class="mb-2 flex items-center gap-1.5 bg-muted px-2 py-1.5">
+							<Icon class="size-4 text-muted-foreground" />
+							<span class="text-sm font-semibold">{AccountTypeLabels[type]}</span>
+							<span class="text-xs text-muted-foreground">({accountsInCategory.length})</span>
 						</div>
-						<!-- 科目グリッド -->
+						<!-- 科目グリッド（flex-wrap） -->
 						<div class="flex flex-wrap gap-1">
 							{#each accountsInCategory as account (account.code)}
 								{#if account.isSystem}
 									<button
 										type="button"
 										class={cn(
-											'px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground',
-											value === account.code && 'font-medium text-foreground underline'
+											'px-2 py-1 text-sm transition-colors',
+											value === account.code
+												? 'font-medium text-primary underline'
+												: 'text-muted-foreground hover:text-foreground'
 										)}
 										onclick={() => handleSelect(account.code)}
 									>
@@ -126,5 +134,5 @@
 				{/if}
 			{/each}
 		</div>
-	</Popover.Content>
-</Popover.Root>
+	</Dialog.Content>
+</Dialog.Root>

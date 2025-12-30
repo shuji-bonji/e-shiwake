@@ -170,10 +170,10 @@
 		deleteDialogOpen = true;
 	}
 
-	// 仕訳の削除
+	// 仕訳の削除（添付ファイルも削除）
 	async function handleDeleteJournal() {
 		if (!deletingJournalId) return;
-		await deleteJournal(deletingJournalId);
+		await deleteJournal(deletingJournalId, directoryHandle);
 		deleteDialogOpen = false;
 		deletingJournalId = null;
 		await refreshAvailableYears();

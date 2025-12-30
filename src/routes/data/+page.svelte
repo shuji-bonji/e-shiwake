@@ -11,15 +11,18 @@
 		deleteYearData,
 		getAllAccounts,
 		getAllVendors,
+		getAttachmentsForFolderMigration,
 		getAutoPurgeBlobSetting,
 		getAvailableYears,
 		getBlobRetentionDays,
+		getFilesystemAttachmentCount,
 		getImportPreview,
 		getJournalsByYear,
 		getStorageMode,
 		getUnexportedAttachmentCount,
 		importData,
 		initializeDatabase,
+		migrateAttachmentToNewFolder,
 		purgeAllExportedBlobs,
 		seedTestData2024,
 		setAutoPurgeBlobSetting,
@@ -74,12 +77,25 @@
 	let directoryHandle = $state<FileSystemDirectoryHandle | null>(null);
 	let directoryName = $state<string | null>(null);
 	let isFileSystemSupported = $state(false);
+	let radioGroupKey = $state(0); // RadioGroup強制再レンダリング用
 
 	// === マイグレーション ===
 	const migration = useMigrationStore();
 	let migrationDialogOpen = $state(false);
 	let pendingStorageMode = $state<StorageType | null>(null);
 	let migrationTargetCount = $state(0);
+
+	// === フォルダ確認ダイアログ ===
+	let folderConfirmDialogOpen = $state(false);
+
+	// === フォルダ変更時のPDF移行 ===
+	let folderMigrationDialogOpen = $state(false);
+	let oldDirectoryHandle = $state<FileSystemDirectoryHandle | null>(null);
+	let newDirectoryHandle = $state<FileSystemDirectoryHandle | null>(null);
+	let folderMigrationCount = $state(0);
+	let isFolderMigrating = $state(false);
+	let folderMigrationProgress = $state(0);
+	let folderMigrationError = $state<string | null>(null);
 
 	// === 容量管理設定 ===
 	let storageUsage = $state<StorageUsage>({ used: 0, quota: 0, percentage: 0 });
@@ -169,27 +185,34 @@
 		// 同じモードなら何もしない
 		if (mode === storageMode) return;
 
-		// マイグレーション対象があるかチェック
-		const targetCount = await migration.getTargetCount(mode);
-
-		if (targetCount > 0) {
-			// 保留モードを記録
-			pendingStorageMode = mode;
-			migrationTargetCount = targetCount;
-
-			// ファイルシステムモードへの切り替えで、ディレクトリ未設定の場合は先に選択
-			if (mode === 'filesystem' && !directoryHandle) {
+		// ファイルシステムモードへの切り替え
+		if (mode === 'filesystem') {
+			if (directoryHandle) {
+				// 既存フォルダがある場合は確認ダイアログを表示
+				pendingStorageMode = mode;
+				folderConfirmDialogOpen = true;
+				return;
+			} else {
+				// ディレクトリ未設定の場合は選択
 				const handle = await pickDirectory();
 				if (!handle) {
-					// ユーザーがキャンセルした場合
-					pendingStorageMode = null;
+					radioGroupKey++;
 					return;
 				}
 				directoryHandle = handle;
 				directoryName = getDirectoryDisplayName(handle);
 				await saveDirectoryHandle(handle);
 			}
+		}
 
+		// マイグレーション対象があるかチェック
+		const targetCount = await migration.getTargetCount(mode);
+
+		if (targetCount > 0) {
+			// 状態をリセットしてダイアログ表示
+			migration.reset();
+			pendingStorageMode = mode;
+			migrationTargetCount = targetCount;
 			migrationDialogOpen = true;
 			return;
 		}
@@ -197,10 +220,76 @@
 		// マイグレーション不要の場合はモードを切り替え
 		storageMode = mode;
 		await setStorageMode(mode);
+	}
 
-		if (mode === 'filesystem' && !directoryHandle) {
-			await handleSelectDirectory();
+	// フォルダ確認ダイアログ: このフォルダを使用
+	async function handleConfirmCurrentFolder() {
+		folderConfirmDialogOpen = false;
+
+		// マイグレーション対象があるかチェック
+		const targetCount = await migration.getTargetCount('filesystem');
+
+		if (targetCount > 0) {
+			migration.reset();
+			pendingStorageMode = 'filesystem';
+			migrationTargetCount = targetCount;
+			migrationDialogOpen = true;
+			return;
 		}
+
+		// マイグレーション不要の場合はモードを切り替え
+		storageMode = 'filesystem';
+		await setStorageMode('filesystem');
+	}
+
+	// フォルダ確認ダイアログ: 別のフォルダを選択
+	async function handleSelectDifferentFolder() {
+		folderConfirmDialogOpen = false;
+
+		const handle = await pickDirectory();
+		if (!handle) {
+			radioGroupKey++;
+			pendingStorageMode = null;
+			return;
+		}
+
+		// 既存フォルダと異なる場合はPDF移行を確認
+		if (directoryHandle && handle.name !== directoryHandle.name) {
+			// filesystem添付ファイルの数を取得
+			const count = await getFilesystemAttachmentCount();
+			if (count > 0) {
+				oldDirectoryHandle = directoryHandle;
+				newDirectoryHandle = handle;
+				folderMigrationCount = count;
+				folderMigrationDialogOpen = true;
+				return;
+			}
+		}
+
+		// 移行対象がない場合はそのままフォルダを更新
+		directoryHandle = handle;
+		directoryName = getDirectoryDisplayName(handle);
+		await saveDirectoryHandle(handle);
+
+		// マイグレーション対象があるかチェック（ブラウザ→ローカル）
+		const targetCount = await migration.getTargetCount('filesystem');
+		if (targetCount > 0) {
+			migration.reset();
+			pendingStorageMode = 'filesystem';
+			migrationTargetCount = targetCount;
+			migrationDialogOpen = true;
+			return;
+		}
+
+		storageMode = 'filesystem';
+		await setStorageMode('filesystem');
+	}
+
+	// フォルダ確認ダイアログ: キャンセル
+	function handleCancelFolderConfirm() {
+		folderConfirmDialogOpen = false;
+		pendingStorageMode = null;
+		radioGroupKey++;
 	}
 
 	// === マイグレーション関連 ===
@@ -220,24 +309,15 @@
 		}
 	}
 
-	async function handleSkipMigration() {
-		if (!pendingStorageMode) return;
-
-		// マイグレーションせずにモード切り替え
-		storageMode = pendingStorageMode;
-		await setStorageMode(pendingStorageMode);
-
-		migrationDialogOpen = false;
-		pendingStorageMode = null;
-		migrationTargetCount = 0;
-	}
-
 	function handleCancelMigration() {
+		// マイグレーションをキャンセルし、モード切り替えも中止
 		migration.cancel();
 		migration.reset();
 		migrationDialogOpen = false;
 		pendingStorageMode = null;
 		migrationTargetCount = 0;
+		// RadioGroupの選択状態を元に戻すために強制再レンダリング
+		radioGroupKey++;
 	}
 
 	function handleCloseMigrationDialog() {
@@ -246,19 +326,94 @@
 		migrationDialogOpen = false;
 		pendingStorageMode = null;
 		migrationTargetCount = 0;
+		// RadioGroupの選択状態を元に戻すために強制再レンダリング
+		radioGroupKey++;
+	}
+
+	// === フォルダ変更時のPDF移行 ===
+	async function handleStartFolderMigration() {
+		if (!oldDirectoryHandle || !newDirectoryHandle) return;
+
+		isFolderMigrating = true;
+		folderMigrationProgress = 0;
+		folderMigrationError = null;
+
+		try {
+			const items = await getAttachmentsForFolderMigration();
+			const total = items.length;
+
+			for (let i = 0; i < items.length; i++) {
+				await migrateAttachmentToNewFolder(items[i], oldDirectoryHandle, newDirectoryHandle);
+				folderMigrationProgress = (i + 1) / total;
+			}
+
+			// 成功したら新しいフォルダを設定
+			directoryHandle = newDirectoryHandle;
+			directoryName = getDirectoryDisplayName(newDirectoryHandle);
+			await saveDirectoryHandle(newDirectoryHandle);
+
+			// ダイアログを閉じる
+			folderMigrationDialogOpen = false;
+			oldDirectoryHandle = null;
+			newDirectoryHandle = null;
+			folderMigrationCount = 0;
+
+			// モード切り替え（まだブラウザ保存だった場合）
+			if (storageMode !== 'filesystem') {
+				// ブラウザ→ローカルのマイグレーション対象をチェック
+				const targetCount = await migration.getTargetCount('filesystem');
+				if (targetCount > 0) {
+					migration.reset();
+					pendingStorageMode = 'filesystem';
+					migrationTargetCount = targetCount;
+					migrationDialogOpen = true;
+				} else {
+					storageMode = 'filesystem';
+					await setStorageMode('filesystem');
+				}
+			}
+		} catch (err) {
+			folderMigrationError = err instanceof Error ? err.message : '不明なエラー';
+		} finally {
+			isFolderMigrating = false;
+		}
+	}
+
+	function handleCancelFolderMigration() {
+		// フォルダ変更をキャンセル（元のフォルダを使い続ける）
+		folderMigrationDialogOpen = false;
+		oldDirectoryHandle = null;
+		newDirectoryHandle = null;
+		folderMigrationCount = 0;
+		folderMigrationProgress = 0;
+		folderMigrationError = null;
+		radioGroupKey++;
 	}
 
 	async function handleSelectDirectory() {
 		const handle = await pickDirectory();
-		if (handle) {
-			directoryHandle = handle;
-			directoryName = getDirectoryDisplayName(handle);
-			await saveDirectoryHandle(handle);
+		if (!handle) return;
 
-			if (storageMode !== 'filesystem') {
-				storageMode = 'filesystem';
-				await setStorageMode('filesystem');
+		// 既存フォルダと異なる場合はPDF移行を確認
+		if (directoryHandle && storageMode === 'filesystem') {
+			const count = await getFilesystemAttachmentCount();
+			if (count > 0) {
+				oldDirectoryHandle = directoryHandle;
+				newDirectoryHandle = handle;
+				folderMigrationCount = count;
+				folderMigrationDialogOpen = true;
+				return;
 			}
+		}
+
+		// 移行対象がない場合はそのままフォルダを更新
+		directoryHandle = handle;
+		directoryName = getDirectoryDisplayName(handle);
+		await saveDirectoryHandle(handle);
+
+		if (storageMode !== 'filesystem') {
+			storageMode = 'filesystem';
+			await setStorageMode('filesystem');
 		}
 	}
 
@@ -613,31 +768,33 @@
 		</Card.Header>
 		<Card.Content class="space-y-6">
 			{#if isFileSystemSupported}
-				<RadioGroup.Root
-					value={storageMode}
-					onValueChange={(v) => handleStorageModeChange(v as StorageType)}
-				>
-					<div class="flex items-start space-x-3">
-						<RadioGroup.Item value="filesystem" id="storage-filesystem" />
-						<div class="grid gap-1.5">
-							<Label for="storage-filesystem" class="font-medium">
-								ローカルフォルダに保存（推奨）
-							</Label>
-							<p class="text-sm text-muted-foreground">
-								選択したフォルダに年度別で自動保存します。バックアップが容易で、他のソフトからもアクセス可能です。
-							</p>
+				{#key radioGroupKey}
+					<RadioGroup.Root
+						value={storageMode}
+						onValueChange={(v) => handleStorageModeChange(v as StorageType)}
+					>
+						<div class="flex items-start space-x-3">
+							<RadioGroup.Item value="filesystem" id="storage-filesystem" />
+							<div class="grid gap-1.5">
+								<Label for="storage-filesystem" class="font-medium">
+									ローカルフォルダに保存（推奨）
+								</Label>
+								<p class="text-sm text-muted-foreground">
+									選択したフォルダに年度別で自動保存します。バックアップが容易で、他のソフトからもアクセス可能です。
+								</p>
+							</div>
 						</div>
-					</div>
-					<div class="flex items-start space-x-3">
-						<RadioGroup.Item value="indexeddb" id="storage-indexeddb" />
-						<div class="grid gap-1.5">
-							<Label for="storage-indexeddb" class="font-medium">ブラウザに保存</Label>
-							<p class="text-sm text-muted-foreground">
-								ブラウザのIndexedDBに保存します。定期的にエクスポートしてバックアップしてください。
-							</p>
+						<div class="flex items-start space-x-3">
+							<RadioGroup.Item value="indexeddb" id="storage-indexeddb" />
+							<div class="grid gap-1.5">
+								<Label for="storage-indexeddb" class="font-medium">ブラウザに保存</Label>
+								<p class="text-sm text-muted-foreground">
+									ブラウザのIndexedDBに保存します。定期的にエクスポートしてバックアップしてください。
+								</p>
+							</div>
 						</div>
-					</div>
-				</RadioGroup.Root>
+					</RadioGroup.Root>
+				{/key}
 
 				{#if storageMode === 'filesystem'}
 					<div class="rounded-lg border p-4">
@@ -1258,12 +1415,90 @@
 
 		<AlertDialog.Footer>
 			{#if !migration.isRunning && migration.progress === 0}
-				<AlertDialog.Cancel onclick={handleSkipMigration}>移行しない</AlertDialog.Cancel>
+				<AlertDialog.Cancel onclick={handleCancelMigration}>キャンセル</AlertDialog.Cancel>
 				<Button onclick={handleStartMigration}>移行を開始</Button>
 			{:else if migration.isRunning}
-				<Button variant="outline" onclick={handleCancelMigration}>キャンセル</Button>
+				<Button variant="outline" onclick={handleCancelMigration}>中止</Button>
 			{:else}
 				<Button onclick={handleCloseMigrationDialog}>閉じる</Button>
+			{/if}
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<!-- フォルダ確認ダイアログ -->
+<AlertDialog.Root bind:open={folderConfirmDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title class="flex items-center gap-2">
+				<Folder class="size-5" />
+				保存先フォルダの確認
+			</AlertDialog.Title>
+			<AlertDialog.Description class="space-y-3">
+				<p>以下のフォルダに証憑PDFを保存します。</p>
+				<div class="flex items-center gap-2 rounded-lg border p-3">
+					<FolderOpen class="size-5 text-green-500" />
+					<span class="font-medium">{directoryName}</span>
+				</div>
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+
+		<AlertDialog.Footer class="flex-col gap-2 sm:flex-row">
+			<AlertDialog.Cancel onclick={handleCancelFolderConfirm}>キャンセル</AlertDialog.Cancel>
+			<Button variant="outline" onclick={handleSelectDifferentFolder}>別のフォルダを選択</Button>
+			<Button onclick={handleConfirmCurrentFolder}>このフォルダを使用</Button>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<!-- フォルダ移行ダイアログ -->
+<AlertDialog.Root bind:open={folderMigrationDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title class="flex items-center gap-2">
+				{#if isFolderMigrating}
+					<Loader2 class="size-5 animate-spin" />
+				{:else}
+					<Folder class="size-5" />
+				{/if}
+				証憑PDFの移行
+			</AlertDialog.Title>
+			<AlertDialog.Description class="space-y-3">
+				{#if !isFolderMigrating && !folderMigrationError}
+					<p>
+						既存のPDFファイル（<strong>{folderMigrationCount}件</strong
+						>）を新しいフォルダに移動しますか？
+					</p>
+					<p class="text-sm text-muted-foreground">
+						移行しない場合、証憑PDFへのアクセスができなくなります。
+					</p>
+				{:else if isFolderMigrating}
+					<p>PDFファイルを移行中です。しばらくお待ちください...</p>
+				{:else if folderMigrationError}
+					<p class="text-destructive">移行中にエラーが発生しました: {folderMigrationError}</p>
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+
+		{#if isFolderMigrating || folderMigrationProgress > 0}
+			<div class="space-y-4 py-4">
+				<Progress value={folderMigrationProgress * 100} class="w-full" />
+				<p class="text-center text-sm text-muted-foreground">
+					{Math.round(folderMigrationProgress * 100)}% 完了
+				</p>
+			</div>
+		{/if}
+
+		<AlertDialog.Footer>
+			{#if !isFolderMigrating && folderMigrationProgress === 0}
+				<AlertDialog.Cancel onclick={handleCancelFolderMigration}>
+					キャンセル（フォルダ変更を中止）
+				</AlertDialog.Cancel>
+				<Button onclick={handleStartFolderMigration}>移行を開始</Button>
+			{:else if isFolderMigrating}
+				<Button variant="outline" disabled>移行中...</Button>
+			{:else}
+				<Button onclick={handleCancelFolderMigration}>閉じる</Button>
 			{/if}
 		</AlertDialog.Footer>
 	</AlertDialog.Content>

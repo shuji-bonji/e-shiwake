@@ -304,9 +304,33 @@ export async function updateJournal(
 }
 
 /**
- * 仕訳の削除
+ * 仕訳の削除（添付ファイルも削除）
  */
-export async function deleteJournal(id: string): Promise<void> {
+export async function deleteJournal(
+	id: string,
+	directoryHandle?: FileSystemDirectoryHandle | null
+): Promise<void> {
+	// 仕訳を取得
+	const journal = await db.journals.get(id);
+	if (!journal) {
+		return; // 既に削除済み
+	}
+
+	// 添付ファイルをファイルシステムから削除
+	if (directoryHandle && journal.attachments.length > 0) {
+		const { deleteFileFromDirectory } = await import('$lib/utils/filesystem');
+		for (const attachment of journal.attachments) {
+			if (attachment.storageType === 'filesystem' && attachment.filePath) {
+				try {
+					await deleteFileFromDirectory(directoryHandle, attachment.filePath);
+				} catch (error) {
+					console.warn(`添付ファイルの削除に失敗: ${attachment.filePath}`, error);
+				}
+			}
+		}
+	}
+
+	// 仕訳を削除
 	await db.journals.delete(id);
 }
 
@@ -1419,6 +1443,111 @@ export async function migrateAttachmentToIndexedDB(
 
 	// 元のファイルを削除
 	await deleteFileFromDirectory(directoryHandle, attachment.filePath);
+}
+
+/**
+ * ファイルシステムに保存されている添付ファイルの数を取得
+ */
+export async function getFilesystemAttachmentCount(): Promise<number> {
+	const journals = await db.journals.toArray();
+	let count = 0;
+
+	for (const journal of journals) {
+		for (const attachment of journal.attachments) {
+			if (attachment.storageType === 'filesystem' && attachment.filePath) {
+				count++;
+			}
+		}
+	}
+
+	return count;
+}
+
+/**
+ * フォルダ間で添付ファイルを移行する情報を取得
+ */
+export interface FolderMigrationItem {
+	journalId: string;
+	attachmentId: string;
+	filePath: string;
+	generatedName: string;
+	year: number;
+}
+
+/**
+ * フォルダ間移行対象の添付ファイルを取得
+ */
+export async function getAttachmentsForFolderMigration(): Promise<FolderMigrationItem[]> {
+	const journals = await db.journals.toArray();
+	const result: FolderMigrationItem[] = [];
+
+	for (const journal of journals) {
+		const year = parseInt(journal.date.substring(0, 4), 10);
+
+		for (const attachment of journal.attachments) {
+			if (attachment.storageType === 'filesystem' && attachment.filePath) {
+				result.push({
+					journalId: journal.id,
+					attachmentId: attachment.id,
+					filePath: attachment.filePath,
+					generatedName: attachment.generatedName,
+					year
+				});
+			}
+		}
+	}
+
+	return result;
+}
+
+/**
+ * 単一の添付ファイルを新しいフォルダに移行
+ */
+export async function migrateAttachmentToNewFolder(
+	item: FolderMigrationItem,
+	oldDirectoryHandle: FileSystemDirectoryHandle,
+	newDirectoryHandle: FileSystemDirectoryHandle
+): Promise<void> {
+	const { readFileFromDirectory, saveFileToDirectory, deleteFileFromDirectory } =
+		await import('$lib/utils/filesystem');
+
+	// 旧フォルダからファイルを読み込む
+	const blob = await readFileFromDirectory(oldDirectoryHandle, item.filePath);
+	if (!blob) {
+		throw new Error(`ファイルが見つかりません: ${item.filePath}`);
+	}
+
+	// 新フォルダにファイルを保存
+	const newFilePath = await saveFileToDirectory(
+		newDirectoryHandle,
+		item.year,
+		item.generatedName,
+		blob
+	);
+
+	// DBの添付ファイルパスを更新
+	const journal = await db.journals.get(item.journalId);
+	if (!journal) return;
+
+	const updatedAttachments = journal.attachments.map((a) => {
+		if (a.id === item.attachmentId) {
+			return { ...a, filePath: newFilePath };
+		}
+		return a;
+	});
+
+	await db.journals.update(item.journalId, {
+		attachments: updatedAttachments,
+		updatedAt: new Date().toISOString()
+	});
+
+	// 旧フォルダからファイルを削除
+	try {
+		await deleteFileFromDirectory(oldDirectoryHandle, item.filePath);
+	} catch {
+		// 削除に失敗しても続行（手動で削除してもらう）
+		console.warn(`旧ファイルの削除に失敗: ${item.filePath}`);
+	}
 }
 
 // ==================== テストデータ ====================
