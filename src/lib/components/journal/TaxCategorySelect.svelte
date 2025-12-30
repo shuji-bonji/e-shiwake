@@ -11,9 +11,10 @@
 		onchange: (category: TaxCategory) => void;
 		class?: string;
 		compact?: boolean;
+		tabindex?: number;
 	}
 
-	let { value, onchange, class: className, compact = true }: Props = $props();
+	let { value, onchange, class: className, compact = true, tabindex }: Props = $props();
 
 	let open = $state(false);
 	let triggerRef = $state<HTMLButtonElement>(null!);
@@ -77,6 +78,7 @@
 					value && getCategoryColor(value),
 					className
 				)}
+				{tabindex}
 			>
 				<span class="truncate">{displayLabel}</span>
 				<ChevronsUpDown class="ml-1 size-3 shrink-0 opacity-50" />

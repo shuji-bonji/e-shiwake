@@ -14,6 +14,8 @@
 		disabled?: boolean;
 		vendorMissing?: boolean;
 		vertical?: boolean;
+		tabindex?: number;
+		onkeydown?: (e: KeyboardEvent) => void;
 	}
 
 	let {
@@ -24,8 +26,16 @@
 		onedit = undefined,
 		disabled = false,
 		vendorMissing = false,
-		vertical = false
+		vertical = false,
+		tabindex = 0,
+		onkeydown
 	}: Props = $props();
+
+	// 外部からフォーカスを設定できるようにエクスポート
+	let dropZoneRef = $state<HTMLDivElement>(null!);
+	export function focus() {
+		dropZoneRef?.focus();
+	}
 
 	let isDragOver = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -81,8 +91,9 @@
 <div class={cn('flex h-full flex-col gap-2', vertical && 'w-full')}>
 	<!-- ドロップゾーン -->
 	<div
+		bind:this={dropZoneRef}
 		role="button"
-		tabindex="0"
+		{tabindex}
 		class={cn(
 			'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors',
 			vertical ? 'flex-1 p-2' : 'p-4',
@@ -94,7 +105,10 @@
 		ondragleave={handleDragLeave}
 		ondrop={handleDrop}
 		onclick={handleClick}
-		onkeydown={(e) => e.key === 'Enter' && handleClick()}
+		onkeydown={(e) => {
+			if (e.key === 'Enter') handleClick();
+			onkeydown?.(e);
+		}}
 	>
 		<Upload class={cn('text-muted-foreground', vertical ? 'size-5' : 'mb-2 size-6')} />
 		{#if !vertical}

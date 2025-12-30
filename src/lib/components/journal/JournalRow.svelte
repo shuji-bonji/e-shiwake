@@ -88,6 +88,11 @@
 	let evidenceChangeDialogOpen = $state(false);
 	let pendingEvidenceStatus = $state<EvidenceStatus | null>(null);
 
+	// タブ順序制御用の参照
+	let vendorInputRef: { focus: () => void } | undefined = $state();
+	let pdfDropZoneRef: { focus: () => void } | undefined = $state();
+	let dateInputRef = $state<HTMLInputElement>(null!);
+
 	// ダイアログ用の派生値
 	const mainDebitLine = $derived(journal.lines.find((l) => l.type === 'debit' && l.accountCode));
 	const mainAccountType = $derived(
@@ -278,6 +283,34 @@
 				: line
 		);
 		onupdate({ ...journal, lines: newLines });
+	}
+
+	// 貸方金額でTabキー押下時、最後の行なら取引先にフォーカス移動
+	function handleCreditAmountKeydown(e: KeyboardEvent, lineId: string) {
+		if (e.key === 'Tab' && !e.shiftKey) {
+			// 最後の貸方行かチェック
+			const lastCreditLine = creditLines[creditLines.length - 1];
+			if (lastCreditLine?.id === lineId) {
+				e.preventDefault();
+				vendorInputRef?.focus();
+			}
+		}
+	}
+
+	// 取引先でTabキー押下時、PDFドロップゾーンにフォーカス移動
+	function handleVendorKeydown(e: KeyboardEvent) {
+		if (e.key === 'Tab' && !e.shiftKey) {
+			e.preventDefault();
+			pdfDropZoneRef?.focus();
+		}
+	}
+
+	// PDFドロップゾーンでTabキー押下時、日付にフォーカス移動（循環）
+	function handlePdfKeydown(e: KeyboardEvent) {
+		if (e.key === 'Tab' && !e.shiftKey) {
+			e.preventDefault();
+			dateInputRef?.focus();
+		}
 	}
 
 	// 仕訳行の追加
@@ -478,7 +511,7 @@
 				<Tooltip.Provider>
 					<Tooltip.Root>
 						<Tooltip.Trigger>
-							<button type="button" class="p-1" onclick={cycleEvidenceStatus}>
+							<button type="button" class="p-1" onclick={cycleEvidenceStatus} tabindex={-1}>
 								{#if journal.evidenceStatus === 'none'}
 									<Circle class="size-5 text-muted-foreground" />
 								{:else if journal.evidenceStatus === 'paper'}
@@ -502,6 +535,7 @@
 
 				<!-- 日付 -->
 				<Input
+					bind:ref={dateInputRef}
 					type="date"
 					value={journal.date}
 					onchange={(e) => updateField('date', e.currentTarget.value)}
@@ -524,12 +558,15 @@
 			<div class="flex items-center gap-2 pl-8 journal:pl-0">
 				<!-- 取引先 -->
 				<VendorInput
+					bind:this={vendorInputRef}
 					{vendors}
 					value={journal.vendor}
 					onchange={(name) => updateField('vendor', name)}
 					onblur={handleVendorBlur}
+					onkeydown={handleVendorKeydown}
 					placeholder="取引先"
 					class="w-40 shrink-0"
+					tabindex={-1}
 				/>
 
 				<!-- 確定ボタン（編集中のみ表示） -->
@@ -545,6 +582,7 @@
 										class="shrink-0 gap-1"
 										disabled={!validation.isValid}
 										onclick={() => onconfirm(journal.id)}
+										tabindex={-1}
 									>
 										<Check class="size-4" />
 										確定
@@ -570,6 +608,7 @@
 					size="icon"
 					class="shrink-0 text-destructive"
 					onclick={() => ondelete(journal.id)}
+					tabindex={-1}
 				>
 					<Trash2 class="size-4" />
 				</Button>
@@ -591,6 +630,7 @@
 									size="icon"
 									class="size-6 text-foreground"
 									onclick={() => addLine('debit')}
+									tabindex={-1}
 								>
 									<Plus class="size-4" strokeWidth={3} />
 								</Button>
@@ -653,6 +693,7 @@
 							<TaxCategorySelect
 								value={line.taxCategory}
 								onchange={(cat) => updateLine(line.id, 'taxCategory', cat)}
+								tabindex={-1}
 							/>
 							<Input
 								type="number"
@@ -672,6 +713,7 @@
 									size="icon"
 									class="size-7 shrink-0"
 									onclick={() => removeLine(line.id)}
+									tabindex={-1}
 								>
 									<Trash2 class="size-3" />
 								</Button>
@@ -694,6 +736,7 @@
 									size="icon"
 									class="size-6 text-foreground"
 									onclick={() => addLine('credit')}
+									tabindex={-1}
 								>
 									<Plus class="size-4" strokeWidth={3} />
 								</Button>
@@ -756,12 +799,14 @@
 							<TaxCategorySelect
 								value={line.taxCategory}
 								onchange={(cat) => updateLine(line.id, 'taxCategory', cat)}
+								tabindex={-1}
 							/>
 							<Input
 								type="number"
 								value={line.amount}
 								onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
 								onblur={syncAttachmentsOnBlur}
+								onkeydown={(e) => handleCreditAmountKeydown(e, line.id)}
 								placeholder="金額"
 								class={cn(
 									'w-full text-right font-mono journal:w-24',
@@ -775,6 +820,7 @@
 									size="icon"
 									class="size-7 shrink-0"
 									onclick={() => removeLine(line.id)}
+									tabindex={-1}
 								>
 									<Trash2 class="size-3" />
 								</Button>
@@ -798,6 +844,7 @@
 	<!-- PDF添付エリア（デスクトップ: 右側、モバイル: 下部） -->
 	<div class="w-full journal:w-24 journal:shrink-0">
 		<PdfDropZone
+			bind:this={pdfDropZoneRef}
 			attachments={journal.attachments}
 			onattach={handleFileDrop}
 			onremove={handleRemoveAttachment}
@@ -805,6 +852,8 @@
 			onedit={handleEditAttachment}
 			vendorMissing={!journal.vendor.trim()}
 			vertical
+			tabindex={-1}
+			onkeydown={handlePdfKeydown}
 		/>
 	</div>
 </div>

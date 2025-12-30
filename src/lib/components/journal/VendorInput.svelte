@@ -12,8 +12,10 @@
 		value: string;
 		onchange: (name: string) => void;
 		onblur?: () => void;
+		onkeydown?: (e: KeyboardEvent) => void;
 		placeholder?: string;
 		class?: string;
+		tabindex?: number;
 	}
 
 	let {
@@ -21,12 +23,19 @@
 		value,
 		onchange,
 		onblur,
+		onkeydown,
 		placeholder = '取引先',
-		class: className
+		class: className,
+		tabindex
 	}: Props = $props();
 
 	let open = $state(false);
 	let inputRef = $state<HTMLInputElement>(null!);
+
+	// 外部からフォーカスを設定できるようにエクスポート
+	export function focus() {
+		inputRef?.focus();
+	}
 
 	// フィルタリングされた候補
 	const filteredVendors = $derived.by(() => {
@@ -78,9 +87,11 @@
 				oninput={handleInput}
 				onfocus={handleFocus}
 				onblur={handleBlur}
+				{onkeydown}
 				{placeholder}
 				class={cn('', className)}
 				autocomplete="off"
+				{tabindex}
 			/>
 		{/snippet}
 	</Popover.Trigger>
