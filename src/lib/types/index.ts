@@ -183,6 +183,19 @@ export interface ExportJournalEntry extends Omit<JournalEntry, 'attachments'> {
 /**
  * 設定
  */
+export type SettingsKey =
+	| 'storageMode'
+	| 'lastExportedAt'
+	| 'autoPurgeBlobAfterExport'
+	| 'blobRetentionDays';
+
+export type SettingsValueMap = {
+	storageMode: StorageType;
+	lastExportedAt: string;
+	autoPurgeBlobAfterExport: boolean;
+	blobRetentionDays: number;
+};
+
 export interface Settings {
 	fiscalYearStart: number; // 会計年度開始月（1-12、個人は通常1）
 	defaultCurrency: string; // 通貨コード（JPY）

@@ -75,24 +75,24 @@ const storageMode: 'filesystem' | 'indexeddb' = settings.storageType;
 
 ```typescript
 interface Attachment {
-  id: string;
-  journalEntryId: string;
-  documentDate: string;        // 書類の日付 YYYY-MM-DD
-  documentType: DocumentType;  // 'receipt' | 'invoice' | 'bill' | ...
-  originalName: string;        // 元のファイル名
-  generatedName: string;       // 自動生成ファイル名
-  mimeType: string;
-  size: number;
-  description: string;
-  amount: number;
-  vendor: string;
+	id: string;
+	journalEntryId: string;
+	documentDate: string; // 書類の日付 YYYY-MM-DD
+	documentType: DocumentType; // 'receipt' | 'invoice' | 'bill' | ...
+	originalName: string; // 元のファイル名
+	generatedName: string; // 自動生成ファイル名
+	mimeType: string;
+	size: number;
+	description: string;
+	amount: number;
+	vendor: string;
 
-  // ストレージモードにより異なる
-  storageType: 'filesystem' | 'indexeddb';
-  blob?: Blob;           // indexeddb モード時のみ
-  filePath?: string;     // filesystem モード時のみ
+	// ストレージモードにより異なる
+	storageType: 'filesystem' | 'indexeddb';
+	blob?: Blob; // indexeddb モード時のみ
+	filePath?: string; // filesystem モード時のみ
 
-  createdAt: string;
+	createdAt: string;
 }
 ```
 
@@ -100,13 +100,13 @@ interface Attachment {
 
 ```typescript
 interface ExportData {
-  version: string;
-  exportedAt: string;
-  fiscalYear: number;
-  journals: JournalEntry[];  // attachments含む（blob除外）
-  accounts: Account[];
-  vendors: Vendor[];
-  settings: Settings;
+	version: string;
+	exportedAt: string;
+	fiscalYear: number;
+	journals: JournalEntry[]; // attachments含む（blob除外）
+	accounts: Account[];
+	vendors: Vendor[];
+	settings: Settings;
 }
 ```
 
@@ -220,7 +220,7 @@ sequenceDiagram
             UI->>DB: attachment.blob
             DB-->>UI: Blob
         end
-        UI->>ZIP: zip.file('evidences/' + fileName, blob)
+        UI->>ZIP: zip.file('evidences/' + year + '/' + journalId + '/' + attachmentId + '/' + fileName, blob)
     end
 
     UI->>ZIP: zip.generateAsync({type: 'blob'})
@@ -233,9 +233,13 @@ sequenceDiagram
 ```
 e-shiwake_backup_2024.zip
 ├── data.json                              # 仕訳・勘定科目・取引先・設定
-└── evidences/                             # 証憑PDF
-    ├── 2024-01-15_領収書_USBケーブル_3980円_Amazon.pdf
-    ├── 2024-01-20_請求書_システム開発_100000円_クライアントA.pdf
+└── evidences/                             # 証憑PDF（ID安全な階層）
+    ├── 2024/
+    │   ├── {journalId}/
+    │   │   ├── {attachmentId}/
+    │   │   │   └── 2024-01-15_領収書_USBケーブル_3980円_Amazon.pdf
+    │   │   └── ...
+    │   └── ...
     └── ...
 ```
 

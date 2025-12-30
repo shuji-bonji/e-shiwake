@@ -139,7 +139,7 @@ describe('zip-export', () => {
 			// evidences/2024/ フォルダに証憑が存在（ファイル名の存在確認）
 			const fileList = Object.keys(zip.files);
 			const hasEvidenceFile = fileList.some(
-				(f) => f === `evidences/2024/${attachment.generatedName}`
+				(f) => f === `evidences/2024/${journal.id}/${attachment.id}/${attachment.generatedName}`
 			);
 			expect(hasEvidenceFile).toBe(true);
 		});
@@ -282,7 +282,7 @@ describe('zip-export', () => {
 			const zip = await JSZip.loadAsync(arrayBuffer);
 			const fileList = Object.keys(zip.files);
 			const hasEvidenceFile = fileList.some(
-				(f) => f === `evidences/2024/${attachment.generatedName}`
+				(f) => f === `evidences/2024/${journal.id}/${attachment.id}/${attachment.generatedName}`
 			);
 			expect(hasEvidenceFile).toBe(true);
 		});
@@ -327,13 +327,17 @@ describe('zip-export', () => {
 
 			// 2024年度フォルダ
 			const has2024File = fileList.some(
-				(f) => f === `evidences/2024/${attachment2024.generatedName}`
+				(f) =>
+					f ===
+					`evidences/2024/${journal2024.id}/${attachment2024.id}/${attachment2024.generatedName}`
 			);
 			expect(has2024File).toBe(true);
 
 			// 2023年度フォルダ
 			const has2023File = fileList.some(
-				(f) => f === `evidences/2023/${attachment2023.generatedName}`
+				(f) =>
+					f ===
+					`evidences/2023/${journal2023.id}/${attachment2023.id}/${attachment2023.generatedName}`
 			);
 			expect(has2023File).toBe(true);
 		});

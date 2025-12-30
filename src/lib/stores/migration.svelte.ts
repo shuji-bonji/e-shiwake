@@ -49,6 +49,7 @@ export function createMigrationStore() {
 	let completed = $state(0);
 	let errors = $state<MigrationError[]>([]);
 	let targetStorageType = $state<StorageType | null>(null);
+	let isCanceled = $state(false);
 
 	// サブスクリプション管理
 	let subscription: Subscription | null = null;
@@ -79,6 +80,7 @@ export function createMigrationStore() {
 		completed = 0;
 		errors = [];
 		targetStorageType = target;
+		isCanceled = false;
 
 		try {
 			// マイグレーション対象を取得
@@ -132,11 +134,11 @@ export function createMigrationStore() {
 							progress = 1;
 
 							// エラーがなければストレージモードを更新
-							if (errors.length === 0) {
+							if (!isCanceled && errors.length === 0) {
 								await setStorageMode(target);
 							}
 
-							resolve(errors.length === 0);
+							resolve(!isCanceled && errors.length === 0);
 						})
 					)
 					.subscribe();
@@ -162,6 +164,7 @@ export function createMigrationStore() {
 			subscription.unsubscribe();
 			subscription = null;
 		}
+		isCanceled = true;
 		isRunning = false;
 	}
 
@@ -177,6 +180,7 @@ export function createMigrationStore() {
 		completed = 0;
 		errors = [];
 		targetStorageType = null;
+		isCanceled = false;
 	}
 
 	return {

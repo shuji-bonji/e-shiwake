@@ -31,18 +31,18 @@
 		DocumentType,
 		TaxCategory
 	} from '$lib/types';
-	import {
-		validateJournal,
-		addAttachmentToJournal,
-		removeAttachmentFromJournal,
-		getAttachmentBlob,
-		suggestDocumentType,
-		updateAttachment,
-		syncAttachmentsWithJournal,
-		saveVendor
-	} from '$lib/db';
+	import { validateJournal, suggestDocumentType } from '$lib/db';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { cn } from '$lib/utils.js';
+	import {
+		addJournalAttachment,
+		confirmEvidenceStatusChange as confirmEvidenceStatusChangeUseCase,
+		previewJournalAttachment,
+		removeJournalAttachment,
+		saveVendorIfNeeded,
+		syncAttachmentsOnBlur as syncAttachmentsOnBlurUseCase,
+		updateJournalAttachment
+	} from '$lib/usecases/journal-attachments';
 
 	interface Props {
 		journal: JournalEntry;
@@ -190,17 +190,12 @@
 		if (pendingEvidenceStatus === null) return;
 
 		try {
-			// 全ての添付ファイルを削除
-			for (const attachment of journal.attachments) {
-				await removeAttachmentFromJournal(journal.id, attachment.id, directoryHandle);
-			}
-
-			// ステータスを更新
-			onupdate({
-				...journal,
-				attachments: [],
-				evidenceStatus: pendingEvidenceStatus
+			const updatedJournal = await confirmEvidenceStatusChangeUseCase({
+				journal,
+				nextStatus: pendingEvidenceStatus,
+				directoryHandle
 			});
+			onupdate(updatedJournal);
 		} catch (error) {
 			console.error('添付ファイルの削除に失敗しました:', error);
 		} finally {
@@ -222,9 +217,7 @@
 	// 取引先保存と証憑同期（blurタイミング）
 	async function handleVendorBlur() {
 		// 取引先を保存（入力完了時のみ）
-		if (journal.vendor.trim()) {
-			await saveVendor(journal.vendor);
-		}
+		await saveVendorIfNeeded(journal.vendor);
 		// 証憑同期
 		await syncAttachmentsOnBlur();
 	}
@@ -238,24 +231,13 @@
 			journal.lines.find((l) => l.type === 'debit' && l.accountCode)?.amount ?? 0;
 
 		try {
-			const syncedAttachments = await syncAttachmentsWithJournal(
-				journal.attachments,
-				{
-					date: journal.date,
-					description: journal.description,
-					vendor: journal.vendor,
-					amount: mainDebitAmount
-				},
+			const syncedAttachments = await syncAttachmentsOnBlurUseCase({
+				journal,
+				mainDebitAmount,
 				directoryHandle
-			);
-			// ファイル名が変わった場合のみ更新
-			if (syncedAttachments.length > 0) {
-				const hasChanges = syncedAttachments.some(
-					(synced, i) => synced.generatedName !== journal.attachments[i]?.generatedName
-				);
-				if (hasChanges) {
-					onupdate({ ...journal, attachments: syncedAttachments });
-				}
+			});
+			if (syncedAttachments) {
+				onupdate({ ...journal, attachments: syncedAttachments });
 			}
 		} catch (error) {
 			console.error('証憑の同期に失敗:', error);
@@ -382,30 +364,17 @@
 		if (!pendingFile) return;
 
 		try {
-			// 仕訳の日付から年度を取得
-			const year = parseInt(journal.date.substring(0, 4), 10);
-
-			const attachment = await addAttachmentToJournal(
-				journal.id,
-				{
-					file: pendingFile,
-					documentDate,
-					documentType,
-					generatedName,
-					year,
-					description: journal.description,
-					amount: mainAmount,
-					vendor: updatedVendor
-				},
+			const updatedJournal = await addJournalAttachment({
+				journal,
+				file: pendingFile,
+				documentDate,
+				documentType,
+				generatedName,
+				updatedVendor,
+				mainAmount,
 				directoryHandle
-			);
-			// ローカル状態を更新（取引先も更新）
-			onupdate({
-				...journal,
-				vendor: updatedVendor,
-				attachments: [...journal.attachments, attachment],
-				evidenceStatus: 'digital'
 			});
+			onupdate(updatedJournal);
 		} catch (error) {
 			console.error('添付ファイルの追加に失敗しました:', error);
 			alert('添付ファイルの追加に失敗しました');
@@ -422,13 +391,12 @@
 	// 添付ファイルの削除
 	async function handleRemoveAttachment(attachmentId: string) {
 		try {
-			await removeAttachmentFromJournal(journal.id, attachmentId, directoryHandle);
-			const updatedAttachments = journal.attachments.filter((a) => a.id !== attachmentId);
-			onupdate({
-				...journal,
-				attachments: updatedAttachments,
-				evidenceStatus: updatedAttachments.length > 0 ? 'digital' : 'none'
+			const updatedJournal = await removeJournalAttachment({
+				journal,
+				attachmentId,
+				directoryHandle
 			});
+			onupdate(updatedJournal);
 		} catch (error) {
 			console.error('添付ファイルの削除に失敗しました:', error);
 		}
@@ -436,13 +404,7 @@
 
 	// 添付ファイルのプレビュー
 	async function handlePreviewAttachment(attachment: Attachment) {
-		const blob = await getAttachmentBlob(journal.id, attachment.id, directoryHandle);
-		if (blob) {
-			const url = URL.createObjectURL(blob);
-			window.open(url, '_blank');
-			// メモリリーク防止のため少し遅延してURLを解放
-			setTimeout(() => URL.revokeObjectURL(url), 1000);
-		}
+		await previewJournalAttachment({ journal, attachment, directoryHandle });
 	}
 
 	// 添付ファイルの編集ダイアログを開く
@@ -462,21 +424,13 @@
 		if (!editingAttachment) return;
 
 		try {
-			const updatedAttachment = await updateAttachment(
-				journal.id,
-				editingAttachment.id,
+			const updatedJournal = await updateJournalAttachment({
+				journal,
+				attachmentId: editingAttachment.id,
 				updates,
 				directoryHandle
-			);
-
-			// ローカル状態を更新
-			const updatedAttachments = journal.attachments.map((a) =>
-				a.id === updatedAttachment.id ? updatedAttachment : a
-			);
-			onupdate({
-				...journal,
-				attachments: updatedAttachments
 			});
+			onupdate(updatedJournal);
 		} catch (error) {
 			console.error('添付ファイルの更新に失敗しました:', error);
 			alert('添付ファイルの更新に失敗しました');

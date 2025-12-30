@@ -1,4 +1,6 @@
 import JSZip from 'jszip';
+import { from, of } from 'rxjs';
+import { catchError, finalize, mergeMap } from 'rxjs/operators';
 import type {
 	ExportData,
 	ExportDataDTO,
@@ -37,6 +39,8 @@ export interface ZipExportOptions {
 	onProgress?: (progress: ZipExportProgress) => void;
 	directoryHandle?: FileSystemDirectoryHandle | null;
 }
+
+const CONCURRENCY = 4;
 
 /**
  * 年度データを ZIP ファイルとしてエクスポート
@@ -94,47 +98,95 @@ export async function exportToZip(
 
 	// 失敗した証憑を追跡
 	const failedAttachments: FailedAttachment[] = [];
+	let completed = 0;
+
+	onProgress?.({
+		phase: 'collecting',
+		current: completed,
+		total,
+		message: `証憑を収集中... (${completed}/${total})`
+	});
+
+	function recordFailure(journalId: string, fileName: string, error: string) {
+		failedAttachments.push({ fileName, journalId, error });
+	}
 
 	// 各証憑を追加
-	for (let i = 0; i < attachments.length; i++) {
-		const { journalId, attachment, year } = attachments[i];
+	await new Promise<void>((resolve) => {
+		from(attachments)
+			.pipe(
+				mergeMap(
+					({ journalId, attachment, year }) =>
+						from(
+							(async () => {
+								const blob = await getAttachmentBlob(journalId, attachment.id, directoryHandle);
 
-		onProgress?.({
-			phase: 'collecting',
-			current: i + 1,
-			total,
-			message: `証憑を収集中... (${i + 1}/${total})`
-		});
+								if (!blob) {
+									recordFailure(journalId, attachment.generatedName, '証憑データが見つかりません');
+									return;
+								}
 
-		try {
-			const blob = await getAttachmentBlob(journalId, attachment.id, directoryHandle);
+								const yearFolder = evidencesFolder.folder(year.toString());
+								if (!yearFolder) {
+									recordFailure(
+										journalId,
+										attachment.generatedName,
+										'年度フォルダの作成に失敗しました'
+									);
+									return;
+								}
 
-			if (blob) {
-				// 年度別フォルダに保存
-				const yearFolder = evidencesFolder.folder(year.toString());
-				if (yearFolder) {
-					// BlobをArrayBufferに変換（Node.js環境との互換性のため）
-					const arrayBuffer = await blob.arrayBuffer();
-					yearFolder.file(attachment.generatedName, arrayBuffer);
-				}
-			} else {
-				// Blobがnullの場合も失敗として記録
-				failedAttachments.push({
-					fileName: attachment.generatedName,
-					journalId,
-					error: '証憑データが見つかりません'
-				});
-			}
-		} catch (error) {
-			console.warn(`証憑の取得に失敗: ${attachment.generatedName}`, error);
-			failedAttachments.push({
-				fileName: attachment.generatedName,
-				journalId,
-				error: error instanceof Error ? error.message : '不明なエラー'
-			});
-			// 失敗しても続行
-		}
-	}
+								const journalFolder = yearFolder.folder(journalId);
+								if (!journalFolder) {
+									recordFailure(
+										journalId,
+										attachment.generatedName,
+										'仕訳フォルダの作成に失敗しました'
+									);
+									return;
+								}
+
+								const attachmentFolder = journalFolder.folder(attachment.id);
+								if (!attachmentFolder) {
+									recordFailure(
+										journalId,
+										attachment.generatedName,
+										'証憑フォルダの作成に失敗しました'
+									);
+									return;
+								}
+
+								const arrayBuffer = await blob.arrayBuffer();
+								attachmentFolder.file(attachment.generatedName, arrayBuffer);
+							})()
+						).pipe(
+							catchError((error) => {
+								console.warn(`証憑の取得に失敗: ${attachment.generatedName}`, error);
+								recordFailure(
+									journalId,
+									attachment.generatedName,
+									error instanceof Error ? error.message : '不明なエラー'
+								);
+								return of(null);
+							}),
+							finalize(() => {
+								completed++;
+								onProgress?.({
+									phase: 'collecting',
+									current: completed,
+									total,
+									message: `証憑を収集中... (${completed}/${total})`
+								});
+							})
+						),
+					CONCURRENCY
+				),
+				finalize(() => {
+					resolve();
+				})
+			)
+			.subscribe();
+	});
 
 	// Phase 3: 圧縮
 	onProgress?.({

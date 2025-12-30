@@ -6,19 +6,22 @@ import type {
 	Attachment,
 	DocumentType,
 	StorageType,
-	ExportData
+	ExportData,
+	SettingsKey,
+	SettingsValueMap
 } from '$lib/types';
 import { defaultAccounts, getDefaultTaxCategory } from './seed';
 
 /**
  * 設定レコード（キーバリュー形式）
  */
-interface SettingsRecord {
-	key: string;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	value: any;
-	updatedAt: string;
-}
+type SettingsRecord = {
+	[K in SettingsKey]: {
+		key: K;
+		value: SettingsValueMap[K];
+		updatedAt: string;
+	};
+}[SettingsKey];
 
 /**
  * e-shiwake データベース
@@ -515,15 +518,20 @@ export interface AttachmentParams {
 /**
  * 設定値を取得
  */
-export async function getSetting<T>(key: string): Promise<T | undefined> {
+export async function getSetting<K extends SettingsKey>(
+	key: K
+): Promise<SettingsValueMap[K] | undefined> {
 	const record = await db.settings.get(key);
-	return record?.value as T | undefined;
+	return record ? (record.value as SettingsValueMap[K]) : undefined;
 }
 
 /**
  * 設定値を保存
  */
-export async function setSetting<T>(key: string, value: T): Promise<void> {
+export async function setSetting<K extends SettingsKey>(
+	key: K,
+	value: SettingsValueMap[K]
+): Promise<void> {
 	await db.settings.put({
 		key,
 		value,
@@ -535,7 +543,7 @@ export async function setSetting<T>(key: string, value: T): Promise<void> {
  * 現在の保存モードを取得
  */
 export async function getStorageMode(): Promise<StorageType> {
-	const mode = await getSetting<StorageType>('storageMode');
+	const mode = await getSetting('storageMode');
 	return mode ?? 'indexeddb';
 }
 
@@ -553,7 +561,7 @@ export async function setStorageMode(mode: StorageType): Promise<void> {
  * 最終エクスポート日時を取得
  */
 export async function getLastExportedAt(): Promise<string | null> {
-	const value = await getSetting<string>('lastExportedAt');
+	const value = await getSetting('lastExportedAt');
 	return value ?? null;
 }
 
@@ -607,7 +615,7 @@ export async function markAttachmentAsExported(
  * 自動Blob削除設定を取得
  */
 export async function getAutoPurgeBlobSetting(): Promise<boolean> {
-	const value = await getSetting<boolean>('autoPurgeBlobAfterExport');
+	const value = await getSetting('autoPurgeBlobAfterExport');
 	return value ?? true; // デフォルト: true
 }
 
@@ -622,7 +630,7 @@ export async function setAutoPurgeBlobSetting(enabled: boolean): Promise<void> {
  * Blob保持日数を取得
  */
 export async function getBlobRetentionDays(): Promise<number> {
-	const value = await getSetting<number>('blobRetentionDays');
+	const value = await getSetting('blobRetentionDays');
 	return value ?? 30; // デフォルト: 30日
 }
 
