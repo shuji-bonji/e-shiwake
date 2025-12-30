@@ -186,7 +186,7 @@ describe('zip-export', () => {
 			expect(progressUpdates.some((p) => p.phase === 'complete')).toBe(true);
 		});
 
-		it('証憑取得に失敗しても処理を続行する', async () => {
+		it('証憑取得に失敗しても処理を続行し、失敗情報を通知する', async () => {
 			const attachment1 = createTestAttachment({
 				id: 'att-1',
 				blob: createTestBlob('1')
@@ -207,8 +207,10 @@ describe('zip-export', () => {
 			// console.warn をモック
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
+			const progressUpdates: ZipExportProgress[] = [];
 			const blob = await exportToZip(exportData, journals, {
-				includeEvidences: true
+				includeEvidences: true,
+				onProgress: (progress) => progressUpdates.push({ ...progress })
 			});
 
 			expect(blob).toBeInstanceOf(Blob);
@@ -221,6 +223,14 @@ describe('zip-export', () => {
 			// 警告が出力されたことを確認
 			expect(warnSpy).toHaveBeenCalled();
 			warnSpy.mockRestore();
+
+			// 完了フェーズで失敗情報が通知されることを確認
+			const completeProgress = progressUpdates.find((p) => p.phase === 'complete');
+			expect(completeProgress).toBeDefined();
+			expect(completeProgress?.failedAttachments).toBeDefined();
+			expect(completeProgress?.failedAttachments).toHaveLength(1);
+			expect(completeProgress?.failedAttachments?.[0].error).toBe('取得エラー');
+			expect(completeProgress?.message).toContain('1件の証憑取得に失敗');
 		});
 
 		it('Blobプロパティがdata.jsonから除外される', async () => {
@@ -349,6 +359,39 @@ describe('zip-export', () => {
 			expect(zip.file('data.json')).not.toBeNull();
 			const evidencesFiles = Object.keys(zip.files).filter((f) => f.startsWith('evidences/'));
 			expect(evidencesFiles.length).toBe(0);
+		});
+
+		it('不正な日付形式でも現在年度にフォールバックしてエラーにならない', async () => {
+			const testBlob = createTestBlob('test');
+			const attachment = createTestAttachment({ blob: testBlob });
+			// 不正な日付形式の仕訳
+			const journal = createTestJournal({
+				date: 'invalid-date', // 不正な形式
+				attachments: [attachment]
+			});
+			const journals = [journal];
+			const exportData = createTestExportData(journals);
+
+			mockedGetAttachmentBlob.mockResolvedValue(testBlob);
+
+			// console.warn をモック
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+			// エラーにならずに完了する
+			const blob = await exportToZip(exportData, journals, {
+				includeEvidences: true
+			});
+
+			expect(blob).toBeInstanceOf(Blob);
+
+			// 警告が出力されたことを確認
+			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('不正な日付形式'));
+			warnSpy.mockRestore();
+
+			// ZIPが正常に生成されたことを確認
+			const arrayBuffer = await blobToArrayBuffer(blob);
+			const zip = await JSZip.loadAsync(arrayBuffer);
+			expect(zip.file('data.json')).not.toBeNull();
 		});
 	});
 });

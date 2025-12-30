@@ -154,6 +154,11 @@ export interface Attachment {
 }
 
 /**
+ * エクスポート用証憑（Blobを除外したDTO）
+ */
+export type ExportAttachment = Omit<Attachment, 'blob'>;
+
+/**
  * 仕訳
  */
 export interface JournalEntry {
@@ -166,6 +171,13 @@ export interface JournalEntry {
 	attachments: Attachment[]; // 紐付けられた証憑
 	createdAt: string; // 作成日時 ISO8601
 	updatedAt: string; // 更新日時 ISO8601
+}
+
+/**
+ * エクスポート用仕訳（証憑のBlobを除外したDTO）
+ */
+export interface ExportJournalEntry extends Omit<JournalEntry, 'attachments'> {
+	attachments: ExportAttachment[];
 }
 
 /**
@@ -194,6 +206,13 @@ export interface ExportData {
 	accounts: Account[];
 	vendors: Vendor[];
 	settings: Settings;
+}
+
+/**
+ * ZIP/JSONエクスポート用データ（Blobを除外したDTO）
+ */
+export interface ExportDataDTO extends Omit<ExportData, 'journals'> {
+	journals: ExportJournalEntry[];
 }
 
 /**

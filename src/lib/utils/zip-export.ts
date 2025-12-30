@@ -1,6 +1,21 @@
 import JSZip from 'jszip';
-import type { ExportData, JournalEntry, Attachment } from '$lib/types';
+import type {
+	ExportData,
+	ExportDataDTO,
+	JournalEntry,
+	Attachment,
+	ExportAttachment
+} from '$lib/types';
 import { getAttachmentBlob } from '$lib/db';
+
+/**
+ * 取得失敗した証憑情報
+ */
+export interface FailedAttachment {
+	fileName: string;
+	journalId: string;
+	error: string;
+}
 
 /**
  * ZIP エクスポートの進捗コールバック
@@ -10,6 +25,8 @@ export interface ZipExportProgress {
 	current: number;
 	total: number;
 	message: string;
+	/** 取得失敗した証憑一覧（complete時に設定） */
+	failedAttachments?: FailedAttachment[];
 }
 
 /**
@@ -75,6 +92,9 @@ export async function exportToZip(
 		throw new Error('ZIP フォルダの作成に失敗しました');
 	}
 
+	// 失敗した証憑を追跡
+	const failedAttachments: FailedAttachment[] = [];
+
 	// 各証憑を追加
 	for (let i = 0; i < attachments.length; i++) {
 		const { journalId, attachment, year } = attachments[i];
@@ -97,9 +117,21 @@ export async function exportToZip(
 					const arrayBuffer = await blob.arrayBuffer();
 					yearFolder.file(attachment.generatedName, arrayBuffer);
 				}
+			} else {
+				// Blobがnullの場合も失敗として記録
+				failedAttachments.push({
+					fileName: attachment.generatedName,
+					journalId,
+					error: '証憑データが見つかりません'
+				});
 			}
 		} catch (error) {
 			console.warn(`証憑の取得に失敗: ${attachment.generatedName}`, error);
+			failedAttachments.push({
+				fileName: attachment.generatedName,
+				journalId,
+				error: error instanceof Error ? error.message : '不明なエラー'
+			});
 			// 失敗しても続行
 		}
 	}
@@ -118,11 +150,18 @@ export async function exportToZip(
 		compressionOptions: { level: 6 }
 	});
 
+	// 完了メッセージを構築
+	let completeMessage = '完了';
+	if (failedAttachments.length > 0) {
+		completeMessage = `完了（${failedAttachments.length}件の証憑取得に失敗）`;
+	}
+
 	onProgress?.({
 		phase: 'complete',
 		current: total,
 		total,
-		message: '完了'
+		message: completeMessage,
+		failedAttachments: failedAttachments.length > 0 ? failedAttachments : undefined
 	});
 
 	return zipBlob;
@@ -131,15 +170,15 @@ export async function exportToZip(
 /**
  * エクスポートデータから Blob を除外
  */
-function prepareExportData(data: ExportData): ExportData {
+function prepareExportData(data: ExportData): ExportDataDTO {
 	return {
 		...data,
 		journals: data.journals.map((journal) => ({
 			...journal,
-			attachments: journal.attachments.map((attachment) => {
+			attachments: journal.attachments.map((attachment): ExportAttachment => {
 				// blob を除外、メタデータのみ保持
 				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				const { blob, ...rest } = attachment as Attachment & { blob?: Blob };
+				const { blob, ...rest } = attachment;
 				return rest;
 			})
 		}))
@@ -155,11 +194,30 @@ interface AttachmentInfo {
 	year: number;
 }
 
+/**
+ * 日付文字列から年度を安全に抽出
+ * YYYY-MM-DD 形式を想定、不正な場合は現在年度を返す
+ */
+function parseYearFromDate(dateStr: string): number {
+	// YYYY-MM-DD 形式のバリデーション
+	const match = /^(\d{4})-\d{2}-\d{2}$/.exec(dateStr);
+	if (match) {
+		const year = parseInt(match[1], 10);
+		// 妥当な年度範囲（1900-2100）をチェック
+		if (year >= 1900 && year <= 2100) {
+			return year;
+		}
+	}
+	// 不正な日付の場合は現在年度を使用
+	console.warn(`不正な日付形式: ${dateStr}、現在年度を使用します`);
+	return new Date().getFullYear();
+}
+
 function collectAttachments(journals: JournalEntry[]): AttachmentInfo[] {
 	const result: AttachmentInfo[] = [];
 
 	for (const journal of journals) {
-		const year = parseInt(journal.date.substring(0, 4), 10);
+		const year = parseYearFromDate(journal.date);
 
 		for (const attachment of journal.attachments) {
 			// Blob または filePath があるものを対象
@@ -187,5 +245,8 @@ export function downloadZip(blob: Blob, filename: string): void {
 	document.body.appendChild(a);
 	a.click();
 	document.body.removeChild(a);
-	URL.revokeObjectURL(url);
+	// ダウンロード完了まで待機してからURL解放（環境によっては即時解放でダウンロード中断の可能性あり）
+	setTimeout(() => {
+		URL.revokeObjectURL(url);
+	}, 1000);
 }
