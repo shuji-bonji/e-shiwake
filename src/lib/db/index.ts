@@ -1268,6 +1268,95 @@ export async function importData(
 }
 
 /**
+ * インポート後に証憑のBlobデータを復元
+ * ZIPインポート時に使用
+ */
+export async function restoreAttachmentBlobs(
+	attachmentBlobs: Map<string, Blob>,
+	storageMode: StorageType,
+	directoryHandle?: FileSystemDirectoryHandle | null,
+	onProgress?: (current: number, total: number) => void
+): Promise<{ restored: number; failed: number; errors: string[] }> {
+	const result = { restored: 0, failed: 0, errors: [] as string[] };
+	const total = attachmentBlobs.size;
+	let current = 0;
+
+	// 全仕訳を取得して証憑を探す
+	const journals = await db.journals.toArray();
+
+	for (const [attachmentId, blob] of attachmentBlobs) {
+		current++;
+		onProgress?.(current, total);
+
+		// この証憑が属する仕訳を検索
+		let targetJournal: JournalEntry | undefined;
+		let targetAttachment: Attachment | undefined;
+
+		for (const journal of journals) {
+			const attachment = journal.attachments.find((a) => a.id === attachmentId);
+			if (attachment) {
+				targetJournal = journal;
+				targetAttachment = attachment;
+				break;
+			}
+		}
+
+		if (!targetJournal || !targetAttachment) {
+			result.failed++;
+			result.errors.push(`証憑ID ${attachmentId} に対応する仕訳が見つかりません`);
+			continue;
+		}
+
+		try {
+			if (storageMode === 'filesystem' && directoryHandle) {
+				// ファイルシステムに保存
+				const { saveFileToDirectory } = await import('$lib/utils/filesystem');
+				const year = parseInt(targetAttachment.documentDate.substring(0, 4), 10);
+				const file = new File([blob], targetAttachment.generatedName, {
+					type: targetAttachment.mimeType
+				});
+				const filePath = await saveFileToDirectory(
+					directoryHandle,
+					year,
+					targetAttachment.generatedName,
+					file
+				);
+
+				// 添付ファイル情報を更新
+				const updatedAttachments = targetJournal.attachments.map((a) =>
+					a.id === attachmentId
+						? { ...a, storageType: 'filesystem' as StorageType, filePath, blob: undefined }
+						: a
+				);
+				await db.journals.update(targetJournal.id, { attachments: updatedAttachments });
+			} else {
+				// IndexedDB に Blob 保存
+				const updatedAttachments = targetJournal.attachments.map((a) =>
+					a.id === attachmentId
+						? {
+								...a,
+								storageType: 'indexeddb' as StorageType,
+								blob,
+								filePath: undefined,
+								blobPurgedAt: undefined
+							}
+						: a
+				);
+				await db.journals.update(targetJournal.id, { attachments: updatedAttachments });
+			}
+			result.restored++;
+		} catch (error) {
+			result.failed++;
+			result.errors.push(
+				`${targetAttachment.generatedName}: ${error instanceof Error ? error.message : '不明なエラー'}`
+			);
+		}
+	}
+
+	return result;
+}
+
+/**
  * インポート前のプレビュー情報を取得
  */
 export async function getImportPreview(data: ExportData): Promise<{

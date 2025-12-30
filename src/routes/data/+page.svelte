@@ -24,6 +24,7 @@
 		initializeDatabase,
 		migrateAttachmentToNewFolder,
 		purgeAllExportedBlobs,
+		restoreAttachmentBlobs,
 		seedTestData2024,
 		setAutoPurgeBlobSetting,
 		setLastExportedAt,
@@ -51,6 +52,7 @@
 		WARNING_THRESHOLD
 	} from '$lib/utils/storage';
 	import { exportToZip, downloadZip, type ZipExportProgress } from '$lib/utils/zip-export';
+	import { importFromZip, isZipFile, type ZipImportProgress } from '$lib/utils/zip-import';
 	import type { StorageUsage } from '$lib/types';
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
 	import { Progress } from '$lib/components/ui/progress/index.js';
@@ -139,6 +141,14 @@
 	let isImporting = $state(false);
 	let importResult = $state<ImportResult | null>(null);
 	let importError = $state<string | null>(null);
+	// ZIP インポート用
+	let isZipImport = $state(false);
+	let zipImportBlobs = $state<Map<string, Blob>>(new Map());
+	let zipImportWarnings = $state<string[]>([]);
+	let zipImportProgress = $state<ZipImportProgress | null>(null);
+	let blobRestoreResult = $state<{ restored: number; failed: number; errors: string[] } | null>(
+		null
+	);
 
 	// === 年度削除関連 ===
 	let deleteDialogOpen = $state(false);
@@ -707,26 +717,46 @@
 
 		if (!file) return;
 
+		// 状態をリセット
 		importFile = file;
 		importError = null;
 		importResult = null;
 		importPreview = null;
 		importData_ = null;
+		isZipImport = false;
+		zipImportBlobs = new Map();
+		zipImportWarnings = [];
+		zipImportProgress = null;
+		blobRestoreResult = null;
 
 		try {
-			const text = await file.text();
-			const data = JSON.parse(text);
+			if (isZipFile(file)) {
+				// ZIPファイルの場合
+				isZipImport = true;
+				const result = await importFromZip(file, (progress) => {
+					zipImportProgress = progress;
+				});
 
-			if (!validateExportData(data)) {
-				importError =
-					'ファイル形式が正しくありません。e-shiwakeからエクスポートしたJSONファイルを選択してください。';
-				return;
+				importData_ = result.exportData;
+				zipImportBlobs = result.attachmentBlobs;
+				zipImportWarnings = result.warnings;
+				importPreview = await getImportPreview(result.exportData);
+			} else {
+				// JSONファイルの場合
+				const text = await file.text();
+				const data = JSON.parse(text);
+
+				if (!validateExportData(data)) {
+					importError =
+						'ファイル形式が正しくありません。e-shiwakeからエクスポートしたファイルを選択してください。';
+					return;
+				}
+
+				importData_ = data;
+				importPreview = await getImportPreview(data);
 			}
-
-			importData_ = data;
-			importPreview = await getImportPreview(data);
-		} catch {
-			importError = 'ファイルの読み込みに失敗しました。有効なJSONファイルを選択してください。';
+		} catch (e) {
+			importError = e instanceof Error ? e.message : 'ファイルの読み込みに失敗しました。';
 		}
 	}
 
@@ -736,12 +766,22 @@
 		isImporting = true;
 		importError = null;
 		importResult = null;
+		blobRestoreResult = null;
 
 		try {
 			const result = await importData(importData_, importMode);
 			importResult = result;
 
 			if (result.success) {
+				// ZIPインポートの場合、証憑Blobを復元
+				if (isZipImport && zipImportBlobs.size > 0) {
+					blobRestoreResult = await restoreAttachmentBlobs(
+						zipImportBlobs,
+						storageMode,
+						directoryHandle
+					);
+				}
+
 				const years = await getAvailableYears();
 				setAvailableYears(years);
 				availableYears = years;
@@ -759,6 +799,11 @@
 		importPreview = null;
 		importResult = null;
 		importError = null;
+		isZipImport = false;
+		zipImportBlobs = new Map();
+		zipImportWarnings = [];
+		zipImportProgress = null;
+		blobRestoreResult = null;
 	}
 
 	// === 年度削除関連 ===
@@ -1166,12 +1211,12 @@
 		</Card.Header>
 		<Card.Content class="space-y-6">
 			<div class="space-y-2">
-				<Label for="import-file">JSONファイルを選択</Label>
+				<Label for="import-file">JSON/ZIPファイルを選択</Label>
 				<div class="flex items-center gap-2">
 					<input
 						id="import-file"
 						type="file"
-						accept=".json,application/json"
+						accept=".json,.zip,application/json,application/zip"
 						onchange={handleFileSelect}
 						class="hidden"
 					/>
@@ -1188,6 +1233,13 @@
 				</div>
 			</div>
 
+			{#if zipImportProgress && zipImportProgress.phase !== 'complete'}
+				<div class="flex items-center gap-3 rounded-lg border p-4">
+					<Loader2 class="size-5 animate-spin" />
+					<span class="text-sm">{zipImportProgress.message}</span>
+				</div>
+			{/if}
+
 			{#if importError}
 				<div
 					class="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
@@ -1200,8 +1252,15 @@
 			{#if importPreview && !importResult}
 				<div class="space-y-4 rounded-lg border p-4">
 					<div class="flex items-center gap-2">
-						<FileJson class="size-5 text-primary" />
+						{#if isZipImport}
+							<Archive class="size-5 text-primary" />
+						{:else}
+							<FileJson class="size-5 text-primary" />
+						{/if}
 						<span class="font-medium">{importPreview.fiscalYear}年度のデータ</span>
+						{#if isZipImport}
+							<span class="text-xs text-muted-foreground">（ZIPファイル）</span>
+						{/if}
 					</div>
 
 					<div class="grid grid-cols-3 gap-4 text-sm">
@@ -1233,6 +1292,19 @@
 							</p>
 						</div>
 					</div>
+
+					{#if isZipImport && zipImportBlobs.size > 0}
+						<div class="flex items-center gap-2 rounded-md bg-muted p-2 text-sm">
+							<Archive class="size-4" />
+							<span>証憑ファイル: {zipImportBlobs.size}件</span>
+							<span class="text-muted-foreground">（現在の保存設定に従って復元されます）</span>
+						</div>
+						{#if zipImportWarnings.length > 0}
+							<div class="text-xs text-amber-600">
+								<p>警告: {zipImportWarnings.length}件</p>
+							</div>
+						{/if}
+					{/if}
 
 					<div class="space-y-2 border-t pt-2">
 						<Label>インポートモード</Label>
@@ -1288,6 +1360,36 @@
 								<p class="font-semibold">{importResult.vendorsImported}件</p>
 							</div>
 						</div>
+						{#if blobRestoreResult}
+							<div class="mt-4 border-t pt-4">
+								<div class="flex items-center gap-2 text-sm">
+									<Archive class="size-4" />
+									<span class="font-medium">証憑ファイルの復元</span>
+								</div>
+								<div class="mt-2 grid grid-cols-2 gap-4 text-sm">
+									<div>
+										<p class="text-muted-foreground">復元成功</p>
+										<p class="font-semibold text-green-600">{blobRestoreResult.restored}件</p>
+									</div>
+									{#if blobRestoreResult.failed > 0}
+										<div>
+											<p class="text-muted-foreground">復元失敗</p>
+											<p class="font-semibold text-amber-600">{blobRestoreResult.failed}件</p>
+										</div>
+									{/if}
+								</div>
+								{#if blobRestoreResult.errors.length > 0}
+									<div class="mt-2 text-xs text-muted-foreground">
+										{#each blobRestoreResult.errors.slice(0, 3) as error, i (i)}
+											<p>{error}</p>
+										{/each}
+										{#if blobRestoreResult.errors.length > 3}
+											<p>...他 {blobRestoreResult.errors.length - 3}件</p>
+										{/if}
+									</div>
+								{/if}
+							</div>
+						{/if}
 					{:else}
 						<div class="flex items-center gap-2 text-destructive">
 							<X class="size-5" />

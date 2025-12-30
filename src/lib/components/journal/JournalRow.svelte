@@ -700,6 +700,7 @@
 								value={line.amount}
 								onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
 								onblur={syncAttachmentsOnBlur}
+								onfocus={(e) => e.currentTarget.select()}
 								placeholder="金額"
 								class={cn(
 									'w-full text-right font-mono journal:w-24',
@@ -806,6 +807,7 @@
 								value={line.amount}
 								onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
 								onblur={syncAttachmentsOnBlur}
+								onfocus={(e) => e.currentTarget.select()}
 								onkeydown={(e) => handleCreditAmountKeydown(e, line.id)}
 								placeholder="金額"
 								class={cn(

@@ -126,6 +126,7 @@
 							type="number"
 							bind:value={amount}
 							min="0"
+							onfocus={(e) => e.currentTarget.select()}
 							class="text-right font-mono"
 						/>
 						<span class="text-sm text-muted-foreground">円</span>
