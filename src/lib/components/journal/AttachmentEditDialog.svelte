@@ -73,7 +73,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="sm:max-w-md">
+	<Dialog.Content class="max-w-[calc(100vw-2rem)] overflow-hidden sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title class="flex items-center gap-2">
 				<Pencil class="size-5" />
@@ -83,7 +83,7 @@
 		</Dialog.Header>
 
 		{#if attachment}
-			<div class="space-y-4 py-4">
+			<div class="min-w-0 space-y-4 py-4">
 				<!-- 元のファイル名 -->
 				<div class="flex items-center gap-2 rounded-md bg-muted p-2 text-sm">
 					<FileText class="size-4 text-red-500" />
@@ -93,7 +93,7 @@
 				<!-- 書類の日付 -->
 				<div class="space-y-2">
 					<Label for="documentDate">書類の日付</Label>
-					<Input id="documentDate" type="date" bind:value={documentDate} />
+					<Input id="documentDate" type="date" bind:value={documentDate} class="w-full" />
 				</div>
 
 				<!-- 書類の種類 -->
@@ -114,7 +114,7 @@
 				<!-- 仕訳名（摘要） -->
 				<div class="space-y-2">
 					<Label>仕訳名</Label>
-					<Input type="text" bind:value={description} placeholder="仕訳の摘要" />
+					<Input type="text" bind:value={description} placeholder="仕訳の摘要" class="w-full" />
 				</div>
 
 				<!-- 金額 -->
@@ -140,6 +140,7 @@
 						value={vendor}
 						onchange={(name) => (vendor = name)}
 						placeholder="取引先名"
+						class="w-full"
 					/>
 				</div>
 

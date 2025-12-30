@@ -50,6 +50,7 @@
 		RECOMMENDED_QUOTA,
 		WARNING_THRESHOLD
 	} from '$lib/utils/storage';
+	import { exportToZip, downloadZip, type ZipExportProgress } from '$lib/utils/zip-export';
 	import type { StorageUsage } from '$lib/types';
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
 	import { Progress } from '$lib/components/ui/progress/index.js';
@@ -117,6 +118,10 @@
 	let unexportedCount = $state(0);
 	let exportingYear = $state<number | null>(null);
 	let exportSuccess = $state<number | null>(null);
+
+	// === ZIP エクスポート関連 ===
+	let zipExportingYear = $state<number | null>(null);
+	let zipProgress = $state<ZipExportProgress | null>(null);
 
 	// === インポート関連 ===
 	let importFile = $state<File | null>(null);
@@ -617,6 +622,65 @@
 		}
 	}
 
+	async function handleExportZip(year: number) {
+		zipExportingYear = year;
+		zipProgress = null;
+
+		try {
+			const journals = await getJournalsByYear(year);
+			const accounts = await getAllAccounts();
+			const vendors = await getAllVendors();
+
+			const exportData: ExportData = {
+				version: '1.0.0',
+				exportedAt: new Date().toISOString(),
+				fiscalYear: year,
+				journals: journals.map((journal) => ({
+					...journal,
+					attachments: journal.attachments.map((att) => {
+						// eslint-disable-next-line @typescript-eslint/no-unused-vars
+						const { blob, ...rest } = att;
+						return rest;
+					})
+				})),
+				accounts,
+				vendors,
+				settings: {
+					fiscalYearStart: 1,
+					defaultCurrency: 'JPY',
+					storageMode,
+					autoPurgeBlobAfterExport: autoPurgeEnabled,
+					blobRetentionDays: retentionDays
+				}
+			};
+
+			const zipBlob = await exportToZip(exportData, journals, {
+				includeEvidences: true,
+				directoryHandle,
+				onProgress: (progress) => {
+					zipProgress = progress;
+				}
+			});
+
+			downloadZip(zipBlob, `e-shiwake_${year}_backup.zip`);
+
+			// エクスポート成功を記録
+			await setLastExportedAt(new Date().toISOString());
+			unexportedCount = await getUnexportedAttachmentCount();
+
+			exportSuccess = year;
+			setTimeout(() => {
+				exportSuccess = null;
+			}, 3000);
+		} catch (error) {
+			console.error('ZIP エクスポートエラー:', error);
+			alert('ZIP エクスポートに失敗しました');
+		} finally {
+			zipExportingYear = null;
+			zipProgress = null;
+		}
+	}
+
 	function downloadBlob(blob: Blob, filename: string) {
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -1065,10 +1129,23 @@
 										証憑ダウンロード
 									</Button>
 								{/if}
-								<Button variant="secondary" size="sm" disabled class="opacity-50">
-									<Archive class="mr-2 size-4" />
-									完全バックアップ
-									<span class="ml-2 text-xs">(準備中)</span>
+								<Button
+									variant="outline"
+									size="sm"
+									onclick={() => handleExportZip(year)}
+									disabled={zipExportingYear !== null || exportingYear !== null}
+								>
+									{#if zipExportingYear === year}
+										<Loader2 class="mr-2 size-4 animate-spin" />
+										{#if zipProgress}
+											{zipProgress.message}
+										{:else}
+											準備中...
+										{/if}
+									{:else}
+										<Archive class="mr-2 size-4" />
+										ZIP
+									{/if}
 								</Button>
 							</div>
 						</div>
@@ -1253,7 +1330,7 @@
 				<p>ブラウザに保存されている証憑PDFを個別にダウンロードします（iPad向け）。</p>
 			</div>
 			<div>
-				<p class="font-medium text-foreground">完全バックアップ（準備中）</p>
+				<p class="font-medium text-foreground">ZIP（完全バックアップ）</p>
 				<p>JSON + 証憑PDFをZIPにまとめてダウンロード。年次アーカイブに最適です。</p>
 			</div>
 		</Card.Content>
