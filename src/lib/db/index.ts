@@ -1280,6 +1280,147 @@ export async function getImportPreview(data: ExportData): Promise<{
 	};
 }
 
+// ==================== ストレージマイグレーション ====================
+
+/**
+ * マイグレーション対象の添付ファイル情報
+ */
+export interface MigrationAttachment {
+	journalId: string;
+	attachmentId: string;
+	attachment: Attachment;
+	year: number;
+}
+
+/**
+ * マイグレーション対象の添付ファイルを取得
+ * @param targetStorageType 移行先のストレージタイプ
+ */
+export async function getAttachmentsForMigration(
+	targetStorageType: StorageType
+): Promise<MigrationAttachment[]> {
+	const journals = await db.journals.toArray();
+	const result: MigrationAttachment[] = [];
+
+	for (const journal of journals) {
+		const year = parseInt(journal.date.substring(0, 4), 10);
+
+		for (const attachment of journal.attachments) {
+			// 移行先と異なるストレージタイプのものを収集
+			if (targetStorageType === 'filesystem') {
+				// IndexedDB → Filesystem: Blobがあるもの
+				if (attachment.storageType === 'indexeddb' && attachment.blob) {
+					result.push({
+						journalId: journal.id,
+						attachmentId: attachment.id,
+						attachment,
+						year
+					});
+				}
+			} else {
+				// Filesystem → IndexedDB: filePathがあるもの
+				if (attachment.storageType === 'filesystem' && attachment.filePath) {
+					result.push({
+						journalId: journal.id,
+						attachmentId: attachment.id,
+						attachment,
+						year
+					});
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+/**
+ * 単一の添付ファイルをFilesystemに移行
+ */
+export async function migrateAttachmentToFilesystem(
+	item: MigrationAttachment,
+	directoryHandle: FileSystemDirectoryHandle
+): Promise<void> {
+	const { saveFileToDirectory } = await import('$lib/utils/filesystem');
+
+	const journal = await db.journals.get(item.journalId);
+	if (!journal) return;
+
+	const attachment = journal.attachments.find((a) => a.id === item.attachmentId);
+	if (!attachment || !attachment.blob) return;
+
+	// Blobをファイルとして保存
+	const filePath = await saveFileToDirectory(
+		directoryHandle,
+		item.year,
+		attachment.generatedName,
+		attachment.blob
+	);
+
+	// 添付ファイルを更新（Blobを削除し、filePathを設定）
+	const updatedAttachments = journal.attachments.map((a) => {
+		if (a.id === item.attachmentId) {
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+			const { blob, exportedAt, blobPurgedAt, ...rest } = a;
+			return {
+				...rest,
+				storageType: 'filesystem' as StorageType,
+				filePath
+			};
+		}
+		return a;
+	});
+
+	await db.journals.update(item.journalId, {
+		attachments: updatedAttachments,
+		updatedAt: new Date().toISOString()
+	});
+}
+
+/**
+ * 単一の添付ファイルをIndexedDBに移行
+ */
+export async function migrateAttachmentToIndexedDB(
+	item: MigrationAttachment,
+	directoryHandle: FileSystemDirectoryHandle
+): Promise<void> {
+	const { readFileFromDirectory, deleteFileFromDirectory } = await import('$lib/utils/filesystem');
+
+	const journal = await db.journals.get(item.journalId);
+	if (!journal) return;
+
+	const attachment = journal.attachments.find((a) => a.id === item.attachmentId);
+	if (!attachment || !attachment.filePath) return;
+
+	// ファイルを読み込んでBlobに変換
+	const blob = await readFileFromDirectory(directoryHandle, attachment.filePath);
+	if (!blob) {
+		throw new Error(`ファイルが見つかりません: ${attachment.filePath}`);
+	}
+
+	// 添付ファイルを更新（filePathを削除し、Blobを設定）
+	const updatedAttachments = journal.attachments.map((a) => {
+		if (a.id === item.attachmentId) {
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+			const { filePath, ...rest } = a;
+			return {
+				...rest,
+				storageType: 'indexeddb' as StorageType,
+				blob
+			};
+		}
+		return a;
+	});
+
+	await db.journals.update(item.journalId, {
+		attachments: updatedAttachments,
+		updatedAt: new Date().toISOString()
+	});
+
+	// 元のファイルを削除
+	await deleteFileFromDirectory(directoryHandle, attachment.filePath);
+}
+
 // ==================== テストデータ ====================
 
 /**

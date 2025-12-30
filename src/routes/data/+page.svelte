@@ -29,6 +29,7 @@
 		type ImportMode,
 		type ImportResult
 	} from '$lib/db';
+	import { useMigrationStore } from '$lib/stores/migration.svelte.js';
 	import { setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
 	import type { ExportData, StorageType } from '$lib/types';
 	import {
@@ -48,6 +49,7 @@
 	} from '$lib/utils/storage';
 	import type { StorageUsage } from '$lib/types';
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
+	import { Progress } from '$lib/components/ui/progress/index.js';
 	import {
 		AlertTriangle,
 		Archive,
@@ -58,6 +60,7 @@
 		Folder,
 		FolderOpen,
 		HardDrive,
+		Loader2,
 		RotateCcw,
 		Settings,
 		Trash2,
@@ -71,6 +74,12 @@
 	let directoryHandle = $state<FileSystemDirectoryHandle | null>(null);
 	let directoryName = $state<string | null>(null);
 	let isFileSystemSupported = $state(false);
+
+	// === マイグレーション ===
+	const migration = useMigrationStore();
+	let migrationDialogOpen = $state(false);
+	let pendingStorageMode = $state<StorageType | null>(null);
+	let migrationTargetCount = $state(0);
 
 	// === 容量管理設定 ===
 	let storageUsage = $state<StorageUsage>({ used: 0, quota: 0, percentage: 0 });
@@ -157,12 +166,86 @@
 
 	// === 保存モード関連 ===
 	async function handleStorageModeChange(mode: StorageType) {
+		// 同じモードなら何もしない
+		if (mode === storageMode) return;
+
+		// マイグレーション対象があるかチェック
+		const targetCount = await migration.getTargetCount(mode);
+
+		if (targetCount > 0) {
+			// 保留モードを記録
+			pendingStorageMode = mode;
+			migrationTargetCount = targetCount;
+
+			// ファイルシステムモードへの切り替えで、ディレクトリ未設定の場合は先に選択
+			if (mode === 'filesystem' && !directoryHandle) {
+				const handle = await pickDirectory();
+				if (!handle) {
+					// ユーザーがキャンセルした場合
+					pendingStorageMode = null;
+					return;
+				}
+				directoryHandle = handle;
+				directoryName = getDirectoryDisplayName(handle);
+				await saveDirectoryHandle(handle);
+			}
+
+			migrationDialogOpen = true;
+			return;
+		}
+
+		// マイグレーション不要の場合はモードを切り替え
 		storageMode = mode;
 		await setStorageMode(mode);
 
 		if (mode === 'filesystem' && !directoryHandle) {
 			await handleSelectDirectory();
 		}
+	}
+
+	// === マイグレーション関連 ===
+	async function handleStartMigration() {
+		if (!pendingStorageMode || !directoryHandle) return;
+
+		const success = await migration.startMigration(pendingStorageMode, directoryHandle);
+
+		if (success) {
+			storageMode = pendingStorageMode;
+			migrationDialogOpen = false;
+			pendingStorageMode = null;
+			migrationTargetCount = 0;
+
+			// ストレージ使用量を更新
+			storageUsage = await getStorageUsage();
+		}
+	}
+
+	async function handleSkipMigration() {
+		if (!pendingStorageMode) return;
+
+		// マイグレーションせずにモード切り替え
+		storageMode = pendingStorageMode;
+		await setStorageMode(pendingStorageMode);
+
+		migrationDialogOpen = false;
+		pendingStorageMode = null;
+		migrationTargetCount = 0;
+	}
+
+	function handleCancelMigration() {
+		migration.cancel();
+		migration.reset();
+		migrationDialogOpen = false;
+		pendingStorageMode = null;
+		migrationTargetCount = 0;
+	}
+
+	function handleCloseMigrationDialog() {
+		if (migration.isRunning) return;
+		migration.reset();
+		migrationDialogOpen = false;
+		pendingStorageMode = null;
+		migrationTargetCount = 0;
 	}
 
 	async function handleSelectDirectory() {
@@ -1112,3 +1195,76 @@
 
 <!-- Safari向け説明ダイアログ -->
 <SafariStorageDialog bind:open={safariDialogOpen} onconfirm={() => {}} />
+
+<!-- マイグレーション確認ダイアログ -->
+<AlertDialog.Root bind:open={migrationDialogOpen} onOpenChange={handleCloseMigrationDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title class="flex items-center gap-2">
+				{#if migration.isRunning}
+					<Loader2 class="size-5 animate-spin" />
+				{:else}
+					<HardDrive class="size-5" />
+				{/if}
+				証憑データの移行
+			</AlertDialog.Title>
+			<AlertDialog.Description class="space-y-3">
+				{#if !migration.isRunning && migration.errors.length === 0}
+					<p>
+						{pendingStorageMode === 'filesystem'
+							? 'ブラウザに保存されている'
+							: 'フォルダに保存されている'}証憑データを移行しますか？
+					</p>
+					<p class="text-foreground">
+						対象: <strong>{migrationTargetCount}件</strong>の添付ファイル
+					</p>
+					<p class="text-sm">
+						{pendingStorageMode === 'filesystem'
+							? '移行すると、証憑PDFがブラウザ内からフォルダに移動します。'
+							: '移行すると、証憑PDFがフォルダからブラウザ内に移動します。'}
+					</p>
+				{:else if migration.isRunning}
+					<p>証憑データを移行中です。しばらくお待ちください...</p>
+				{:else if migration.errors.length > 0}
+					<p class="text-destructive">一部のファイルの移行に失敗しました。</p>
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+
+		{#if migration.isRunning || migration.progress > 0}
+			<div class="space-y-4 py-4">
+				<Progress value={migration.progress * 100} class="w-full" />
+				<p class="text-center text-sm text-muted-foreground">
+					{migration.completed} / {migration.total} 完了
+					{#if migration.errors.length > 0}
+						<span class="text-destructive">（{migration.errors.length}件のエラー）</span>
+					{/if}
+				</p>
+			</div>
+		{/if}
+
+		{#if migration.errors.length > 0 && !migration.isRunning}
+			<div
+				class="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-destructive/50 bg-destructive/10 p-3"
+			>
+				<p class="text-sm font-medium text-destructive">エラー一覧:</p>
+				{#each migration.errors as error (error.attachmentId)}
+					<p class="text-xs text-destructive">
+						{error.fileName}: {error.error}
+					</p>
+				{/each}
+			</div>
+		{/if}
+
+		<AlertDialog.Footer>
+			{#if !migration.isRunning && migration.progress === 0}
+				<AlertDialog.Cancel onclick={handleSkipMigration}>移行しない</AlertDialog.Cancel>
+				<Button onclick={handleStartMigration}>移行を開始</Button>
+			{:else if migration.isRunning}
+				<Button variant="outline" onclick={handleCancelMigration}>キャンセル</Button>
+			{:else}
+				<Button onclick={handleCloseMigrationDialog}>閉じる</Button>
+			{/if}
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
