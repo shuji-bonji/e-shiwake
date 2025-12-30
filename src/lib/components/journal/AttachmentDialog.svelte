@@ -81,13 +81,13 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="sm:max-w-md">
+	<Dialog.Content class="max-w-[calc(100vw-2rem)] overflow-hidden sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title>証憑を添付</Dialog.Title>
 			<Dialog.Description>書類の情報を入力してください</Dialog.Description>
 		</Dialog.Header>
 
-		<div class="space-y-4 py-4">
+		<div class="min-w-0 space-y-4 py-4">
 			<!-- 元のファイル名 -->
 			{#if file}
 				<div class="flex items-center gap-2 rounded-md bg-muted p-2 text-sm">
@@ -102,7 +102,7 @@
 			<!-- 書類の日付 -->
 			<div class="space-y-2">
 				<Label for="documentDate">書類の日付</Label>
-				<Input id="documentDate" type="date" bind:value={documentDate} />
+				<Input id="documentDate" type="date" bind:value={documentDate} class="w-full" />
 				<p class="text-xs text-muted-foreground">書類に記載された日付（電帳法の取引年月日）</p>
 			</div>
 
@@ -129,6 +129,7 @@
 					value={editableVendor}
 					onchange={(name) => (editableVendor = name)}
 					placeholder="取引先名を入力"
+					class="w-full"
 				/>
 				{#if vendorMissing}
 					<p class="flex items-center gap-1 text-xs text-amber-600">

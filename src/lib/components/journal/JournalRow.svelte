@@ -199,6 +199,7 @@
 			console.error('添付ファイルの削除に失敗しました:', error);
 		} finally {
 			pendingEvidenceStatus = null;
+			evidenceChangeDialogOpen = false;
 		}
 	}
 

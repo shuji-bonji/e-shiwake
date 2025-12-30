@@ -146,3 +146,13 @@
 .animate-flash {
 	animation: flash 0.8s ease-in-out;
 }
+
+/* 日付入力のカレンダーアイコン（Chrome/Edge） */
+input[type='date']::-webkit-calendar-picker-indicator {
+	filter: invert(0.5);
+	cursor: pointer;
+}
+
+.dark input[type='date']::-webkit-calendar-picker-indicator {
+	filter: invert(0.8);
+}
