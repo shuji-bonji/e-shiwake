@@ -38,7 +38,8 @@
 		getAttachmentBlob,
 		suggestDocumentType,
 		updateAttachment,
-		syncAttachmentsWithJournal
+		syncAttachmentsWithJournal,
+		saveVendor
 	} from '$lib/db';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { cn } from '$lib/utils.js';
@@ -211,6 +212,16 @@
 	// フィールド更新（即時、証憑同期なし）
 	function updateField<K extends keyof JournalEntry>(field: K, value: JournalEntry[K]) {
 		onupdate({ ...journal, [field]: value });
+	}
+
+	// 取引先保存と証憑同期（blurタイミング）
+	async function handleVendorBlur() {
+		// 取引先を保存（入力完了時のみ）
+		if (journal.vendor.trim()) {
+			await saveVendor(journal.vendor);
+		}
+		// 証憑同期
+		await syncAttachmentsOnBlur();
 	}
 
 	// 証憑同期（blurタイミングで呼ばれる）
@@ -516,7 +527,7 @@
 					{vendors}
 					value={journal.vendor}
 					onchange={(name) => updateField('vendor', name)}
-					onblur={syncAttachmentsOnBlur}
+					onblur={handleVendorBlur}
 					placeholder="取引先"
 					class="w-40 shrink-0"
 				/>

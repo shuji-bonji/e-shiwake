@@ -277,7 +277,7 @@ export async function addJournal(
 
 	// 取引先を自動登録
 	if (journal.vendor) {
-		await ensureVendorExists(journal.vendor);
+		await saveVendor(journal.vendor);
 	}
 
 	return id;
@@ -285,6 +285,7 @@ export async function addJournal(
 
 /**
  * 仕訳の更新
+ * 注意: 取引先の自動登録は行わない（blurタイミングで別途saveVendorを呼ぶ）
  */
 export async function updateJournal(
 	id: string,
@@ -296,11 +297,6 @@ export async function updateJournal(
 		...updates,
 		updatedAt: now
 	});
-
-	// 取引先を自動登録
-	if (updates.vendor) {
-		await ensureVendorExists(updates.vendor);
-	}
 }
 
 /**
@@ -411,13 +407,17 @@ export function validateJournal(journal: Pick<JournalEntry, 'lines'>): {
 
 /**
  * 取引先の存在確認と自動登録
+ * 空文字や空白のみの場合は何もしない
  */
-async function ensureVendorExists(name: string): Promise<void> {
-	const existing = await db.vendors.where('name').equals(name).first();
+export async function saveVendor(name: string): Promise<void> {
+	const trimmed = name.trim();
+	if (!trimmed) return;
+
+	const existing = await db.vendors.where('name').equals(trimmed).first();
 	if (!existing) {
 		await db.vendors.add({
 			id: crypto.randomUUID(),
-			name,
+			name: trimmed,
 			createdAt: new Date().toISOString()
 		});
 	}
@@ -1676,7 +1676,7 @@ export async function seedTestData2024(): Promise<number> {
 
 	for (const data of testJournals) {
 		// 取引先を登録
-		await ensureVendorExists(data.vendor);
+		await saveVendor(data.vendor);
 
 		// 仕訳を登録
 		await db.journals.add({
