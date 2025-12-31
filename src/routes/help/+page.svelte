@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import {
 		BookOpen,
 		FileText,
@@ -13,55 +14,55 @@
 
 	const sections = [
 		{
-			href: '/help/getting-started',
+			href: `${base}/help/getting-started`,
 			label: 'はじめに',
 			icon: BookOpen,
 			description: 'e-shiwakeの概要と基本的な使い方'
 		},
 		{
-			href: '/help/journal',
+			href: `${base}/help/journal`,
 			label: '仕訳入力',
 			icon: FileText,
 			description: '仕訳の入力・編集・削除方法'
 		},
 		{
-			href: '/help/tax-category',
+			href: `${base}/help/tax-category`,
 			label: '消費税区分',
 			icon: Receipt,
 			description: '消費税区分の設定と使い方'
 		},
 		{
-			href: '/help/evidence',
+			href: `${base}/help/evidence`,
 			label: '証憑管理',
 			icon: Paperclip,
 			description: 'PDF証憑の紐付けと管理'
 		},
 		{
-			href: '/help/accounts',
+			href: `${base}/help/accounts`,
 			label: '勘定科目管理',
 			icon: FolderCog,
 			description: '勘定科目の追加・編集'
 		},
 		{
-			href: '/help/data-management',
+			href: `${base}/help/data-management`,
 			label: '設定・データ管理',
 			icon: Database,
 			description: '証憑保存設定・エクスポート・インポート・バックアップ'
 		},
 		{
-			href: '/help/pwa',
+			href: `${base}/help/pwa`,
 			label: 'PWA・オフライン',
 			icon: Smartphone,
 			description: 'アプリのインストールとオフライン利用'
 		},
 		{
-			href: '/help/shortcuts',
+			href: `${base}/help/shortcuts`,
 			label: 'ショートカット',
 			icon: Keyboard,
 			description: 'キーボードショートカット一覧'
 		},
 		{
-			href: '/help/glossary',
+			href: `${base}/help/glossary`,
 			label: '用語集',
 			icon: BookA,
 			description: '簿記・会計用語の解説'
