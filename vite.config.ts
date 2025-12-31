@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
+import { base } from './svelte.config.js';
 
 export default defineConfig({
 	plugins: [
@@ -13,30 +14,33 @@ export default defineConfig({
 			mode: 'production',
 			strategies: 'generateSW',
 			registerType: 'prompt', // ユーザーに更新を通知
+			// GitHub Pages のベースパスを考慮
+			base: base || '/',
+			scope: base || '/',
 			manifest: {
 				name: 'e-shiwake - 電子仕訳',
 				short_name: 'e-shiwake',
 				description: 'フリーランス・個人事業主向けの仕訳入力+証憑管理PWA',
-				start_url: '/',
+				start_url: './',
 				display: 'standalone',
 				background_color: '#ffffff',
 				theme_color: '#0f172a',
 				categories: ['productivity', 'finance'],
 				icons: [
 					{
-						src: '/icon-192x192.png',
+						src: 'icon-192x192.png',
 						sizes: '192x192',
 						type: 'image/png',
 						purpose: 'any'
 					},
 					{
-						src: '/icon-512x512.png',
+						src: 'icon-512x512.png',
 						sizes: '512x512',
 						type: 'image/png',
 						purpose: 'any'
 					},
 					{
-						src: '/icon-512x512.png',
+						src: 'icon-512x512.png',
 						sizes: '512x512',
 						type: 'image/png',
 						purpose: 'maskable'
