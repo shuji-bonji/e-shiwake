@@ -86,6 +86,8 @@ npm run test:unit
 - PWA 対応（オフライン動作、インストール可能）
 - ストレージモード切替（ローカルフォルダ / ブラウザ保存）
 - 証憑マイグレーション機能
+- 完全バックアップ（ZIP: JSON + PDF）
+- ZIPインポート（証憑復元対応）
 
 ### 今後の予定
 
@@ -100,7 +102,6 @@ npm run test:unit
 - 損益計算書
 - 貸借対照表
 - 青色申告決算書生成
-- 完全バックアップ（ZIP: JSON + PDF）
 
 ## 電帳法対応
 
@@ -148,6 +149,8 @@ src/
 │   │   ├── ui/         # shadcn-svelte コンポーネント
 │   │   ├── layout/     # レイアウトコンポーネント
 │   │   └── journal/    # 仕訳関連コンポーネント
+│   ├── adapters/       # 外部依存の抽象化層
+│   ├── usecases/       # ビジネスロジック
 │   ├── stores/         # Svelte stores
 │   ├── db/             # IndexedDB 関連（Dexie）
 │   ├── types/          # TypeScript 型定義
