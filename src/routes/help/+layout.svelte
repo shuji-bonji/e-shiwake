@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
 	import {
@@ -25,15 +26,15 @@
 	let { children }: Props = $props();
 
 	const navItems = [
-		{ href: '/help/getting-started', label: 'はじめに', icon: BookOpen },
-		{ href: '/help/journal', label: '仕訳入力', icon: FileText },
-		{ href: '/help/tax-category', label: '消費税区分', icon: Receipt },
-		{ href: '/help/evidence', label: '証憑管理', icon: Paperclip },
-		{ href: '/help/accounts', label: '勘定科目管理', icon: FolderCog },
-		{ href: '/help/data-management', label: '設定・データ管理', icon: Database },
-		{ href: '/help/pwa', label: 'PWA・オフライン', icon: Smartphone },
-		{ href: '/help/shortcuts', label: 'ショートカット', icon: Keyboard },
-		{ href: '/help/glossary', label: '用語集', icon: BookA }
+		{ href: `${base}/help/getting-started`, label: 'はじめに', icon: BookOpen },
+		{ href: `${base}/help/journal`, label: '仕訳入力', icon: FileText },
+		{ href: `${base}/help/tax-category`, label: '消費税区分', icon: Receipt },
+		{ href: `${base}/help/evidence`, label: '証憑管理', icon: Paperclip },
+		{ href: `${base}/help/accounts`, label: '勘定科目管理', icon: FolderCog },
+		{ href: `${base}/help/data-management`, label: '設定・データ管理', icon: Database },
+		{ href: `${base}/help/pwa`, label: 'PWA・オフライン', icon: Smartphone },
+		{ href: `${base}/help/shortcuts`, label: 'ショートカット', icon: Keyboard },
+		{ href: `${base}/help/glossary`, label: '用語集', icon: BookA }
 	];
 
 	const currentPath = $derived($page.url.pathname);
@@ -42,7 +43,7 @@
 <div class="flex h-screen flex-col">
 	<!-- ヘッダー -->
 	<header class="sticky top-0 z-10 flex items-center gap-4 border-b bg-background px-4 py-3">
-		<Button variant="ghost" size="icon" href="/">
+		<Button variant="ghost" size="icon" href="{base}/">
 			<ArrowLeft class="size-5" />
 		</Button>
 		<h1 class="text-lg font-semibold">e-shiwake ヘルプ</h1>
@@ -78,7 +79,7 @@
 					value={currentPath}
 					onchange={(e) => goto(e.currentTarget.value)}
 				>
-					<option value="/help">目次</option>
+					<option value="{base}/help">目次</option>
 					{#each navItems as item (item.href)}
 						<option value={item.href}>{item.label}</option>
 					{/each}

@@ -11,6 +11,7 @@
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import {
 		useFiscalYear,
 		setSelectedYear,
@@ -28,8 +29,8 @@
 	// 年度ストア
 	const fiscalYear = useFiscalYear();
 
-	// パス比較用のヘルパー
-	const pathname = $derived(page.url.pathname as string);
+	// パス比較用のヘルパー（ベースパスを除去して比較）
+	const pathname = $derived(page.url.pathname.replace(base, '') || '/');
 
 	// 未エクスポート警告の状態
 	let unexportedCount = $state(0);
@@ -60,7 +61,7 @@
 		setSelectedYear(year);
 		// 仕訳帳ページ以外にいる場合は遷移
 		if (pathname !== '/') {
-			goto('/');
+			goto(`${base}/`);
 		}
 	}
 </script>
@@ -123,7 +124,7 @@
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton isActive={pathname === '/'}>
 							{#snippet child({ props })}
-								<a href="/" {...props}>
+								<a href="{base}/" {...props}>
 									<BookOpen class="size-4" />
 									<span>仕訳帳</span>
 								</a>
@@ -162,7 +163,7 @@
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton isActive={pathname === '/accounts'}>
 							{#snippet child({ props })}
-								<a href="/accounts" {...props}>
+								<a href="{base}/accounts" {...props}>
 									<List class="size-4" />
 									<span>勘定科目</span>
 								</a>
@@ -172,7 +173,7 @@
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton isActive={pathname === '/data'}>
 							{#snippet child({ props })}
-								<a href="/data" {...props}>
+								<a href="{base}/data" {...props}>
 									<Settings class="size-4" />
 									<span>設定・データ管理</span>
 								</a>
@@ -190,7 +191,7 @@
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton isActive={pathname.startsWith('/help')}>
 					{#snippet child({ props })}
-						<a href="/help" {...props}>
+						<a href="{base}/help" {...props}>
 							<CircleHelp class="size-4" />
 							<span>ヘルプ</span>
 						</a>
@@ -203,7 +204,7 @@
 					<Sidebar.MenuButton isActive={pathname === '/data'}>
 						{#snippet child({ props })}
 							<a
-								href="/data"
+								href="{base}/data"
 								{...props}
 								class="flex items-center gap-2 text-amber-600 dark:text-amber-400"
 							>

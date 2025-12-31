@@ -2,6 +2,7 @@
 	import './layout.css';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import favicon from '$lib/assets/favicon.svg';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
@@ -110,7 +111,7 @@
 
 	function handleOpenSettings() {
 		showStorageWarning = false;
-		goto('/settings');
+		goto(`${base}/data`);
 	}
 </script>
 
