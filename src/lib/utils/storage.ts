@@ -3,7 +3,7 @@
  * IndexedDBの容量監視とBlob削除機能
  */
 
-import type { StorageUsage } from '$lib/types';
+import type { JournalEntry, StorageUsage } from '$lib/types';
 
 // 推奨上限（500MB）- iPad/Safariの1GB制限に対して余裕を持たせる
 export const RECOMMENDED_QUOTA = 500 * 1024 * 1024;
@@ -65,8 +65,7 @@ export function shouldShowStorageWarning(usage: StorageUsage): boolean {
  * 削除可能なBlob（エクスポート済みで保持期間を過ぎたもの）の数を取得
  */
 export function getPurgeableAttachmentCount(
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	journals: any[],
+	journals: JournalEntry[],
 	retentionDays: number
 ): number {
 	const now = new Date();
