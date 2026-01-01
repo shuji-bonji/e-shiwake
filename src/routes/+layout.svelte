@@ -1,26 +1,26 @@
 <script lang="ts">
-	import './layout.css';
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import favicon from '$lib/assets/favicon.svg';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import { Toaster } from '$lib/components/ui/sonner/index.js';
-	import { toast } from 'svelte-sonner';
-	import { AlertTriangle } from '@lucide/svelte';
-	import AppSidebar from '$lib/components/layout/AppSidebar.svelte';
 	import AppHeader from '$lib/components/layout/AppHeader.svelte';
+	import AppSidebar from '$lib/components/layout/AppSidebar.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { Toaster } from '$lib/components/ui/sonner/index.js';
 	import { getStorageMode } from '$lib/db';
+	import { initializeTheme } from '$lib/stores/theme.svelte.js';
+	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import {
-		getStorageUsage,
 		formatBytes,
 		getRecommendedUsagePercentage,
+		getStorageUsage,
 		WARNING_THRESHOLD
 	} from '$lib/utils/storage';
-	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
-	import { initializeTheme } from '$lib/stores/theme.svelte.js';
+	import { AlertTriangle } from '@lucide/svelte';
+	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import { pwaInfo } from 'virtual:pwa-info';
+	import './layout.css';
 
 	let { children } = $props();
 

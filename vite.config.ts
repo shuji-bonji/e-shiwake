@@ -3,7 +3,9 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
-import { base } from './svelte.config.js';
+import config from './svelte.config.js';
+
+const base = config.kit?.paths?.base || '';
 
 export default defineConfig({
 	plugins: [
