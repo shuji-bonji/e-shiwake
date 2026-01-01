@@ -11,7 +11,8 @@
 		Plus,
 		ArrowUp,
 		ArrowDown,
-		Check
+		Check,
+		Copy
 	} from '@lucide/svelte';
 	import AccountSelect from './AccountSelect.svelte';
 	import TaxCategorySelect from './TaxCategorySelect.svelte';
@@ -54,6 +55,7 @@
 		onupdate: (journal: JournalEntry) => void;
 		ondelete: (id: string) => void;
 		onconfirm?: (id: string) => void;
+		oncopy?: (journal: JournalEntry) => void;
 	}
 
 	let {
@@ -65,7 +67,8 @@
 		isFlashing = false,
 		onupdate,
 		ondelete,
-		onconfirm
+		onconfirm,
+		oncopy
 	}: Props = $props();
 
 	// バリデーション
@@ -552,6 +555,29 @@
 									{/if}
 								</Tooltip.Content>
 							{/if}
+						</Tooltip.Root>
+					</Tooltip.Provider>
+				{/if}
+
+				<!-- コピーボタン（編集中でない場合のみ表示） -->
+				{#if !isEditing && oncopy}
+					<Tooltip.Provider>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										variant="ghost"
+										size="icon"
+										class="shrink-0"
+										onclick={() => oncopy(journal)}
+										tabindex={-1}
+									>
+										<Copy class="size-4" />
+									</Button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content>この仕訳をコピーして新規作成</Tooltip.Content>
 						</Tooltip.Root>
 					</Tooltip.Provider>
 				{/if}

@@ -1,15 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { Plus } from '@lucide/svelte';
+	import { Plus, Search, X } from '@lucide/svelte';
 	import JournalRow from '$lib/components/journal/JournalRow.svelte';
+	import SearchHelp from '$lib/components/journal/SearchHelp.svelte';
 	import type { JournalEntry, Account, Vendor } from '$lib/types';
 	import {
 		initializeDatabase,
 		getAllAccounts,
 		getAllVendors,
 		getJournalsByYear,
+		getAllJournals,
 		getJournalById,
 		addJournal,
 		updateJournal,
@@ -21,12 +24,15 @@
 	import { useFiscalYear, setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
 	import { getSavedDirectoryHandle, supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { cloneJournal } from '$lib/utils/clone';
+	import { parseSearchQuery, filterJournals, isEmptyQuery } from '$lib/utils/journal-search';
+	import { copyJournalForNew } from '$lib/utils/journal-copy';
 
 	// 年度ストア
 	const fiscalYear = useFiscalYear();
 
 	// 状態
-	let journals = $state<JournalEntry[]>([]);
+	let journals = $state<JournalEntry[]>([]); // 選択中年度の仕訳
+	let allJournals = $state<JournalEntry[]>([]); // 全年度の仕訳（検索用）
 	let accounts = $state<Account[]>([]);
 	let vendors = $state<Vendor[]>([]);
 	let directoryHandle = $state<FileSystemDirectoryHandle | null>(null);
@@ -36,6 +42,21 @@
 	let editingJournalId = $state<string | null>(null); // 新規追加で編集中の仕訳ID
 	let flashingJournalId = $state<string | null>(null); // フラッシュ表示中の仕訳ID
 	let isInitialized = $state(false); // 初期化完了フラグ
+	let searchQuery = $state(''); // 検索クエリ
+
+	// 検索中かどうか
+	const isSearching = $derived(!isEmptyQuery(searchQuery));
+
+	// 検索条件でフィルタリングされた仕訳
+	// 検索中は全年度から検索、通常時は選択年度のみ
+	const filteredJournals = $derived.by(() => {
+		const query = searchQuery;
+		if (isEmptyQuery(query)) {
+			return journals;
+		}
+		const criteria = parseSearchQuery(query, accounts);
+		return filterJournals(allJournals, criteria);
+	});
 
 	// 仕訳をソート（編集中は常に上、それ以外は日付降順）
 	function sortJournals(list: JournalEntry[], editingId: string | null = null): JournalEntry[] {
@@ -69,7 +90,7 @@
 			}
 		}
 
-		// 初期データを読み込み
+		// 初期データを読み込み（全年度の仕訳も同時にロード）
 		await loadData(fiscalYear.selectedYear);
 		lastLoadedYear = fiscalYear.selectedYear;
 		isInitialized = true;
@@ -89,11 +110,17 @@
 		isLoading = true;
 		editingJournalId = null; // 年度変更時は編集中状態をリセット
 		try {
-			[accounts, vendors, journals] = await Promise.all([
+			// 全年度の仕訳も同時に読み込み（検索用）
+			const [accts, vends, yearJournals, all] = await Promise.all([
 				getAllAccounts(),
 				getAllVendors(),
-				getJournalsByYear(year)
+				getJournalsByYear(year),
+				getAllJournals()
 			]);
+			accounts = accts;
+			vendors = vends;
+			journals = yearJournals;
+			allJournals = all;
 		} finally {
 			isLoading = false;
 		}
@@ -108,6 +135,8 @@
 		if (newJournal) {
 			editingJournalId = newId; // 編集中としてマーク
 			journals = sortJournals([newJournal, ...journals], newId);
+			// 全年度の仕訳も更新
+			refreshAllJournals();
 		}
 	}
 
@@ -115,6 +144,11 @@
 	async function refreshAvailableYears() {
 		const years = await getAvailableYears();
 		setAvailableYears(years);
+	}
+
+	// 全年度の仕訳を更新（検索用）
+	async function refreshAllJournals() {
+		allJournals = await getAllJournals();
 	}
 
 	// 仕訳の更新
@@ -140,6 +174,9 @@
 
 		// 取引先リストを更新（新規取引先が自動登録されるため）
 		vendors = await getAllVendors();
+
+		// 全年度の仕訳も更新
+		refreshAllJournals();
 
 		// 既存仕訳で日付が変わったらフラッシュ
 		if (isExisting && dateChanged) {
@@ -178,6 +215,28 @@
 		deletingJournalId = null;
 		await refreshAvailableYears();
 		await loadData(fiscalYear.selectedYear);
+		// 全年度の仕訳も更新
+		refreshAllJournals();
+	}
+
+	// 仕訳をコピーして新規作成
+	async function handleCopyJournal(journal: JournalEntry) {
+		const copiedData = copyJournalForNew(journal);
+		const newId = await addJournal(copiedData);
+		const newJournal = await getJournalById(newId);
+		if (newJournal) {
+			editingJournalId = newId;
+			journals = sortJournals([newJournal, ...journals], newId);
+			// 年度リストを更新（コピー元と年度が異なる場合に備えて）
+			await refreshAvailableYears();
+			// 全年度の仕訳も更新
+			refreshAllJournals();
+		}
+	}
+
+	// 検索をクリア
+	function clearSearch() {
+		searchQuery = '';
 	}
 </script>
 
@@ -194,12 +253,37 @@
 		</Button>
 	</div>
 
+	<!-- 検索ボックス -->
+	<div class="flex items-center gap-2">
+		<div class="relative flex-1">
+			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+			<Input
+				type="text"
+				placeholder="検索（摘要、取引先、勘定科目、金額、日付...）"
+				bind:value={searchQuery}
+				class="pr-10 pl-10"
+			/>
+			{#if searchQuery}
+				<button
+					type="button"
+					onclick={clearSearch}
+					class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+					aria-label="検索をクリア"
+				>
+					<X class="size-4" />
+				</button>
+			{/if}
+		</div>
+		<SearchHelp />
+	</div>
+
 	<!-- 仕訳リスト -->
 	{#if isLoading}
 		<div class="flex items-center justify-center py-8">
 			<p class="text-muted-foreground">読み込み中...</p>
 		</div>
-	{:else if journals.length === 0}
+	{:else if !isSearching && journals.length === 0}
+		<!-- 検索していない かつ 選択年度に仕訳がない -->
 		<div
 			class="flex min-h-[400px] flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center"
 		>
@@ -220,9 +304,35 @@
 				</Button>
 			</div>
 		</div>
+	{:else if filteredJournals.length === 0}
+		<div
+			class="flex min-h-[200px] flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center"
+		>
+			<div class="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
+				<div
+					class="flex size-16 items-center justify-center rounded-full bg-muted"
+					aria-hidden="true"
+				>
+					<Search class="size-8 text-muted-foreground" />
+				</div>
+				<h3 class="mt-4 text-lg font-semibold">検索結果がありません</h3>
+				<p class="mt-2 mb-4 text-sm text-muted-foreground">
+					検索条件に一致する仕訳が見つかりませんでした
+				</p>
+				<Button variant="outline" onclick={clearSearch}>
+					<X class="mr-2 size-4" />
+					検索をクリア
+				</Button>
+			</div>
+		</div>
 	{:else}
+		{#if isSearching}
+			<p class="text-sm text-muted-foreground">
+				全年度から {filteredJournals.length}件の仕訳が見つかりました
+			</p>
+		{/if}
 		<div class="space-y-4">
-			{#each journals as journal (journal.id)}
+			{#each filteredJournals as journal (journal.id)}
 				<JournalRow
 					{journal}
 					{accounts}
@@ -233,6 +343,7 @@
 					onupdate={handleUpdateJournal}
 					ondelete={openDeleteDialog}
 					onconfirm={handleConfirmJournal}
+					oncopy={handleCopyJournal}
 				/>
 			{/each}
 		</div>

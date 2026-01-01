@@ -40,6 +40,56 @@
 		</HelpNote>
 	</HelpSection>
 
+	<HelpSection title="仕訳のコピー">
+		<p>既存の仕訳をコピーして新しい仕訳を作成できます。定期的な支払いなどで便利です。</p>
+		<ol class="ml-4 list-decimal space-y-2">
+			<li>コピーしたい仕訳のコピーボタン（📋）をクリック</li>
+			<li>コピーされた仕訳が一覧の上部に追加されます</li>
+			<li>日付は今日の日付に自動設定されます</li>
+			<li>証憑（添付ファイル）はコピーされません</li>
+		</ol>
+		<HelpNote type="info">
+			<p>コピー元の勘定科目、金額、摘要、取引先がそのまま引き継がれます。</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="仕訳の検索">
+		<p>検索ボックスを使って仕訳を素早く絞り込めます。</p>
+		<HelpNote type="info">
+			<p>検索は<strong>全年度</strong>を対象に行われます。過去の年度の仕訳も検索できます。</p>
+		</HelpNote>
+		<p class="mt-2"><strong>検索できる項目：</strong></p>
+		<HelpTable
+			headers={['入力例', '検索対象', '説明']}
+			rows={[
+				['Amazon', '摘要・取引先', 'テキスト部分一致'],
+				['消耗品費', '勘定科目', '科目名の前方一致'],
+				['10000', '金額', '完全一致'],
+				['10,000', '金額', 'カンマ付き金額も可'],
+				['2025-01', '年月', 'その月の仕訳を表示'],
+				['12月', '月', '全年度の12月の仕訳'],
+				['2025-01-15', '日付', '特定の日付'],
+				['10/13', '月日', '全年度の10月13日の仕訳'],
+				['1/5', '月日', 'ゼロ埋めなしもOK']
+			]}
+		/>
+		<p class="mt-4"><strong>複数条件の検索：</strong></p>
+		<p class="mt-1">
+			スペースで区切って複数の条件を入力すると、すべてに一致する仕訳が表示されます（AND検索）。
+		</p>
+		<ul class="mt-2 ml-4 list-disc space-y-1">
+			<li>
+				<code class="rounded bg-muted px-1.5 py-0.5 text-sm">Amazon 12月</code> → Amazonの12月の仕訳
+			</li>
+			<li>
+				<code class="rounded bg-muted px-1.5 py-0.5 text-sm">消耗品費 10000</code> → 消耗品費で1万円の仕訳
+			</li>
+		</ul>
+		<HelpNote type="tip">
+			<p>検索ボックス横の「ℹ️」ボタンをクリックすると、検索ヒントが表示されます。</p>
+		</HelpNote>
+	</HelpSection>
+
 	<HelpSection title="複合仕訳">
 		<p>1つの取引で借方または貸方が複数行ある場合（家事按分、源泉徴収など）に対応しています。</p>
 		<p class="mt-2"><strong>例：携帯電話代の家事按分（80%事業使用）</strong></p>

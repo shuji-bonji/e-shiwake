@@ -233,6 +233,23 @@ export async function getJournalsByYear(year: number): Promise<JournalEntry[]> {
 }
 
 /**
+ * 全年度の仕訳を取得（日付降順）
+ * 検索時の全年度横断検索用
+ */
+export async function getAllJournals(): Promise<JournalEntry[]> {
+	const journals = await db.journals.toArray();
+
+	// 日付降順（新しい順）でソート、同日内は作成日時降順
+	return journals.sort((a, b) => {
+		const dateCompare = (b.date || '').localeCompare(a.date || '');
+		if (dateCompare !== 0) return dateCompare;
+		const aCreatedAt = a.createdAt || a.updatedAt || '';
+		const bCreatedAt = b.createdAt || b.updatedAt || '';
+		return bCreatedAt.localeCompare(aCreatedAt);
+	});
+}
+
+/**
  * 利用可能な年度の取得（仕訳データから抽出）
  * 現在年度は常に含める（新規仕訳追加のため）
  */
