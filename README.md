@@ -164,6 +164,24 @@ File System Access API を使用して、ユーザーが選択したディレク
 
 IndexedDB に Blob として保存。定期的なエクスポートを推奨。
 
+## ページ構成
+
+```
+/                           仕訳帳（ホーム）
+├── /accounts               勘定科目管理
+├── /data                   データ管理
+└── /help                   ヘルプ
+    ├── /getting-started    はじめに
+    ├── /journal            仕訳入力
+    ├── /accounts           勘定科目
+    ├── /evidence           証憑管理
+    ├── /tax-category       消費税区分
+    ├── /data-management    データ管理
+    ├── /pwa                PWA・インストール
+    ├── /shortcuts          キーボードショートカット
+    └── /glossary           用語集
+```
+
 ## 開発者向け
 
 詳細な仕様については `CLAUDE.md` を参照してください。
