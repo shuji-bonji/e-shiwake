@@ -54,6 +54,7 @@ Svelte MCP server を利用可能。Svelte 5 と SvelteKit のドキュメント
 - **証憑管理**: PDF を仕訳に紐付け、自動リネームして保存
 - **PWA**: オフライン動作、インストール可能
 - **全年度横断検索**: 摘要、取引先、勘定科目、金額、日付で検索可能
+- **帳簿機能**: 総勘定元帳、試算表（CSV出力対応）
 
 ### ターゲットユーザー
 
@@ -281,12 +282,16 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 
 ```
 /                           # 仕訳帳（ホーム）
+├── /ledger                 # 総勘定元帳
+├── /trial-balance          # 試算表
 ├── /accounts               # 勘定科目管理
 ├── /data                   # データ管理（エクスポート/インポート/削除）
 ├── /export                 # エクスポート（レガシー）
 └── /help                   # ヘルプ トップ
     ├── /getting-started    # はじめに
     ├── /journal            # 仕訳入力
+    ├── /ledger             # 総勘定元帳
+    ├── /trial-balance      # 試算表
     ├── /accounts           # 勘定科目
     ├── /evidence           # 証憑管理
     ├── /tax-category       # 消費税区分
@@ -316,8 +321,8 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 │                 │                                                │
 │  📒 帳簿        │                                                │
 │  ├─ 仕訳帳     │                                                │
-│  ├─ 総勘定元帳  │  ※Phase 2                                     │
-│  └─ 試算表     │  ※Phase 2                                     │
+│  ├─ 総勘定元帳  │                                                │
+│  └─ 試算表     │                                                │
 │                 │                                                │
 ├─────────────────┤                                                │
 │                 │                                                │
@@ -737,10 +742,17 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 - iOS Safari対応（apple-mobile-web-app-\*メタタグ）
 - 消費税計算ユーティリティ（`$lib/utils/tax.ts`）
 
-### Phase 2: 帳簿機能
+### Phase 2: 帳簿機能 ✅ 完了
 
-- [ ] 総勘定元帳
-- [ ] 試算表
+- [x] 総勘定元帳（科目別取引履歴、残高推移、CSV出力）
+- [x] 試算表（合計残高試算表/残高試算表、貸借一致チェック、CSV出力）
+
+**実装詳細**:
+
+- `$lib/utils/ledger.ts` - 総勘定元帳生成ロジック
+- `$lib/utils/trial-balance.ts` - 試算表生成ロジック
+- `/ledger` - 総勘定元帳ページ（科目選択、前後ナビ、CSV出力）
+- `/trial-balance` - 試算表ページ（表示モード切替、貸借一致チェック）
 
 ### Phase 3: 確定申告対応
 

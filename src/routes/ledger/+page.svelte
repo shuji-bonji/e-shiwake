@@ -4,12 +4,13 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { BookOpen, Download, ChevronLeft, ChevronRight } from '@lucide/svelte';
+	import { BookOpen, Download, Receipt, Wallet, TrendingUp, CreditCard, Gem } from '@lucide/svelte';
 	import { initializeDatabase, getJournalsByYear, getAllAccounts } from '$lib/db';
 	import { generateLedger, getUsedAccounts, type LedgerData } from '$lib/utils/ledger';
 	import { formatAmount } from '$lib/utils/trial-balance';
 	import { useFiscalYear, setSelectedYear } from '$lib/stores/fiscalYear.svelte';
-	import type { Account, JournalEntry } from '$lib/types';
+	import type { Account, AccountType, JournalEntry } from '$lib/types';
+	import { AccountTypeLabels } from '$lib/types';
 
 	let isLoading = $state(true);
 	let accounts = $state<Account[]>([]);
@@ -19,6 +20,35 @@
 	let ledgerData = $state<LedgerData | null>(null);
 
 	const fiscalYear = useFiscalYear();
+
+	// カテゴリ順序（試算表と同じ順）
+	const typeOrder: AccountType[] = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+
+	// カテゴリごとのアイコン
+	const categoryIcons: Record<AccountType, typeof Receipt> = {
+		expense: Receipt,
+		asset: Wallet,
+		revenue: TrendingUp,
+		liability: CreditCard,
+		equity: Gem
+	};
+
+	// 使用済み科目をカテゴリ別にグループ化
+	const groupedUsedAccounts = $derived.by(() => {
+		const groups: Record<AccountType, Account[]> = {
+			asset: [],
+			liability: [],
+			equity: [],
+			revenue: [],
+			expense: []
+		};
+
+		for (const account of usedAccounts) {
+			groups[account.type].push(account);
+		}
+
+		return groups;
+	});
 
 	// 勘定科目が変更されたら元帳を再生成
 	$effect(() => {
@@ -53,21 +83,8 @@
 		await loadData();
 	}
 
-	function handleAccountChange(code: string) {
+	function selectAccount(code: string) {
 		selectedAccountCode = code;
-	}
-
-	// 前後の科目に移動
-	function navigateAccount(direction: 'prev' | 'next') {
-		const currentIndex = usedAccounts.findIndex((a) => a.code === selectedAccountCode);
-		if (currentIndex === -1) return;
-
-		const newIndex =
-			direction === 'prev'
-				? Math.max(0, currentIndex - 1)
-				: Math.min(usedAccounts.length - 1, currentIndex + 1);
-
-		selectedAccountCode = usedAccounts[newIndex].code;
 	}
 
 	// CSV エクスポート
@@ -134,6 +151,11 @@
 					{/each}
 				</Select.Content>
 			</Select.Root>
+
+			<Button variant="outline" onclick={exportCSV} disabled={!ledgerData}>
+				<Download class="mr-2 size-4" />
+				CSV
+			</Button>
 		</div>
 	</div>
 
@@ -150,54 +172,39 @@
 			</Card.Content>
 		</Card.Root>
 	{:else}
-		<!-- 科目選択 -->
+		<!-- 科目選択（バッジ形式） -->
 		<Card.Root>
-			<Card.Content class="flex items-center gap-4 p-4">
-				<Button
-					variant="outline"
-					size="icon"
-					onclick={() => navigateAccount('prev')}
-					disabled={usedAccounts.findIndex((a) => a.code === selectedAccountCode) === 0}
-				>
-					<ChevronLeft class="size-4" />
-				</Button>
-
-				<Select.Root
-					type="single"
-					value={selectedAccountCode}
-					onValueChange={(v) => v && handleAccountChange(v)}
-				>
-					<Select.Trigger class="flex-1">
-						{#if selectedAccountCode}
-							{usedAccounts.find((a) => a.code === selectedAccountCode)?.name || '選択してください'}
-						{:else}
-							勘定科目を選択
-						{/if}
-					</Select.Trigger>
-					<Select.Content>
-						{#each usedAccounts as account (account.code)}
-							<Select.Item value={account.code}>
-								{account.code}
-								{account.name}
-							</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-
-				<Button
-					variant="outline"
-					size="icon"
-					onclick={() => navigateAccount('next')}
-					disabled={usedAccounts.findIndex((a) => a.code === selectedAccountCode) ===
-						usedAccounts.length - 1}
-				>
-					<ChevronRight class="size-4" />
-				</Button>
-
-				<Button variant="outline" onclick={exportCSV} disabled={!ledgerData}>
-					<Download class="mr-2 size-4" />
-					CSV
-				</Button>
+			<Card.Content class="space-y-3 p-4">
+				{#each typeOrder as type (type)}
+					{@const typeAccounts = groupedUsedAccounts[type]}
+					{@const Icon = categoryIcons[type]}
+					{#if typeAccounts.length > 0}
+						<div>
+							<!-- カテゴリヘッダー -->
+							<div class="mb-1.5 flex items-center gap-1.5">
+								<Icon class="size-3.5 text-muted-foreground" />
+								<span class="text-xs font-medium text-muted-foreground"
+									>{AccountTypeLabels[type]}</span
+								>
+							</div>
+							<!-- 科目バッジ -->
+							<div class="flex flex-wrap gap-1.5">
+								{#each typeAccounts as account (account.code)}
+									<button
+										type="button"
+										class="rounded-md border px-2.5 py-1 text-sm transition-colors {selectedAccountCode ===
+										account.code
+											? 'border-primary bg-primary text-primary-foreground'
+											: 'border-border bg-background hover:bg-muted'}"
+										onclick={() => selectAccount(account.code)}
+									>
+										{account.name}
+									</button>
+								{/each}
+							</div>
+						</div>
+					{/if}
+				{/each}
 			</Card.Content>
 		</Card.Root>
 
