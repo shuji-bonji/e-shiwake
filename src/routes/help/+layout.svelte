@@ -7,6 +7,8 @@
 	import {
 		ArrowLeft,
 		BookOpen,
+		BookText,
+		Scale,
 		FileText,
 		Receipt,
 		Paperclip,
@@ -28,6 +30,8 @@
 	const navItems = [
 		{ href: `${base}/help/getting-started`, label: 'はじめに', icon: BookOpen },
 		{ href: `${base}/help/journal`, label: '仕訳入力', icon: FileText },
+		{ href: `${base}/help/ledger`, label: '総勘定元帳', icon: BookText },
+		{ href: `${base}/help/trial-balance`, label: '試算表', icon: Scale },
 		{ href: `${base}/help/tax-category`, label: '消費税区分', icon: Receipt },
 		{ href: `${base}/help/evidence`, label: '証憑管理', icon: Paperclip },
 		{ href: `${base}/help/accounts`, label: '勘定科目管理', icon: FolderCog },

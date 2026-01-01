@@ -3,7 +3,8 @@
 	import {
 		Calendar,
 		BookOpen,
-		FileSpreadsheet,
+		BookText,
+		Scale,
 		Settings,
 		List,
 		AlertTriangle,
@@ -125,25 +126,30 @@
 						<Sidebar.MenuButton isActive={pathname === '/'}>
 							{#snippet child({ props })}
 								<a href="{base}/" {...props}>
-									<BookOpen class="size-4" />
+									<BookText class="size-4" />
 									<span>仕訳帳</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
-					<!-- Phase 2 -->
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton class="pointer-events-none opacity-50">
-							<List class="size-4" />
-							<span>総勘定元帳</span>
-							<span class="ml-auto text-xs">Phase 2</span>
+						<Sidebar.MenuButton isActive={pathname === '/ledger'}>
+							{#snippet child({ props })}
+								<a href="{base}/ledger" {...props}>
+									<BookOpen class="size-4" />
+									<span>総勘定元帳</span>
+								</a>
+							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton class="pointer-events-none opacity-50">
-							<FileSpreadsheet class="size-4" />
-							<span>試算表</span>
-							<span class="ml-auto text-xs">Phase 2</span>
+						<Sidebar.MenuButton isActive={pathname === '/trial-balance'}>
+							{#snippet child({ props })}
+								<a href="{base}/trial-balance" {...props}>
+									<Scale class="size-4" />
+									<span>試算表</span>
+								</a>
+							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
