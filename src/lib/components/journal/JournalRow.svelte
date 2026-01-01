@@ -606,7 +606,9 @@
 							</Tooltip.Trigger>
 							{#if !validation.isValid}
 								<Tooltip.Content>
-									{#if validation.debitTotal === 0 && validation.creditTotal === 0}
+									{#if validation.hasEmptyAccounts}
+										勘定科目を選択してください
+									{:else if validation.debitTotal === 0 && validation.creditTotal === 0}
 										金額を入力してください
 									{:else}
 										借方・貸方の合計が一致しません
@@ -903,9 +905,13 @@
 		<!-- バリデーションエラー表示 -->
 		{#if !validation.isValid && journal.lines.some((l) => l.amount > 0)}
 			<div class="mt-3 text-sm text-destructive">
-				借方合計と貸方合計が一致しません（差額: {Math.abs(
-					validation.debitTotal - validation.creditTotal
-				).toLocaleString()}円）
+				{#if validation.hasEmptyAccounts}
+					勘定科目が選択されていない行があります
+				{:else if validation.debitTotal !== validation.creditTotal}
+					借方合計と貸方合計が一致しません（差額: {Math.abs(
+						validation.debitTotal - validation.creditTotal
+					).toLocaleString()}円）
+				{/if}
 			</div>
 		{/if}
 	</div>

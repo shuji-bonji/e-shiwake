@@ -543,6 +543,31 @@ describe('仕訳管理', () => {
 			expect(result.debitTotal).toBe(10000);
 			expect(result.creditTotal).toBe(10000);
 		});
+
+		it('勘定科目が未選択の行があると無効', () => {
+			const result = validateJournal({
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 1000 },
+					{ id: '2', type: 'credit', accountCode: '', amount: 1000 }
+				]
+			});
+
+			expect(result.isValid).toBe(false);
+			expect(result.hasEmptyAccounts).toBe(true);
+			expect(result.debitTotal).toBe(1000);
+			expect(result.creditTotal).toBe(1000);
+		});
+
+		it('すべての勘定科目が選択済みなら hasEmptyAccounts は false', () => {
+			const result = validateJournal({
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 1000 },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 1000 }
+				]
+			});
+
+			expect(result.hasEmptyAccounts).toBe(false);
+		});
 	});
 });
 
