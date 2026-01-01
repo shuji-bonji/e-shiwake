@@ -8,7 +8,8 @@ import type {
 	StorageType,
 	ExportData,
 	SettingsKey,
-	SettingsValueMap
+	SettingsValueMap,
+	TaxCategory
 } from '$lib/types';
 import { defaultAccounts, getDefaultTaxCategory } from './seed';
 
@@ -402,6 +403,54 @@ export async function deleteJournal(
 
 	// 仕訳を削除
 	await db.journals.delete(id);
+}
+
+/**
+ * 特定の勘定科目を使用している仕訳行の数を取得
+ */
+export async function countJournalLinesByAccountCode(accountCode: string): Promise<number> {
+	const journals = await db.journals.toArray();
+	let count = 0;
+	for (const journal of journals) {
+		for (const line of journal.lines) {
+			if (line.accountCode === accountCode) {
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
+/**
+ * 特定の勘定科目を使用している仕訳行の消費税区分を一括更新
+ */
+export async function updateTaxCategoryByAccountCode(
+	accountCode: string,
+	newTaxCategory: TaxCategory
+): Promise<number> {
+	const journals = await db.journals.toArray();
+	let updatedCount = 0;
+
+	for (const journal of journals) {
+		let hasUpdate = false;
+		const updatedLines = journal.lines.map((line) => {
+			if (line.accountCode === accountCode && line.taxCategory !== newTaxCategory) {
+				hasUpdate = true;
+				updatedCount++;
+				return { ...line, taxCategory: newTaxCategory };
+			}
+			return line;
+		});
+
+		if (hasUpdate) {
+			await db.journals.update(journal.id, {
+				lines: updatedLines,
+				updatedAt: new Date().toISOString()
+			});
+		}
+	}
+
+	return updatedCount;
 }
 
 /**

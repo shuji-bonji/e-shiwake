@@ -17,8 +17,8 @@
 		Percent
 	} from '@lucide/svelte';
 	import * as Switch from '$lib/components/ui/switch/index.js';
-	import type { Account, AccountType } from '$lib/types';
-	import { AccountTypeLabels } from '$lib/types';
+	import type { Account, AccountType, TaxCategory } from '$lib/types';
+	import { AccountTypeLabels, TaxCategoryLabels } from '$lib/types';
 	import {
 		db,
 		initializeDatabase,
@@ -27,8 +27,11 @@
 		updateAccount,
 		deleteAccount,
 		isAccountInUse,
-		generateNextCode
+		generateNextCode,
+		countJournalLinesByAccountCode,
+		updateTaxCategoryByAccountCode
 	} from '$lib/db';
+	import * as Checkbox from '$lib/components/ui/checkbox/index.js';
 	import { BUSINESS_RATIO_CONFIGURABLE_ACCOUNTS } from '$lib/constants/accounts';
 
 	// 状態
@@ -36,9 +39,17 @@
 	let isLoading = $state(true);
 	let dialogOpen = $state(false);
 	let deleteDialogOpen = $state(false);
+	let syncConfirmDialogOpen = $state(false);
 	let editingAccount = $state<Account | null>(null);
 	let deletingAccount = $state<Account | null>(null);
 	let isAccountUsed = $state(false);
+	let affectedJournalCount = $state(0);
+	let shouldSyncJournals = $state(true);
+	let pendingAccountUpdate = $state<{
+		code: string;
+		updates: Partial<Account>;
+		newTaxCategory: TaxCategory;
+	} | null>(null);
 
 	// フォーム状態
 	let formCode = $state('');
@@ -47,6 +58,16 @@
 	let formError = $state('');
 	let formBusinessRatioEnabled = $state(false);
 	let formDefaultBusinessRatio = $state(30);
+	let formDefaultTaxCategory = $state<TaxCategory | undefined>(undefined);
+
+	// 勘定科目タイプ別のデフォルト消費税区分オプション
+	const taxCategoryOptions: Record<AccountType, TaxCategory[]> = {
+		expense: ['purchase_10', 'purchase_8', 'exempt', 'out_of_scope', 'na'],
+		revenue: ['sales_10', 'sales_8', 'exempt', 'out_of_scope', 'na'],
+		asset: ['na', 'purchase_10', 'purchase_8'],
+		liability: ['na'],
+		equity: ['na']
+	};
 
 	// カテゴリ順序（フリーランス向け: よく使う順）
 	const typeOrder: AccountType[] = ['expense', 'asset', 'revenue', 'liability', 'equity'];
@@ -99,6 +120,7 @@
 		formError = '';
 		formBusinessRatioEnabled = false;
 		formDefaultBusinessRatio = 30;
+		formDefaultTaxCategory = 'purchase_10'; // 費用のデフォルト
 		formCode = await generateNextCode('expense');
 		dialogOpen = true;
 	}
@@ -108,6 +130,15 @@
 		if (!editingAccount) {
 			// 新規追加時のみコードを自動生成
 			formCode = await generateNextCode(newType);
+			// タイプに応じたデフォルト消費税区分を設定
+			const defaults: Record<AccountType, TaxCategory> = {
+				expense: 'purchase_10',
+				revenue: 'sales_10',
+				asset: 'na',
+				liability: 'na',
+				equity: 'na'
+			};
+			formDefaultTaxCategory = defaults[newType];
 		}
 	}
 
@@ -119,6 +150,7 @@
 		formError = '';
 		formBusinessRatioEnabled = account.businessRatioEnabled ?? false;
 		formDefaultBusinessRatio = account.defaultBusinessRatio ?? 30;
+		formDefaultTaxCategory = account.defaultTaxCategory;
 		dialogOpen = true;
 	}
 
@@ -131,24 +163,57 @@
 	async function handleSubmit() {
 		formError = '';
 
-		if (!formCode.trim()) {
-			formError = '勘定科目コードを入力してください';
-			return;
-		}
-		if (!formName.trim()) {
-			formError = '勘定科目名を入力してください';
-			return;
+		// システム科目の場合は名前とタイプのバリデーションをスキップ
+		if (!editingAccount?.isSystem) {
+			if (!formCode.trim()) {
+				formError = '勘定科目コードを入力してください';
+				return;
+			}
+			if (!formName.trim()) {
+				formError = '勘定科目名を入力してください';
+				return;
+			}
 		}
 
 		try {
 			if (editingAccount) {
-				// 更新
-				await updateAccount(editingAccount.code, {
-					name: formName.trim(),
-					type: formType,
-					businessRatioEnabled: formBusinessRatioEnabled,
-					defaultBusinessRatio: formBusinessRatioEnabled ? formDefaultBusinessRatio : undefined
-				});
+				const updates: Partial<Account> = editingAccount.isSystem
+					? {
+							businessRatioEnabled: formBusinessRatioEnabled,
+							defaultBusinessRatio: formBusinessRatioEnabled ? formDefaultBusinessRatio : undefined,
+							defaultTaxCategory: formDefaultTaxCategory
+						}
+					: {
+							name: formName.trim(),
+							type: formType,
+							businessRatioEnabled: formBusinessRatioEnabled,
+							defaultBusinessRatio: formBusinessRatioEnabled ? formDefaultBusinessRatio : undefined,
+							defaultTaxCategory: formDefaultTaxCategory
+						};
+
+				// 消費税区分が変更された場合、仕訳の同期確認を行う
+				const taxCategoryChanged =
+					formDefaultTaxCategory && editingAccount.defaultTaxCategory !== formDefaultTaxCategory;
+
+				if (taxCategoryChanged && formDefaultTaxCategory) {
+					const count = await countJournalLinesByAccountCode(editingAccount.code);
+					if (count > 0) {
+						// 仕訳が存在する場合は同期確認ダイアログを表示
+						affectedJournalCount = count;
+						shouldSyncJournals = true;
+						pendingAccountUpdate = {
+							code: editingAccount.code,
+							updates,
+							newTaxCategory: formDefaultTaxCategory
+						};
+						dialogOpen = false;
+						syncConfirmDialogOpen = true;
+						return;
+					}
+				}
+
+				// 仕訳がない場合は直接更新
+				await updateAccount(editingAccount.code, updates);
 			} else {
 				// 新規追加
 				const existing = await db.accounts.get(formCode.trim());
@@ -161,7 +226,8 @@
 					name: formName.trim(),
 					type: formType,
 					businessRatioEnabled: formBusinessRatioEnabled,
-					defaultBusinessRatio: formBusinessRatioEnabled ? formDefaultBusinessRatio : undefined
+					defaultBusinessRatio: formBusinessRatioEnabled ? formDefaultBusinessRatio : undefined,
+					defaultTaxCategory: formDefaultTaxCategory
 				});
 			}
 			dialogOpen = false;
@@ -169,6 +235,34 @@
 		} catch (error) {
 			formError = error instanceof Error ? error.message : '保存に失敗しました';
 		}
+	}
+
+	async function handleSyncConfirm() {
+		if (!pendingAccountUpdate) return;
+
+		try {
+			// 勘定科目を更新
+			await updateAccount(pendingAccountUpdate.code, pendingAccountUpdate.updates);
+
+			// 仕訳の消費税区分を更新（ユーザーが選択した場合）
+			if (shouldSyncJournals) {
+				await updateTaxCategoryByAccountCode(
+					pendingAccountUpdate.code,
+					pendingAccountUpdate.newTaxCategory
+				);
+			}
+
+			syncConfirmDialogOpen = false;
+			pendingAccountUpdate = null;
+			await loadAccounts();
+		} catch (error) {
+			console.error('Sync failed:', error);
+		}
+	}
+
+	function handleSyncCancel() {
+		syncConfirmDialogOpen = false;
+		pendingAccountUpdate = null;
 	}
 
 	async function handleDelete() {
@@ -327,6 +421,28 @@
 				</div>
 			{/if}
 
+			<!-- デフォルト消費税区分（システム科目・カスタム科目共通） -->
+			<div class="space-y-2">
+				<Label for="defaultTaxCategory">デフォルト消費税区分</Label>
+				<Select.Root
+					type="single"
+					value={formDefaultTaxCategory}
+					onValueChange={(v) => v && (formDefaultTaxCategory = v as TaxCategory)}
+				>
+					<Select.Trigger class="w-full">
+						{formDefaultTaxCategory
+							? TaxCategoryLabels[formDefaultTaxCategory]
+							: '選択してください'}
+					</Select.Trigger>
+					<Select.Content>
+						{#each taxCategoryOptions[formType] as tc (tc)}
+							<Select.Item value={tc}>{TaxCategoryLabels[tc]}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+				<p class="text-xs text-muted-foreground">仕訳入力時に自動で設定される消費税区分</p>
+			</div>
+
 			<!-- 家事按分設定（費用科目のみ表示） -->
 			{#if formType === 'expense'}
 				<div class="rounded-md border bg-muted/30 p-3">
@@ -401,6 +517,47 @@
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (deleteDialogOpen = false)}>キャンセル</Button>
 			<Button variant="destructive" onclick={handleDelete} disabled={isAccountUsed}>削除</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- 仕訳同期確認ダイアログ -->
+<Dialog.Root bind:open={syncConfirmDialogOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>既存仕訳の消費税区分を更新しますか？</Dialog.Title>
+			<Dialog.Description>
+				この勘定科目を使用している仕訳が {affectedJournalCount} 件あります。
+			</Dialog.Description>
+		</Dialog.Header>
+		<div class="space-y-4">
+			<div class="rounded-md bg-muted p-3 text-sm">
+				<p class="font-medium">変更内容</p>
+				{#if pendingAccountUpdate}
+					<p class="mt-1 text-muted-foreground">
+						消費税区分を「{TaxCategoryLabels[pendingAccountUpdate.newTaxCategory]}」に変更
+					</p>
+				{/if}
+			</div>
+			<div class="flex items-start gap-2">
+				<Checkbox.Root
+					id="syncJournals"
+					checked={shouldSyncJournals}
+					onCheckedChange={(v) => (shouldSyncJournals = !!v)}
+				/>
+				<div class="grid gap-1.5 leading-none">
+					<Label for="syncJournals" class="text-sm font-medium">既存の仕訳も一括で更新する</Label>
+					<p class="text-xs text-muted-foreground">
+						チェックを外すと、既存の仕訳は変更されません（新規仕訳から適用）
+					</p>
+				</div>
+			</div>
+		</div>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={handleSyncCancel}>キャンセル</Button>
+			<Button onclick={handleSyncConfirm}>
+				{shouldSyncJournals ? '更新する' : '科目のみ更新'}
+			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

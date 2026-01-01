@@ -17,6 +17,8 @@ import {
 	isAccountInUse,
 	generateNextCode,
 	isSystemAccount,
+	countJournalLinesByAccountCode,
+	updateTaxCategoryByAccountCode,
 	// 仕訳
 	getJournalsByYear,
 	getAvailableYears,
@@ -203,6 +205,115 @@ describe('勘定科目管理', () => {
 			expect(isSystemAccount('5006')).toBe(true); // 消耗品費
 			expect(isSystemAccount('5100')).toBe(false); // ユーザー追加
 			expect(isSystemAccount('5101')).toBe(false); // ユーザー追加
+		});
+	});
+
+	describe('countJournalLinesByAccountCode', () => {
+		it('勘定科目を使用している仕訳行の件数を取得できる', async () => {
+			// 仕訳を2件追加（5006を3回使用）
+			await db.journals.add({
+				id: 'journal-1',
+				date: '2024-01-15',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 1000, taxCategory: 'purchase_10' },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 1000, taxCategory: 'na' }
+				],
+				vendor: 'テスト',
+				description: 'テスト仕訳1',
+				evidenceStatus: 'none',
+				attachments: [],
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
+			});
+			await db.journals.add({
+				id: 'journal-2',
+				date: '2024-01-16',
+				lines: [
+					{ id: '3', type: 'debit', accountCode: '5006', amount: 2000, taxCategory: 'purchase_10' },
+					{ id: '4', type: 'debit', accountCode: '5006', amount: 500, taxCategory: 'purchase_10' },
+					{ id: '5', type: 'credit', accountCode: '1002', amount: 2500, taxCategory: 'na' }
+				],
+				vendor: 'テスト',
+				description: 'テスト仕訳2',
+				evidenceStatus: 'none',
+				attachments: [],
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
+			});
+
+			const count = await countJournalLinesByAccountCode('5006');
+			expect(count).toBe(3);
+
+			const countNotUsed = await countJournalLinesByAccountCode('5101');
+			expect(countNotUsed).toBe(0);
+		});
+	});
+
+	describe('updateTaxCategoryByAccountCode', () => {
+		it('指定した勘定科目の消費税区分を一括更新できる', async () => {
+			// 仕訳を追加
+			await db.journals.add({
+				id: 'journal-1',
+				date: '2024-01-15',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 1000, taxCategory: 'purchase_10' },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 1000, taxCategory: 'na' }
+				],
+				vendor: 'テスト',
+				description: 'テスト仕訳1',
+				evidenceStatus: 'none',
+				attachments: [],
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
+			});
+			await db.journals.add({
+				id: 'journal-2',
+				date: '2024-01-16',
+				lines: [
+					{ id: '3', type: 'debit', accountCode: '5006', amount: 2000, taxCategory: 'purchase_10' },
+					{ id: '4', type: 'credit', accountCode: '1002', amount: 2000, taxCategory: 'na' }
+				],
+				vendor: 'テスト',
+				description: 'テスト仕訳2',
+				evidenceStatus: 'none',
+				attachments: [],
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
+			});
+
+			// 消費税区分を更新
+			const updatedCount = await updateTaxCategoryByAccountCode('5006', 'purchase_8');
+			expect(updatedCount).toBe(2);
+
+			// 更新されていることを確認
+			const journal1 = await db.journals.get('journal-1');
+			const journal2 = await db.journals.get('journal-2');
+
+			expect(journal1?.lines[0].taxCategory).toBe('purchase_8');
+			expect(journal1?.lines[1].taxCategory).toBe('na'); // 1002は変更されない
+
+			expect(journal2?.lines[0].taxCategory).toBe('purchase_8');
+			expect(journal2?.lines[1].taxCategory).toBe('na'); // 1002は変更されない
+		});
+
+		it('同じ消費税区分の場合は更新しない', async () => {
+			await db.journals.add({
+				id: 'journal-1',
+				date: '2024-01-15',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 1000, taxCategory: 'purchase_10' },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 1000, taxCategory: 'na' }
+				],
+				vendor: 'テスト',
+				description: 'テスト',
+				evidenceStatus: 'none',
+				attachments: [],
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
+			});
+
+			const updatedCount = await updateTaxCategoryByAccountCode('5006', 'purchase_10');
+			expect(updatedCount).toBe(0);
 		});
 	});
 });
