@@ -615,7 +615,14 @@ export async function setSetting<K extends SettingsKey>(
  */
 export async function getStorageMode(): Promise<StorageType> {
 	const mode = await getSetting('storageMode');
-	return mode ?? 'indexeddb';
+	// ランタイム検証: 不正な値の場合はデフォルトにフォールバック
+	if (mode !== 'filesystem' && mode !== 'indexeddb') {
+		if (mode !== undefined) {
+			console.warn(`[settings] 不正なstorageMode値: ${mode}、デフォルト値を使用します`);
+		}
+		return 'indexeddb';
+	}
+	return mode;
 }
 
 /**
@@ -633,6 +640,11 @@ export async function setStorageMode(mode: StorageType): Promise<void> {
  */
 export async function getLastExportedAt(): Promise<string | null> {
 	const value = await getSetting('lastExportedAt');
+	// ランタイム検証: 文字列以外はnullにフォールバック
+	if (value !== undefined && typeof value !== 'string') {
+		console.warn(`[settings] 不正なlastExportedAt値: ${typeof value}、nullを返します`);
+		return null;
+	}
 	return value ?? null;
 }
 
@@ -687,6 +699,13 @@ export async function markAttachmentAsExported(
  */
 export async function getAutoPurgeBlobSetting(): Promise<boolean> {
 	const value = await getSetting('autoPurgeBlobAfterExport');
+	// ランタイム検証: boolean以外はデフォルトにフォールバック
+	if (value !== undefined && typeof value !== 'boolean') {
+		console.warn(
+			`[settings] 不正なautoPurgeBlobAfterExport値: ${typeof value}、デフォルト値を使用します`
+		);
+		return true;
+	}
 	return value ?? true; // デフォルト: true
 }
 
@@ -702,6 +721,11 @@ export async function setAutoPurgeBlobSetting(enabled: boolean): Promise<void> {
  */
 export async function getBlobRetentionDays(): Promise<number> {
 	const value = await getSetting('blobRetentionDays');
+	// ランタイム検証: 正の数値以外はデフォルトにフォールバック
+	if (value !== undefined && (typeof value !== 'number' || value < 0 || !Number.isFinite(value))) {
+		console.warn(`[settings] 不正なblobRetentionDays値: ${value}、デフォルト値を使用します`);
+		return 30;
+	}
 	return value ?? 30; // デフォルト: 30日
 }
 

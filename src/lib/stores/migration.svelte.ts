@@ -131,7 +131,11 @@ export function createMigrationStore() {
 						// 完了時の処理
 						finalize(async () => {
 							isRunning = false;
-							progress = 1;
+
+							// キャンセルされた場合はprogress = 1にしない（UIで完了と誤認させない）
+							if (!isCanceled) {
+								progress = 1;
+							}
 
 							// エラーがなければストレージモードを更新
 							if (!isCanceled && errors.length === 0) {
@@ -202,6 +206,9 @@ export function createMigrationStore() {
 		},
 		get targetStorageType() {
 			return targetStorageType;
+		},
+		get isCanceled() {
+			return isCanceled;
 		},
 
 		// メソッド

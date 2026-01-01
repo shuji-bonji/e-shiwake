@@ -115,8 +115,17 @@ export async function importFromZip(
 	// 証憑ファイル名からattachment IDへのマッピングを作成
 	const fileNameToAttachment = new Map<string, { journalId: string; attachment: Attachment }>();
 	const attachmentIdToAttachment = new Map<string, { journalId: string; attachment: Attachment }>();
+	const duplicateFileNames = new Set<string>();
+
 	for (const journal of exportData.journals) {
 		for (const attachment of journal.attachments) {
+			// 同名ファイルの衝突を検知
+			if (fileNameToAttachment.has(attachment.generatedName)) {
+				duplicateFileNames.add(attachment.generatedName);
+				warnings.push(
+					`同名の証憑ファイルが複数存在します: ${attachment.generatedName}（旧形式ZIPでは最後の1件のみ使用されます）`
+				);
+			}
 			fileNameToAttachment.set(attachment.generatedName, {
 				journalId: journal.id,
 				attachment
@@ -169,9 +178,14 @@ export async function importFromZip(
 										warnings.push(`不明な証憑ID: ${attachmentId}`);
 										return;
 									}
+									// journalIdが指定されていて一致しない場合はスキップ（データ不整合）
 									if (journalId && attachmentInfo.journalId !== journalId) {
-										warnings.push(`証憑と仕訳の対応が一致しません: ${attachmentId} (${journalId})`);
+										warnings.push(
+											`証憑と仕訳の対応が一致しません（スキップ）: ${attachmentId} (期待: ${attachmentInfo.journalId}, 実際: ${journalId})`
+										);
+										return;
 									}
+									// ファイル名の不一致は警告のみ（リネームの可能性あり）
 									if (attachmentInfo.attachment.generatedName !== fileName) {
 										warnings.push(`証憑ファイル名が一致しません: ${fileName}`);
 									}

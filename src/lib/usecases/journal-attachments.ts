@@ -51,7 +51,12 @@ function parseYearFromDate(dateStr: string): number {
 			return year;
 		}
 	}
-	return new Date().getFullYear();
+	// 不正な日付の場合は警告を出して現在年度にフォールバック
+	const fallbackYear = new Date().getFullYear();
+	console.warn(
+		`[journal-attachments] 不正な日付形式のため現在年度（${fallbackYear}）を使用します: "${dateStr}"`
+	);
+	return fallbackYear;
 }
 
 export async function saveVendorIfNeeded(
