@@ -469,7 +469,8 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 **バリデーション**:
 
 - 借方合計 ≠ 貸方合計 の場合、警告表示（赤枠など）
-- 保存はできるが、警告は残る
+- 勘定科目が未選択の行がある場合も警告表示
+- 確定ボタンはバリデーションが通るまで無効化
 
 ### 3. 証憑紐付け
 
@@ -744,15 +745,16 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 
 ### Phase 2: 帳簿機能 ✅ 完了
 
-- [x] 総勘定元帳（科目別取引履歴、残高推移、CSV出力）
-- [x] 試算表（合計残高試算表/残高試算表、貸借一致チェック、CSV出力）
+- [x] 総勘定元帳（科目別取引履歴、残高推移、CSV出力、印刷/PDF保存）
+- [x] 試算表（合計残高試算表/残高試算表、貸借一致チェック、CSV出力、印刷/PDF保存）
 
 **実装詳細**:
 
 - `$lib/utils/ledger.ts` - 総勘定元帳生成ロジック
 - `$lib/utils/trial-balance.ts` - 試算表生成ロジック
-- `/ledger` - 総勘定元帳ページ（科目選択、前後ナビ、CSV出力）
-- `/trial-balance` - 試算表ページ（表示モード切替、貸借一致チェック）
+- `/ledger` - 総勘定元帳ページ（科目選択、前後ナビ、CSV出力、印刷/PDF）
+- `/trial-balance` - 試算表ページ（表示モード切替、貸借一致チェック、印刷/PDF）
+- `src/routes/layout.css` - 印刷用スタイル（@media print）
 
 ### Phase 3: 確定申告対応
 
@@ -801,7 +803,9 @@ src/
 │       ├── export.ts                # エクスポート処理
 │       ├── zip-export.ts            # ZIPエクスポート処理
 │       ├── journal-search.ts        # 仕訳検索（クエリパース、フィルタリング）
-│       └── journal-copy.ts          # 仕訳コピー
+│       ├── journal-copy.ts          # 仕訳コピー
+│       ├── business-ratio.ts        # 家事按分（適用、解除、自動計算）
+│       └── clone.ts                 # ディープクローン（Blob保持）
 ├── routes/
 │   ├── +layout.svelte        # サイドバーレイアウト
 │   ├── +page.svelte          # 仕訳帳（ホーム）

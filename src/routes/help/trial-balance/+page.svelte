@@ -89,4 +89,19 @@
 			</p>
 		</HelpNote>
 	</HelpSection>
+
+	<HelpSection title="印刷・PDF保存">
+		<p>試算表を印刷またはPDFとして保存できます。</p>
+		<ol class="ml-4 list-decimal space-y-2">
+			<li>年度と表示モードを選択</li>
+			<li>「保存」または「印刷」ボタンをクリック</li>
+			<li>ブラウザの印刷ダイアログが表示されます</li>
+		</ol>
+		<HelpNote type="tip">
+			<p>
+				印刷ダイアログで「PDFとして保存」を選択すると、PDFファイルとして出力できます。
+				確定申告の添付資料として活用できます。
+			</p>
+		</HelpNote>
+	</HelpSection>
 </div>
