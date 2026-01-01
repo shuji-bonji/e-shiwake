@@ -126,6 +126,29 @@ describe('business-ratio', () => {
 			expect(result.businessAmount).toBe(3300);
 			expect(result.personalAmount).toBe(6700);
 		});
+
+		it('0円でも按分適用できる（後から金額入力で自動計算）', () => {
+			const lines: JournalLine[] = [
+				{ id: '1', type: 'debit', accountCode: '5017', amount: 0 },
+				{ id: '2', type: 'credit', accountCode: '1003', amount: 0 }
+			];
+
+			const result = applyBusinessRatio({
+				lines,
+				targetLineIndex: 0,
+				businessRatio: 33
+			});
+
+			// 0円でも両方の行が生成される
+			expect(result.lines).toHaveLength(3);
+			expect(result.businessAmount).toBe(0);
+			expect(result.personalAmount).toBe(0);
+			expect(result.lines[0]._businessRatioApplied).toBe(true);
+			expect(result.lines[0]._businessRatio).toBe(33);
+			expect(result.lines[0]._originalAmount).toBe(0);
+			expect(result.lines[1]._businessRatioGenerated).toBe(true);
+			expect(result.lines[1].amount).toBe(0);
+		});
 	});
 
 	describe('removeBusinessRatio', () => {
@@ -298,6 +321,75 @@ describe('business-ratio', () => {
 			const result = getBusinessRatioTargetLine(lines, mockAccounts);
 
 			expect(result).toBeNull();
+		});
+
+		it('既に按分適用済みの行はスキップする', () => {
+			const lines: JournalLine[] = [
+				{
+					id: '1',
+					type: 'debit',
+					accountCode: '5017',
+					amount: 30000,
+					_businessRatioApplied: true,
+					_originalAmount: 100000,
+					_businessRatio: 30
+				},
+				{
+					id: '2',
+					type: 'debit',
+					accountCode: '3002',
+					amount: 70000,
+					_businessRatioGenerated: true
+				},
+				{ id: '3', type: 'credit', accountCode: '1003', amount: 100000 }
+			];
+
+			const result = getBusinessRatioTargetLine(lines, mockAccounts);
+
+			// 按分適用済みの行はスキップされるのでnullを返す
+			expect(result).toBeNull();
+		});
+
+		it('複数の按分対象がある場合、未適用の最初の行を返す', () => {
+			const accountsWithMultiple: Account[] = [
+				{
+					code: '5017',
+					name: '地代家賃',
+					type: 'expense',
+					isSystem: true,
+					createdAt: '',
+					businessRatioEnabled: true,
+					defaultBusinessRatio: 30
+				},
+				{
+					code: '5004',
+					name: '通信費',
+					type: 'expense',
+					isSystem: true,
+					createdAt: '',
+					businessRatioEnabled: true,
+					defaultBusinessRatio: 50
+				}
+			];
+
+			const lines: JournalLine[] = [
+				{
+					id: '1',
+					type: 'debit',
+					accountCode: '5017',
+					amount: 30000,
+					_businessRatioApplied: true
+				},
+				{ id: '2', type: 'debit', accountCode: '5004', amount: 10000 },
+				{ id: '3', type: 'credit', accountCode: '1003', amount: 40000 }
+			];
+
+			const result = getBusinessRatioTargetLine(lines, accountsWithMultiple);
+
+			// 最初の行は適用済みなので、2番目の通信費が返される
+			expect(result).not.toBeNull();
+			expect(result?.line.id).toBe('2');
+			expect(result?.account.code).toBe('5004');
 		});
 	});
 
