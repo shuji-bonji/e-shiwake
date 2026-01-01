@@ -4,7 +4,16 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { BookOpen, Download, Receipt, Wallet, TrendingUp, CreditCard, Gem } from '@lucide/svelte';
+	import {
+		BookOpen,
+		Download,
+		Printer,
+		Receipt,
+		Wallet,
+		TrendingUp,
+		CreditCard,
+		Gem
+	} from '@lucide/svelte';
 	import { initializeDatabase, getJournalsByYear, getAllAccounts } from '$lib/db';
 	import { generateLedger, getUsedAccounts, type LedgerData } from '$lib/utils/ledger';
 	import { formatAmount } from '$lib/utils/trial-balance';
@@ -18,6 +27,13 @@
 	let journals = $state<JournalEntry[]>([]);
 	let selectedAccountCode = $state<string>('');
 	let ledgerData = $state<LedgerData | null>(null);
+
+	// Safari判定（SafariはChromeと異なりuser agentに"Chrome"を含まない）
+	const isSafari = $derived(
+		typeof navigator !== 'undefined' &&
+			/Safari/.test(navigator.userAgent) &&
+			!/Chrome/.test(navigator.userAgent)
+	);
 
 	const fiscalYear = useFiscalYear();
 
@@ -87,6 +103,11 @@
 		selectedAccountCode = code;
 	}
 
+	// 印刷
+	function handlePrint() {
+		window.print();
+	}
+
 	// CSV エクスポート
 	function exportCSV() {
 		if (!ledgerData) return;
@@ -152,9 +173,14 @@
 				</Select.Content>
 			</Select.Root>
 
-			<Button variant="outline" onclick={exportCSV} disabled={!ledgerData}>
+			<Button variant="outline" onclick={exportCSV} disabled={!ledgerData} class="print-hidden">
 				<Download class="mr-2 size-4" />
 				CSV
+			</Button>
+
+			<Button variant="outline" onclick={handlePrint} disabled={!ledgerData} class="print-hidden">
+				<Printer class="mr-2 size-4" />
+				{isSafari ? '印刷' : '保存'}
 			</Button>
 		</div>
 	</div>
@@ -172,8 +198,16 @@
 			</Card.Content>
 		</Card.Root>
 	{:else}
+		<!-- 印刷用ヘッダー（通常時は非表示） -->
+		<div class="print-header hidden">
+			<h2>総勘定元帳</h2>
+			{#if ledgerData}
+				<p>{fiscalYear.selectedYear}年度 / {ledgerData.accountName}</p>
+			{/if}
+		</div>
+
 		<!-- 科目選択（バッジ形式） -->
-		<Card.Root>
+		<Card.Root class="print-hidden">
 			<Card.Content class="space-y-3 p-4">
 				{#each typeOrder as type (type)}
 					{@const typeAccounts = groupedUsedAccounts[type]}

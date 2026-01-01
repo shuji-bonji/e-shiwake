@@ -156,3 +156,109 @@ input[type='date']::-webkit-calendar-picker-indicator {
 .dark input[type='date']::-webkit-calendar-picker-indicator {
 	filter: invert(0.8);
 }
+
+/* 印刷用スタイル */
+@media print {
+	/* 常にライトモードで印刷 */
+	:root {
+		--background: oklch(1 0 0);
+		--foreground: oklch(0.141 0.005 285.823);
+		--card: oklch(1 0 0);
+		--card-foreground: oklch(0.141 0.005 285.823);
+		--muted: oklch(0.967 0.001 286.375);
+		--muted-foreground: oklch(0.552 0.016 285.938);
+		--border: oklch(0.92 0.004 286.32);
+	}
+
+	/* サイドバーと不要なUIを非表示 */
+	[data-sidebar='sidebar'],
+	[data-sidebar='rail'],
+	[data-sidebar='trigger'],
+	.print-hidden,
+	button:not(.print-visible) {
+		display: none !important;
+	}
+
+	/* メインコンテンツを全幅に */
+	main {
+		margin: 0 !important;
+		padding: 1rem !important;
+		width: 100% !important;
+		max-width: 100% !important;
+	}
+
+	/* ページ設定 */
+	@page {
+		margin: 1.5cm;
+		size: A4;
+	}
+
+	/* テーブルのスタイル調整 */
+	table {
+		width: 100% !important;
+		border-collapse: collapse;
+		font-size: 10pt;
+	}
+
+	th,
+	td {
+		border: 1px solid #ccc !important;
+		padding: 4px 8px !important;
+	}
+
+	th {
+		background-color: #f5f5f5 !important;
+		color: #333 !important;
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+
+	/* 改ページ制御 */
+	tr {
+		page-break-inside: avoid;
+	}
+
+	thead {
+		display: table-header-group;
+	}
+
+	/* カードのシャドウを削除 */
+	[class*='card'] {
+		box-shadow: none !important;
+		border: 1px solid #ddd !important;
+	}
+
+	/* 背景色を印刷 */
+	.bg-muted\/50,
+	.bg-muted\/30,
+	.bg-primary\/10 {
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+
+	/* タイトルの調整 */
+	h1 {
+		font-size: 16pt;
+		margin-bottom: 1rem;
+	}
+
+	/* 印刷ヘッダー（ページ上部の情報） */
+	.print-header {
+		display: block !important;
+		text-align: center;
+		margin-bottom: 1rem;
+		padding-bottom: 0.5rem;
+		border-bottom: 2px solid #333;
+	}
+
+	.print-header h2 {
+		font-size: 14pt;
+		margin: 0;
+	}
+
+	.print-header p {
+		font-size: 10pt;
+		color: #666;
+		margin: 0.25rem 0 0;
+	}
+}
