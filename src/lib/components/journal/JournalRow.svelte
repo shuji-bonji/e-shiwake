@@ -12,7 +12,9 @@
 		ArrowUp,
 		ArrowDown,
 		Check,
-		Copy
+		Copy,
+		Percent,
+		X
 	} from '@lucide/svelte';
 	import AccountSelect from './AccountSelect.svelte';
 	import TaxCategorySelect from './TaxCategorySelect.svelte';
@@ -20,9 +22,14 @@
 	import PdfDropZone from './PdfDropZone.svelte';
 	import AttachmentDialog from './AttachmentDialog.svelte';
 	import AttachmentEditDialog from './AttachmentEditDialog.svelte';
-	import BusinessRatioPanel from './BusinessRatioPanel.svelte';
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
-	import { applyBusinessRatio, removeBusinessRatio } from '$lib/utils/business-ratio';
+	import {
+		applyBusinessRatio,
+		removeBusinessRatio,
+		getBusinessRatioTargetLine,
+		hasBusinessRatioApplied,
+		getAppliedBusinessRatio
+	} from '$lib/utils/business-ratio';
 	import type {
 		JournalEntry,
 		JournalLine,
@@ -77,6 +84,11 @@
 	const validation = $derived(validateJournal(journal));
 	const debitLines = $derived(journal.lines.filter((l) => l.type === 'debit'));
 	const creditLines = $derived(journal.lines.filter((l) => l.type === 'credit'));
+
+	// 家事按分の状態
+	const businessRatioTarget = $derived(getBusinessRatioTargetLine(journal.lines, accounts));
+	const isBusinessRatioApplied = $derived(hasBusinessRatioApplied(journal.lines));
+	const appliedBusinessRatio = $derived(getAppliedBusinessRatio(journal.lines));
 
 	// 添付ダイアログの状態
 	let attachmentDialogOpen = $state(false);
@@ -255,6 +267,34 @@
 		field: keyof JournalLine,
 		value: string | number | TaxCategory | undefined
 	) {
+		const targetLine = journal.lines.find((l) => l.id === lineId);
+
+		// 按分適用済みの行の金額変更 → 自動再計算
+		if (
+			field === 'amount' &&
+			targetLine?._businessRatioApplied &&
+			targetLine._businessRatio !== undefined
+		) {
+			const newTotal = Number(value);
+			const ratio = targetLine._businessRatio;
+			const businessAmount = Math.floor((newTotal * ratio) / 100);
+			const personalAmount = newTotal - businessAmount;
+
+			const newLines = journal.lines.map((line) => {
+				if (line.id === lineId) {
+					// 事業分を更新
+					return { ...line, amount: businessAmount, _originalAmount: newTotal };
+				} else if (line._businessRatioGenerated) {
+					// 家事分（事業主貸）を更新
+					return { ...line, amount: personalAmount };
+				}
+				return line;
+			});
+			onupdate({ ...journal, lines: newLines });
+			return;
+		}
+
+		// 通常の更新
 		const newLines = journal.lines.map((line) =>
 			line.id === lineId ? { ...line, [field]: value } : line
 		);
@@ -619,6 +659,35 @@
 			<div class="space-y-3">
 				<div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
 					借方
+
+					<!-- 家事按分ボタン（インライン） -->
+					{#if isBusinessRatioApplied}
+						<button
+							type="button"
+							class="flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+							onclick={handleRemoveBusinessRatio}
+							tabindex={-1}
+						>
+							<Percent class="size-3" />
+							{appliedBusinessRatio}%
+							<X class="size-3" />
+						</button>
+					{:else if businessRatioTarget}
+						<button
+							type="button"
+							class="flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+							onclick={() =>
+								handleApplyBusinessRatio(
+									businessRatioTarget.index,
+									businessRatioTarget.account.defaultBusinessRatio ?? 50
+								)}
+							tabindex={-1}
+						>
+							<Percent class="size-3" />
+							按分適用
+						</button>
+					{/if}
+
 					<span class="ml-auto font-mono">{validation.debitTotal.toLocaleString('ja-JP')}円</span>
 					<Tooltip.Provider>
 						<Tooltip.Root>
@@ -840,13 +909,6 @@
 			</div>
 		{/if}
 
-		<!-- 家事按分パネル -->
-		<BusinessRatioPanel
-			lines={journal.lines}
-			{accounts}
-			onapply={handleApplyBusinessRatio}
-			onremove={handleRemoveBusinessRatio}
-		/>
 	</div>
 
 	<!-- PDF添付エリア（デスクトップ: 右側、モバイル: 下部） -->

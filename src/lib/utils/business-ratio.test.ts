@@ -54,7 +54,7 @@ describe('business-ratio', () => {
 			expect(result.lines[2].amount).toBe(100000);
 		});
 
-		it('100%按分で事業主貸が生成されない', () => {
+		it('100%按分でも事業主貸が0円で生成される（自動再計算用）', () => {
 			const lines: JournalLine[] = [
 				{ id: '1', type: 'debit', accountCode: '5017', amount: 100000 },
 				{ id: '2', type: 'credit', accountCode: '1003', amount: 100000 }
@@ -66,9 +66,12 @@ describe('business-ratio', () => {
 				businessRatio: 100
 			});
 
-			expect(result.lines).toHaveLength(2);
+			// 事業主貸は0円でも生成される（後から金額変更で自動計算するため）
+			expect(result.lines).toHaveLength(3);
 			expect(result.businessAmount).toBe(100000);
 			expect(result.personalAmount).toBe(0);
+			expect(result.lines[1].amount).toBe(0);
+			expect(result.lines[1]._businessRatioGenerated).toBe(true);
 		});
 
 		it('0%按分で全額事業主貸になる', () => {

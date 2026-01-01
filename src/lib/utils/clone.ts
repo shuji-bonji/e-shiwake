@@ -45,7 +45,12 @@ export function cloneJournal(journal: JournalEntry): JournalEntry {
 			accountCode: line.accountCode,
 			amount: line.amount,
 			taxCategory: line.taxCategory,
-			memo: line.memo
+			memo: line.memo,
+			// 家事按分フラグ
+			_businessRatioApplied: line._businessRatioApplied,
+			_originalAmount: line._originalAmount,
+			_businessRatio: line._businessRatio,
+			_businessRatioGenerated: line._businessRatioGenerated
 		})),
 		vendor: journal.vendor,
 		description: journal.description,

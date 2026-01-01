@@ -58,17 +58,15 @@ export function applyBusinessRatio(params: ApplyBusinessRatioParams): ApplyBusin
 				_businessRatio: businessRatio
 			});
 
-			// 個人分（事業主貸を追加）
-			if (personalAmount > 0) {
-				result.push({
-					id: crypto.randomUUID(),
-					type: 'debit',
-					accountCode: OWNER_WITHDRAWAL_CODE,
-					amount: personalAmount,
-					taxCategory: 'na',
-					_businessRatioGenerated: true
-				});
-			}
+			// 個人分（事業主貸を追加）- 0円でも追加して後から金額入力で自動計算
+			result.push({
+				id: crypto.randomUUID(),
+				type: 'debit',
+				accountCode: OWNER_WITHDRAWAL_CODE,
+				amount: personalAmount,
+				taxCategory: 'na',
+				_businessRatioGenerated: true
+			});
 		} else {
 			result.push(line);
 		}
@@ -141,6 +139,7 @@ export function calculateBusinessRatioPreview(
 
 /**
  * 按分対象の借方行を取得
+ * 既に按分適用済みの行はスキップする
  */
 export function getBusinessRatioTargetLine(
 	lines: JournalLine[],
@@ -149,6 +148,8 @@ export function getBusinessRatioTargetLine(
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 		if (line.type !== 'debit') continue;
+		// 既に按分適用済みの行はスキップ
+		if (line._businessRatioApplied) continue;
 
 		const account = accounts.find((a) => a.code === line.accountCode);
 		if (account?.businessRatioEnabled) {
