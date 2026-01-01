@@ -12,12 +12,12 @@ const svg = readFileSync(svgPath);
 const sizes = [192, 512];
 
 for (const size of sizes) {
+	const outputPath = join(__dirname, `../static/icon-${size}x${size}.png`);
 	await sharp(svg)
 		.resize(size, size)
 		.png()
-		.toFile(join(__dirname, `../static/icon-${size}x${size}.png`));
-
-	console.log(`Generated icon-${size}x${size}.png`);
+		.toFile(outputPath);
+	console.log(`Generated: icon-${size}x${size}.png`);
 }
 
-console.log('All icons generated successfully!');
+console.log('Done!');

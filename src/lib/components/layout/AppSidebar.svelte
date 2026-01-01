@@ -72,11 +72,7 @@
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton size="lg" class="cursor-default hover:bg-transparent">
-					<div
-						class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
-					>
-						<BookOpen class="size-4" />
-					</div>
+					<img src="{base}/favicon.svg" alt="e-shiwake" class="size-8 rounded-lg" />
 					<div class="flex flex-col gap-0.5 leading-none">
 						<span class="font-semibold">e-shiwake</span>
 						<span class="text-xs text-muted-foreground">電子仕訳</span>
