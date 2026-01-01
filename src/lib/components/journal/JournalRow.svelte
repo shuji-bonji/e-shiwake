@@ -20,7 +20,9 @@
 	import PdfDropZone from './PdfDropZone.svelte';
 	import AttachmentDialog from './AttachmentDialog.svelte';
 	import AttachmentEditDialog from './AttachmentEditDialog.svelte';
+	import BusinessRatioPanel from './BusinessRatioPanel.svelte';
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
+	import { applyBusinessRatio, removeBusinessRatio } from '$lib/utils/business-ratio';
 	import type {
 		JournalEntry,
 		JournalLine,
@@ -446,6 +448,22 @@
 	function handleEditCancel() {
 		editingAttachment = null;
 	}
+
+	// 家事按分を適用
+	function handleApplyBusinessRatio(targetLineIndex: number, businessRatio: number) {
+		const result = applyBusinessRatio({
+			lines: journal.lines,
+			targetLineIndex,
+			businessRatio
+		});
+		onupdate({ ...journal, lines: result.lines });
+	}
+
+	// 家事按分を解除
+	function handleRemoveBusinessRatio() {
+		const restoredLines = removeBusinessRatio(journal.lines);
+		onupdate({ ...journal, lines: restoredLines });
+	}
 </script>
 
 <div
@@ -821,6 +839,14 @@
 				).toLocaleString()}円）
 			</div>
 		{/if}
+
+		<!-- 家事按分パネル -->
+		<BusinessRatioPanel
+			lines={journal.lines}
+			{accounts}
+			onapply={handleApplyBusinessRatio}
+			onremove={handleRemoveBusinessRatio}
+		/>
 	</div>
 
 	<!-- PDF添付エリア（デスクトップ: 右側、モバイル: 下部） -->

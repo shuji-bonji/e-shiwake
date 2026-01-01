@@ -72,6 +72,9 @@ export interface Account {
 	isSystem: boolean; // システム初期データか、ユーザー追加か
 	defaultTaxCategory?: TaxCategory; // デフォルト消費税区分
 	createdAt: string; // 作成日時 ISO8601
+	// 家事按分関連
+	businessRatioEnabled?: boolean; // 家事按分対象かどうか
+	defaultBusinessRatio?: number; // デフォルト事業割合（0-100）
 }
 
 /**
@@ -126,6 +129,11 @@ export interface JournalLine {
 	amount: number; // 金額（電帳法: 取引金額）
 	taxCategory?: TaxCategory; // 消費税区分
 	memo?: string; // 行メモ（按分理由など）
+	// 家事按分メタデータ（内部管理用、エクスポート時は除外）
+	_businessRatioApplied?: boolean; // 按分適用済みフラグ
+	_originalAmount?: number; // 按分前の元金額
+	_businessRatio?: number; // 適用した按分率
+	_businessRatioGenerated?: boolean; // 按分で自動生成された行（事業主貸）
 }
 
 /**

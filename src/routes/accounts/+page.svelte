@@ -13,8 +13,10 @@
 		Wallet,
 		TrendingUp,
 		CreditCard,
-		Gem
+		Gem,
+		Percent
 	} from '@lucide/svelte';
+	import * as Switch from '$lib/components/ui/switch/index.js';
 	import type { Account, AccountType } from '$lib/types';
 	import { AccountTypeLabels } from '$lib/types';
 	import {
@@ -27,6 +29,7 @@
 		isAccountInUse,
 		generateNextCode
 	} from '$lib/db';
+	import { BUSINESS_RATIO_CONFIGURABLE_ACCOUNTS } from '$lib/constants/accounts';
 
 	// 状態
 	let accounts = $state<Account[]>([]);
@@ -42,6 +45,8 @@
 	let formName = $state('');
 	let formType = $state<AccountType>('expense');
 	let formError = $state('');
+	let formBusinessRatioEnabled = $state(false);
+	let formDefaultBusinessRatio = $state(30);
 
 	// カテゴリ順序（フリーランス向け: よく使う順）
 	const typeOrder: AccountType[] = ['expense', 'asset', 'revenue', 'liability', 'equity'];
@@ -92,6 +97,8 @@
 		formName = '';
 		formType = 'expense';
 		formError = '';
+		formBusinessRatioEnabled = false;
+		formDefaultBusinessRatio = 30;
 		formCode = await generateNextCode('expense');
 		dialogOpen = true;
 	}
@@ -110,6 +117,8 @@
 		formName = account.name;
 		formType = account.type;
 		formError = '';
+		formBusinessRatioEnabled = account.businessRatioEnabled ?? false;
+		formDefaultBusinessRatio = account.defaultBusinessRatio ?? 30;
 		dialogOpen = true;
 	}
 
@@ -136,7 +145,9 @@
 				// 更新
 				await updateAccount(editingAccount.code, {
 					name: formName.trim(),
-					type: formType
+					type: formType,
+					businessRatioEnabled: formBusinessRatioEnabled,
+					defaultBusinessRatio: formBusinessRatioEnabled ? formDefaultBusinessRatio : undefined
 				});
 			} else {
 				// 新規追加
@@ -148,7 +159,9 @@
 				await addAccount({
 					code: formCode.trim(),
 					name: formName.trim(),
-					type: formType
+					type: formType,
+					businessRatioEnabled: formBusinessRatioEnabled,
+					defaultBusinessRatio: formBusinessRatioEnabled ? formDefaultBusinessRatio : undefined
 				});
 			}
 			dialogOpen = false;
@@ -207,14 +220,31 @@
 						<div class="flex flex-wrap gap-1">
 							{#each typeAccounts as account (account.code)}
 								{#if account.isSystem}
-									<div class="px-2 py-1 text-sm text-muted-foreground">
+									<div class="flex items-center gap-1 px-2 py-1 text-sm text-muted-foreground">
 										{account.name}
+										{#if BUSINESS_RATIO_CONFIGURABLE_ACCOUNTS.includes(account.code)}
+											<button
+												type="button"
+												class="rounded p-0.5 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+												onclick={() => openEditDialog(account)}
+												title="按分設定"
+											>
+												<Percent
+													class="size-3 {account.businessRatioEnabled
+														? 'text-amber-500'
+														: 'text-muted-foreground/50'}"
+												/>
+											</button>
+										{/if}
 									</div>
 								{:else}
 									<div
 										class="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-sm font-medium dark:border-slate-700 dark:bg-slate-800"
 									>
 										<span>{account.name}</span>
+										{#if account.businessRatioEnabled}
+											<Percent class="size-3 text-amber-500" />
+										{/if}
 										<button
 											type="button"
 											class="rounded p-0.5 text-muted-foreground hover:bg-slate-200 hover:text-foreground dark:hover:bg-slate-600"
@@ -247,10 +277,22 @@
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title>
-				{editingAccount ? '勘定科目を編集' : '勘定科目を追加'}
+				{#if editingAccount?.isSystem}
+					按分設定
+				{:else if editingAccount}
+					勘定科目を編集
+				{:else}
+					勘定科目を追加
+				{/if}
 			</Dialog.Title>
 			<Dialog.Description>
-				{editingAccount ? '勘定科目の情報を編集します' : '新しい勘定科目を追加します'}
+				{#if editingAccount?.isSystem}
+					「{editingAccount.name}」の家事按分設定を変更します
+				{:else if editingAccount}
+					勘定科目の情報を編集します
+				{:else}
+					新しい勘定科目を追加します
+				{/if}
 			</Dialog.Description>
 		</Dialog.Header>
 		<form
@@ -260,28 +302,65 @@
 				handleSubmit();
 			}}
 		>
-			<div class="space-y-2">
-				<Label for="type">カテゴリ</Label>
-				<Select.Root
-					type="single"
-					value={formType}
-					onValueChange={(v) => v && handleTypeChange(v as AccountType)}
-					disabled={!!editingAccount}
-				>
-					<Select.Trigger class="w-full">
-						{AccountTypeLabels[formType]}
-					</Select.Trigger>
-					<Select.Content>
-						{#each typeOrder as t (t)}
-							<Select.Item value={t}>{AccountTypeLabels[t]}</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-			</div>
-			<div class="space-y-2">
-				<Label for="name">勘定科目名</Label>
-				<Input id="name" bind:value={formName} placeholder="例: 車両費" />
-			</div>
+			{#if !editingAccount?.isSystem}
+				<div class="space-y-2">
+					<Label for="type">カテゴリ</Label>
+					<Select.Root
+						type="single"
+						value={formType}
+						onValueChange={(v) => v && handleTypeChange(v as AccountType)}
+						disabled={!!editingAccount}
+					>
+						<Select.Trigger class="w-full">
+							{AccountTypeLabels[formType]}
+						</Select.Trigger>
+						<Select.Content>
+							{#each typeOrder as t (t)}
+								<Select.Item value={t}>{AccountTypeLabels[t]}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+				<div class="space-y-2">
+					<Label for="name">勘定科目名</Label>
+					<Input id="name" bind:value={formName} placeholder="例: 車両費" />
+				</div>
+			{/if}
+
+			<!-- 家事按分設定（費用科目のみ表示） -->
+			{#if formType === 'expense'}
+				<div class="rounded-md border bg-muted/30 p-3">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-2">
+							<Percent class="size-4 text-amber-600" />
+							<Label for="businessRatioEnabled" class="text-sm font-medium">家事按分対象</Label>
+						</div>
+						<Switch.Root
+							id="businessRatioEnabled"
+							checked={formBusinessRatioEnabled}
+							onCheckedChange={(v) => (formBusinessRatioEnabled = v)}
+						/>
+					</div>
+					{#if formBusinessRatioEnabled}
+						<div class="mt-3 flex items-center gap-2">
+							<Label for="defaultBusinessRatio" class="shrink-0 text-sm">デフォルト事業割合</Label>
+							<Input
+								id="defaultBusinessRatio"
+								type="number"
+								bind:value={formDefaultBusinessRatio}
+								min={0}
+								max={100}
+								class="w-20 text-right"
+							/>
+							<span class="text-sm text-muted-foreground">%</span>
+						</div>
+						<p class="mt-1 text-xs text-muted-foreground">
+							仕訳入力時にこの割合が初期値として設定されます
+						</p>
+					{/if}
+				</div>
+			{/if}
+
 			{#if formError}
 				<p class="text-sm text-destructive">{formError}</p>
 			{/if}
@@ -290,7 +369,13 @@
 					キャンセル
 				</Button>
 				<Button type="submit">
-					{editingAccount ? '更新' : '追加'}
+					{#if editingAccount?.isSystem}
+						保存
+					{:else if editingAccount}
+						更新
+					{:else}
+						追加
+					{/if}
 				</Button>
 			</Dialog.Footer>
 		</form>

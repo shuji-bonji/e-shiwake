@@ -73,4 +73,43 @@
 			<li><strong>カスタム</strong>：ユーザーが追加した科目</li>
 		</ul>
 	</HelpSection>
+
+	<HelpSection title="家事按分設定">
+		<p>
+			費用科目に対して、家事按分の対象かどうかとデフォルトの事業割合を設定できます。
+			設定した科目を仕訳で使用すると、自動的に按分パネルが表示されます。
+		</p>
+
+		<p class="mt-4"><strong>設定方法：</strong></p>
+		<ol class="ml-4 list-decimal space-y-2">
+			<li>費用科目の「%」アイコンをクリック（システム科目・カスタム科目どちらも可）</li>
+			<li>「家事按分対象」のスイッチをオンにする</li>
+			<li>デフォルトの事業割合を入力（0〜100%）</li>
+			<li>「保存」をクリック</li>
+		</ol>
+		<HelpNote type="tip">
+			<p>システム科目でも按分設定の変更は可能です。科目名やカテゴリは変更できません。</p>
+		</HelpNote>
+
+		<p class="mt-4"><strong>按分設定が可能な科目：</strong></p>
+		<ul class="ml-4 list-disc space-y-1 text-sm">
+			<li>水道光熱費</li>
+			<li>通信費</li>
+			<li>損害保険料</li>
+			<li>修繕費</li>
+			<li>消耗品費</li>
+			<li>減価償却費</li>
+			<li>地代家賃</li>
+		</ul>
+		<p class="mt-2 text-sm text-muted-foreground">
+			※ デフォルトでは按分は設定されていません。必要に応じて有効化してください。
+		</p>
+
+		<HelpNote type="info">
+			<p>
+				科目一覧で、按分対象の科目には「%」アイコンが表示されます。
+				按分パネルの使い方は「仕訳入力」ヘルプの「家事按分」セクションを参照してください。
+			</p>
+		</HelpNote>
+	</HelpSection>
 </div>

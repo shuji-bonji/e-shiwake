@@ -72,6 +72,60 @@ class EShiwakeDatabase extends Dexie {
 						}
 					});
 			});
+
+		// Version 4: 家事按分設定
+		this.version(4)
+			.stores({
+				accounts: 'code, name, type, isSystem',
+				vendors: 'id, name',
+				journals: 'id, date, vendor, evidenceStatus',
+				attachments: 'id, journalEntryId',
+				settings: 'key'
+			})
+			.upgrade(async (tx) => {
+				// 家事按分対象の勘定科目コードと按分率
+				const businessRatioSettings: Record<string, number> = {
+					'5004': 20, // 水道光熱費
+					'5006': 50, // 通信費
+					'5012': 30, // 減価償却費
+					'5017': 30 // 地代家賃
+				};
+
+				// 既存の勘定科目に家事按分設定を追加
+				await tx
+					.table('accounts')
+					.toCollection()
+					.modify((account: Account) => {
+						if (account.code in businessRatioSettings) {
+							account.businessRatioEnabled = true;
+							account.defaultBusinessRatio = businessRatioSettings[account.code];
+						}
+					});
+			});
+
+		// Version 5: 家事按分のデフォルト値を削除（ユーザー自身が設定する方式に変更）
+		this.version(5)
+			.stores({
+				accounts: 'code, name, type, isSystem',
+				vendors: 'id, name',
+				journals: 'id, date, vendor, evidenceStatus',
+				attachments: 'id, journalEntryId',
+				settings: 'key'
+			})
+			.upgrade(async (tx) => {
+				// Version 4で設定されたデフォルト値をリセット
+				const accountsToReset = ['5004', '5006', '5012', '5017'];
+
+				await tx
+					.table('accounts')
+					.toCollection()
+					.modify((account: Account) => {
+						if (accountsToReset.includes(account.code)) {
+							account.businessRatioEnabled = undefined;
+							account.defaultBusinessRatio = undefined;
+						}
+					});
+			});
 	}
 }
 
