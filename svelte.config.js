@@ -18,16 +18,11 @@ const config = {
 		prerender: {
 			handleHttpError: 'warn', // プリレンダリング時のエラーを警告に
 			handleMissingId: 'warn',
+			handleUnseenRoutes: 'ignore', // クロールで見つからないルートは無視
+			// 動的なページはプリレンダリングしない（404.htmlフォールバックに任せる）
+			// プリレンダリングすると相対パスになり、GitHub Pages CDNキャッシュ問題が発生する
 			entries: [
 				'/',
-				'/ledger',
-				'/trial-balance',
-				'/profit-loss',
-				'/balance-sheet',
-				'/tax-summary',
-				'/accounts',
-				'/data',
-				'/export',
 				'/help',
 				'/help/getting-started',
 				'/help/journal',
