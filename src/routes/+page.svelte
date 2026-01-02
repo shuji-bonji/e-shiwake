@@ -337,8 +337,8 @@
 	<!-- ヘッダー -->
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold print-hidden">仕訳帳</h1>
-			<p class="text-sm text-muted-foreground print-hidden">{fiscalYear.selectedYear}年度</p>
+			<h1 class="print-hidden text-2xl font-bold">仕訳帳</h1>
+			<p class="print-hidden text-sm text-muted-foreground">{fiscalYear.selectedYear}年度</p>
 			<!-- 印刷用ヘッダー -->
 			<div class="print-header hidden">
 				<h1 class="text-xl font-bold">仕訳帳</h1>
@@ -372,7 +372,7 @@
 	</div>
 
 	<!-- 検索ボックス -->
-	<div class="flex items-center gap-2 print-hidden">
+	<div class="print-hidden flex items-center gap-2">
 		<div class="relative flex-1">
 			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 			<Input

@@ -12,7 +12,8 @@
 		TrendingUp,
 		Landmark,
 		Receipt,
-		FileText
+		FileText,
+		FileOutput
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -192,6 +193,30 @@
 								<a href="{base}/tax-summary" {...props}>
 									<Receipt class="size-4" />
 									<span>消費税集計</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+			</Sidebar.GroupContent>
+		</Sidebar.Group>
+
+		<Sidebar.Separator />
+
+		<!-- 出力セクション -->
+		<Sidebar.Group>
+			<Sidebar.GroupLabel>
+				<FileOutput class="size-4" />
+				出力
+			</Sidebar.GroupLabel>
+			<Sidebar.GroupContent>
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={pathname === '/reports'}>
+							{#snippet child({ props })}
+								<a href="{base}/reports" {...props}>
+									<FileText class="size-4" />
+									<span>帳簿出力</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>

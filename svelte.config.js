@@ -29,6 +29,7 @@ const config = {
 				'/balance-sheet',
 				'/profit-loss',
 				'/tax-summary',
+				'/reports',
 				'/export',
 				'/help',
 				'/help/getting-started',
