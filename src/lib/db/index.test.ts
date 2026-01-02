@@ -775,6 +775,15 @@ describe('添付ファイル', () => {
 			expect(suggestDocumentType('liability')).toBe('bill');
 			expect(suggestDocumentType(null)).toBe('bill');
 		});
+
+		it('借方が未払金系の場合は領収書を提案', () => {
+			// 未払金（2004）、未払費用（2005）、未払消費税（2006）
+			expect(suggestDocumentType('liability', '2004')).toBe('receipt');
+			expect(suggestDocumentType('liability', '2005')).toBe('receipt');
+			expect(suggestDocumentType('liability', '2006')).toBe('receipt');
+			// 他の負債は請求書（受領）
+			expect(suggestDocumentType('liability', '2001')).toBe('bill');
+		});
 	});
 });
 

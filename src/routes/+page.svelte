@@ -128,6 +128,9 @@
 
 	// 新規仕訳の追加
 	async function handleAddJournal() {
+		// 検索フィルタを解除（新規仕訳が見えるように）
+		searchQuery = '';
+
 		const emptyJournal = createEmptyJournal();
 		const newId = await addJournal(emptyJournal);
 		// 新規仕訳を取得してローカル状態に追加

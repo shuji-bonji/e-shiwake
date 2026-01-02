@@ -610,9 +610,24 @@ export function generateAttachmentName(
 }
 
 /**
- * 勘定科目タイプから書類の種類を推測
+ * 未払金系の勘定科目コード（借方にある場合は支払済み = 領収書）
  */
-export function suggestDocumentType(accountType: Account['type'] | null): DocumentType {
+const UNPAID_ACCOUNT_CODES = ['2004', '2005', '2006']; // 未払金、未払費用、未払消費税
+
+/**
+ * 勘定科目タイプから書類の種類を推測
+ * @param accountType 勘定科目タイプ
+ * @param accountCode 勘定科目コード（未払金系の判定用）
+ */
+export function suggestDocumentType(
+	accountType: Account['type'] | null,
+	accountCode?: string
+): DocumentType {
+	// 借方が未払金系の場合は領収書（支払済みの証拠）
+	if (accountCode && UNPAID_ACCOUNT_CODES.includes(accountCode)) {
+		return 'receipt';
+	}
+
 	if (!accountType) return 'bill'; // デフォルトは請求書（受領）
 
 	switch (accountType) {

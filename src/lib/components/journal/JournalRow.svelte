@@ -118,7 +118,8 @@
 			: null
 	);
 	const mainAmount = $derived(mainDebitLine?.amount ?? 0);
-	const suggestedDocType = $derived(suggestDocumentType(mainAccountType));
+	const mainAccountCode = $derived(mainDebitLine?.accountCode);
+	const suggestedDocType = $derived(suggestDocumentType(mainAccountType, mainAccountCode));
 
 	// 勘定科目のタイプを取得
 	function getAccountType(code: string): AccountType | null {
