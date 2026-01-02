@@ -762,18 +762,18 @@ describe('添付ファイル', () => {
 	});
 
 	describe('suggestDocumentType', () => {
-		it('費用系は領収書を提案', () => {
-			expect(suggestDocumentType('expense')).toBe('receipt');
+		it('費用系は請求書（受領）を提案', () => {
+			expect(suggestDocumentType('expense')).toBe('bill');
 		});
 
-		it('収益系は請求書を提案', () => {
+		it('収益系は請求書（発行）を提案', () => {
 			expect(suggestDocumentType('revenue')).toBe('invoice');
 		});
 
-		it('その他はotherを返す', () => {
-			expect(suggestDocumentType('asset')).toBe('other');
-			expect(suggestDocumentType('liability')).toBe('other');
-			expect(suggestDocumentType(null)).toBe('other');
+		it('その他は請求書（受領）を返す', () => {
+			expect(suggestDocumentType('asset')).toBe('bill');
+			expect(suggestDocumentType('liability')).toBe('bill');
+			expect(suggestDocumentType(null)).toBe('bill');
 		});
 	});
 });

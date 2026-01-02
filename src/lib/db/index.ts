@@ -613,15 +613,15 @@ export function generateAttachmentName(
  * 勘定科目タイプから書類の種類を推測
  */
 export function suggestDocumentType(accountType: Account['type'] | null): DocumentType {
-	if (!accountType) return 'other';
+	if (!accountType) return 'bill'; // デフォルトは請求書（受領）
 
 	switch (accountType) {
 		case 'expense':
-			return 'receipt'; // 費用系 → 領収書
+			return 'bill'; // 費用系 → 請求書（受領）※インボイス制度対応
 		case 'revenue':
 			return 'invoice'; // 収益系 → 請求書（発行）
 		default:
-			return 'other';
+			return 'bill'; // その他も請求書（受領）をデフォルト
 	}
 }
 
