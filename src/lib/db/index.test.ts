@@ -1272,5 +1272,161 @@ describe('インポート/エクスポート', () => {
 			const found = vendors.find((v) => v.name === '新規取引先');
 			expect(found).toBeDefined();
 		});
+
+		it('家事按分メタデータがマージモードで保持される', async () => {
+			const exportData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [
+					{
+						id: 'business-ratio-journal',
+						date: '2024-06-01',
+						lines: [
+							{
+								id: 'line-1',
+								type: 'debit' as const,
+								accountCode: '5001',
+								amount: 8000,
+								taxCategory: 'purchase_10' as const,
+								memo: '事業分80%',
+								_businessRatioApplied: true,
+								_originalAmount: 10000,
+								_businessRatio: 80,
+								_businessRatioGenerated: false
+							},
+							{
+								id: 'line-2',
+								type: 'debit' as const,
+								accountCode: '3002',
+								amount: 2000,
+								memo: '家事分20%',
+								_businessRatioApplied: true,
+								_originalAmount: 10000,
+								_businessRatio: 80,
+								_businessRatioGenerated: true
+							},
+							{
+								id: 'line-3',
+								type: 'credit' as const,
+								accountCode: '1002',
+								amount: 10000
+							}
+						],
+						vendor: 'NTTドコモ',
+						description: '携帯電話代',
+						evidenceStatus: 'none' as const,
+						attachments: [],
+						createdAt: '2024-06-01T00:00:00.000Z',
+						updatedAt: '2024-06-01T00:00:00.000Z'
+					}
+				],
+				accounts: [],
+				vendors: [],
+				settings: testSettings
+			};
+
+			const result = await importData(exportData, 'merge');
+
+			expect(result.success).toBe(true);
+			expect(result.journalsImported).toBe(1);
+
+			// 家事按分メタデータが保持されていることを確認
+			const journal = await getJournalById('business-ratio-journal');
+			expect(journal).toBeDefined();
+
+			const debitLine1 = journal?.lines.find((l) => l.id === 'line-1');
+			expect(debitLine1?._businessRatioApplied).toBe(true);
+			expect(debitLine1?._originalAmount).toBe(10000);
+			expect(debitLine1?._businessRatio).toBe(80);
+			expect(debitLine1?._businessRatioGenerated).toBe(false);
+			expect(debitLine1?.taxCategory).toBe('purchase_10');
+
+			const debitLine2 = journal?.lines.find((l) => l.id === 'line-2');
+			expect(debitLine2?._businessRatioApplied).toBe(true);
+			expect(debitLine2?._businessRatioGenerated).toBe(true);
+		});
+
+		it('家事按分メタデータが上書きモードで保持される', async () => {
+			// 既存の仕訳を追加（上書きされる）
+			await addJournal({
+				date: '2024-06-01',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5001', amount: 5000 },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 5000 }
+				],
+				vendor: '既存',
+				description: '既存仕訳',
+				evidenceStatus: 'none',
+				attachments: []
+			});
+
+			const exportData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [
+					{
+						id: 'overwrite-journal',
+						date: '2024-06-15',
+						lines: [
+							{
+								id: 'line-1',
+								type: 'debit' as const,
+								accountCode: '5005',
+								amount: 4000,
+								taxCategory: 'purchase_10' as const,
+								_businessRatioApplied: true,
+								_originalAmount: 5000,
+								_businessRatio: 80,
+								_businessRatioGenerated: false
+							},
+							{
+								id: 'line-2',
+								type: 'debit' as const,
+								accountCode: '3002',
+								amount: 1000,
+								_businessRatioApplied: true,
+								_originalAmount: 5000,
+								_businessRatio: 80,
+								_businessRatioGenerated: true
+							},
+							{
+								id: 'line-3',
+								type: 'credit' as const,
+								accountCode: '1001',
+								amount: 5000
+							}
+						],
+						vendor: 'JR',
+						description: '交通費（按分）',
+						evidenceStatus: 'none' as const,
+						attachments: [],
+						createdAt: '2024-06-15T00:00:00.000Z',
+						updatedAt: '2024-06-15T00:00:00.000Z'
+					}
+				],
+				accounts: [],
+				vendors: [],
+				settings: testSettings
+			};
+
+			const result = await importData(exportData, 'overwrite');
+
+			expect(result.success).toBe(true);
+
+			// 上書きモードでも家事按分メタデータが保持されていることを確認
+			const journal = await getJournalById('overwrite-journal');
+			expect(journal).toBeDefined();
+
+			const debitLine1 = journal?.lines.find((l) => l.id === 'line-1');
+			expect(debitLine1?._businessRatioApplied).toBe(true);
+			expect(debitLine1?._originalAmount).toBe(5000);
+			expect(debitLine1?._businessRatio).toBe(80);
+			expect(debitLine1?.taxCategory).toBe('purchase_10');
+
+			const debitLine2 = journal?.lines.find((l) => l.id === 'line-2');
+			expect(debitLine2?._businessRatioGenerated).toBe(true);
+		});
 	});
 });
