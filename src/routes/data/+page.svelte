@@ -1492,11 +1492,7 @@
 
 		<div class="space-y-4 py-4">
 			<div class="flex items-start gap-3">
-				<Checkbox
-					id="delete-confirm-check"
-					checked={deleteConfirmChecked}
-					onCheckedChange={(v) => (deleteConfirmChecked = !!v)}
-				/>
+				<Checkbox id="delete-confirm-check" bind:checked={deleteConfirmChecked} />
 				<Label for="delete-confirm-check" class="text-sm leading-relaxed">
 					エクスポート済みであることを確認しました
 				</Label>
