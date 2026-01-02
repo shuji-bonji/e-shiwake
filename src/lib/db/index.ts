@@ -1349,7 +1349,13 @@ export async function importData(
 						type: line.type,
 						accountCode: line.accountCode,
 						amount: line.amount,
-						memo: line.memo
+						taxCategory: line.taxCategory,
+						memo: line.memo,
+						// 家事按分メタデータ
+						_businessRatioApplied: line._businessRatioApplied,
+						_originalAmount: line._originalAmount,
+						_businessRatio: line._businessRatio,
+						_businessRatioGenerated: line._businessRatioGenerated
 					})),
 					vendor: journal.vendor,
 					description: journal.description,
@@ -1387,7 +1393,13 @@ export async function importData(
 						type: line.type,
 						accountCode: line.accountCode,
 						amount: line.amount,
-						memo: line.memo
+						taxCategory: line.taxCategory,
+						memo: line.memo,
+						// 家事按分メタデータ
+						_businessRatioApplied: line._businessRatioApplied,
+						_originalAmount: line._originalAmount,
+						_businessRatio: line._businessRatio,
+						_businessRatioGenerated: line._businessRatioGenerated
 					})),
 					vendor: journal.vendor,
 					description: journal.description,
