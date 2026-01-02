@@ -6,6 +6,8 @@ import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import config from './svelte.config.js';
 
 const base = config.kit?.paths?.base || '';
+// PWAのパスにはトレイリングスラッシュが必要
+const pwaBase = base ? `${base}/` : '/';
 
 export default defineConfig({
 	plugins: [
@@ -17,8 +19,8 @@ export default defineConfig({
 			strategies: 'generateSW',
 			registerType: 'prompt', // ユーザーに更新を通知
 			// GitHub Pages のベースパスを考慮
-			base: base || '/',
-			scope: base || '/',
+			base: pwaBase,
+			scope: pwaBase,
 			manifest: {
 				name: 'e-shiwake - 電子仕訳',
 				short_name: 'e-shiwake',
