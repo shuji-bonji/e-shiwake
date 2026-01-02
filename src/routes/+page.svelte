@@ -3,7 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { Plus, Search, X } from '@lucide/svelte';
+	import { Plus, Search, X, Download, Printer } from '@lucide/svelte';
 	import JournalRow from '$lib/components/journal/JournalRow.svelte';
 	import SearchHelp from '$lib/components/journal/SearchHelp.svelte';
 	import type { JournalEntry, Account, Vendor } from '$lib/types';
@@ -257,23 +257,122 @@
 	function clearSearch() {
 		searchQuery = '';
 	}
+
+	// Safari判定（SafariはChromeと異なりuser agentに"Chrome"を含まない）
+	const isSafari = $derived(
+		typeof navigator !== 'undefined' &&
+			/Safari/.test(navigator.userAgent) &&
+			!/Chrome/.test(navigator.userAgent)
+	);
+
+	// 印刷
+	function handlePrint() {
+		window.print();
+	}
+
+	// CSV エクスポート
+	function exportCSV() {
+		// 表示中の仕訳をエクスポート（検索中は検索結果、通常時は選択年度）
+		const targetJournals = filteredJournals;
+		if (targetJournals.length === 0) return;
+
+		const accountMap = new Map(accounts.map((a) => [a.code, a.name]));
+
+		const headers = [
+			'日付',
+			'摘要',
+			'取引先',
+			'借方科目',
+			'借方金額',
+			'貸方科目',
+			'貸方金額',
+			'証跡'
+		];
+
+		const rows = targetJournals.flatMap((journal) => {
+			const debitLines = journal.lines.filter((l) => l.type === 'debit');
+			const creditLines = journal.lines.filter((l) => l.type === 'credit');
+			const maxLines = Math.max(debitLines.length, creditLines.length);
+
+			return Array.from({ length: maxLines }, (_, i) => {
+				const debit = debitLines[i];
+				const credit = creditLines[i];
+				return [
+					i === 0 ? journal.date : '',
+					i === 0 ? journal.description : '',
+					i === 0 ? journal.vendor : '',
+					debit ? accountMap.get(debit.accountCode) || debit.accountCode : '',
+					debit ? debit.amount.toString() : '',
+					credit ? accountMap.get(credit.accountCode) || credit.accountCode : '',
+					credit ? credit.amount.toString() : '',
+					i === 0
+						? journal.evidenceStatus === 'digital'
+							? 'あり'
+							: journal.evidenceStatus === 'paper'
+								? '紙'
+								: 'なし'
+						: ''
+				];
+			});
+		});
+
+		const csvContent =
+			'\uFEFF' +
+			[headers.join(','), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(','))].join(
+				'\n'
+			);
+
+		const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		const suffix = isSearching ? '検索結果' : `${fiscalYear.selectedYear}`;
+		a.download = `仕訳帳_${suffix}.csv`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
 </script>
 
 <div class="space-y-4">
 	<!-- ヘッダー -->
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold">仕訳帳</h1>
-			<p class="text-sm text-muted-foreground">{fiscalYear.selectedYear}年度</p>
+			<h1 class="text-2xl font-bold print-hidden">仕訳帳</h1>
+			<p class="text-sm text-muted-foreground print-hidden">{fiscalYear.selectedYear}年度</p>
+			<!-- 印刷用ヘッダー -->
+			<div class="print-header hidden">
+				<h1 class="text-xl font-bold">仕訳帳</h1>
+				<p class="text-sm">{fiscalYear.selectedYear}年度</p>
+			</div>
 		</div>
-		<Button onclick={handleAddJournal}>
-			<Plus class="mr-2 size-4" />
-			新規仕訳
-		</Button>
+		<div class="flex items-center gap-2">
+			<Button
+				variant="outline"
+				onclick={exportCSV}
+				disabled={filteredJournals.length === 0}
+				class="print-hidden"
+			>
+				<Download class="mr-2 size-4" />
+				CSV
+			</Button>
+			<Button
+				variant="outline"
+				onclick={handlePrint}
+				disabled={filteredJournals.length === 0}
+				class="print-hidden"
+			>
+				<Printer class="mr-2 size-4" />
+				{isSafari ? '印刷' : '保存'}
+			</Button>
+			<Button onclick={handleAddJournal} class="print-hidden">
+				<Plus class="mr-2 size-4" />
+				新規仕訳
+			</Button>
+		</div>
 	</div>
 
 	<!-- 検索ボックス -->
-	<div class="flex items-center gap-2">
+	<div class="flex items-center gap-2 print-hidden">
 		<div class="relative flex-1">
 			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 			<Input
