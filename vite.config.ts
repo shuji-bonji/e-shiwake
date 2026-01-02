@@ -53,6 +53,8 @@ export default defineConfig({
 			},
 			workbox: {
 				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+				// ナビゲーションフォールバックを無効化（GitHub Pages の 404.html に任せる）
+				navigateFallback: null,
 				runtimeCaching: [
 					{
 						urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
