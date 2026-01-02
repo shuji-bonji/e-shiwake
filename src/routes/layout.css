@@ -157,6 +157,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
 	filter: invert(0.8);
 }
 
+/* 印刷専用要素（通常時は非表示） */
+.print-only {
+	display: none !important;
+}
+
 /* 印刷用スタイル */
 @media print {
 	/* 常にライトモードで印刷 */
@@ -177,6 +182,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
 	.print-hidden,
 	button:not(.print-visible) {
 		display: none !important;
+	}
+
+	/* 印刷専用要素を表示 */
+	.print-only {
+		display: block !important;
 	}
 
 	/* メインコンテンツを全幅に */
@@ -260,5 +270,35 @@ input[type='date']::-webkit-calendar-picker-indicator {
 		font-size: 10pt;
 		color: #666;
 		margin: 0.25rem 0 0;
+	}
+
+	/* 仕訳帳用: 複合仕訳の区切り線 */
+	.journal-separator td {
+		border-bottom: 2px solid #666 !important;
+	}
+
+	/* rowspan セルの縦位置 */
+	.align-top {
+		vertical-align: top !important;
+	}
+
+	/* 印刷時のテーブル幅指定 */
+	.print-table {
+		width: 100%;
+		table-layout: fixed;
+	}
+
+	.print-table th,
+	.print-table td {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	/* 印刷合計行 */
+	.print-total td {
+		background-color: #f0f0f0 !important;
+		font-weight: bold !important;
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
 	}
 }

@@ -530,6 +530,7 @@
 	}
 
 	function getPrintStyles(): string {
+		// layout.css の @media print スタイルと統一
 		return `
       <style>
         * {
@@ -541,54 +542,59 @@
           font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
           font-size: 10pt;
           line-height: 1.4;
-          color: #000;
+          color: #333;
+          background: #fff;
         }
+        /* layout.css の print-header と統一 */
         .print-header {
           text-align: center;
-          margin-bottom: 20pt;
-          padding-bottom: 10pt;
-          border-bottom: 2px solid #000;
+          margin-bottom: 1rem;
+          padding-bottom: 0.5rem;
+          border-bottom: 2px solid #333;
         }
         .print-header h1 {
           font-size: 16pt;
-          margin-bottom: 5pt;
+          margin: 0;
         }
         .print-header p {
           font-size: 10pt;
-          color: #333;
+          color: #666;
+          margin: 0.25rem 0 0;
         }
         .report-section {
           margin-bottom: 30pt;
         }
         .report-section h2 {
           font-size: 14pt;
-          margin-bottom: 5pt;
-          padding-bottom: 3pt;
-          border-bottom: 1px solid #333;
+          margin-bottom: 1rem;
         }
         .report-section h3 {
           font-size: 11pt;
           margin: 15pt 0 5pt 0;
         }
         .period {
-          font-size: 9pt;
+          font-size: 10pt;
           color: #666;
           margin-bottom: 10pt;
         }
+        /* layout.css のテーブルスタイルと統一 */
         table {
           width: 100%;
           border-collapse: collapse;
           margin-bottom: 10pt;
-          font-size: 9pt;
+          font-size: 10pt;
         }
         th, td {
-          border: 1px solid #333;
-          padding: 4pt 6pt;
+          border: 1px solid #ccc;
+          padding: 4px 8px;
           text-align: left;
         }
         th {
-          background-color: #f0f0f0;
+          background-color: #f5f5f5;
+          color: #333;
           font-weight: bold;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .amount {
           text-align: right;
@@ -597,6 +603,8 @@
         .date {
           width: 80pt;
           white-space: nowrap;
+          font-family: monospace;
+          font-size: 10pt;
         }
         .code {
           width: 50pt;
@@ -614,20 +622,29 @@
         .group-header td {
           background-color: #e8e8e8;
           font-weight: bold;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .subtotal-row td {
           background-color: #f5f5f5;
           font-weight: bold;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
+        /* layout.css の print-total と統一 */
         .total-row td {
-          background-color: #e0e0e0;
+          background-color: #f0f0f0;
           font-weight: bold;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .balance-check {
           font-size: 10pt;
           margin-bottom: 10pt;
           padding: 5pt 10pt;
           border-radius: 3pt;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .balance-check.balanced {
           background-color: #d4edda;
@@ -646,6 +663,8 @@
           border: 2px solid #333;
           font-size: 12pt;
           font-weight: bold;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .net-income.profit {
           background-color: #d4edda;
@@ -679,15 +698,25 @@
           margin-bottom: 20pt;
         }
         .ledger-account h3 {
-          background-color: #f0f0f0;
+          background-color: #f5f5f5;
           padding: 5pt 10pt;
           margin-bottom: 5pt;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .page-break-before {
           page-break-before: always;
         }
+        tr {
+          page-break-inside: avoid;
+        }
+        thead {
+          display: table-header-group;
+        }
+        /* layout.css の @page と統一 */
         @page {
-          margin: 15mm;
+          margin: 1.5cm;
+          size: A4;
         }
       </style>
     `;

@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import * as Table from '$lib/components/ui/table/index.js';
 	import { Plus, Search, X, Download, Printer } from '@lucide/svelte';
 	import JournalRow from '$lib/components/journal/JournalRow.svelte';
 	import SearchHelp from '$lib/components/journal/SearchHelp.svelte';
@@ -265,123 +266,29 @@
 			!/Chrome/.test(navigator.userAgent)
 	);
 
-	/**
-	 * 印刷用スタイルを生成
-	 */
-	function getPrintStyles(): string {
-		return `
-			<style>
-				* {
-					margin: 0;
-					padding: 0;
-					box-sizing: border-box;
-				}
-				body {
-					font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
-					font-size: 10pt;
-					line-height: 1.4;
-					color: #000;
-				}
-				.print-header {
-					text-align: center;
-					margin-bottom: 20pt;
-					padding-bottom: 10pt;
-					border-bottom: 2px solid #000;
-				}
-				.print-header h1 {
-					font-size: 16pt;
-					margin-bottom: 5pt;
-				}
-				.print-header p {
-					font-size: 10pt;
-					color: #333;
-				}
-				table {
-					width: 100%;
-					border-collapse: collapse;
-					font-size: 9pt;
-				}
-				th, td {
-					border: 1px solid #333;
-					padding: 4pt 6pt;
-					text-align: left;
-					vertical-align: top;
-				}
-				th {
-					background-color: #f0f0f0;
-					font-weight: bold;
-					white-space: nowrap;
-				}
-				.col-date {
-					width: 70pt;
-					white-space: nowrap;
-				}
-				.col-description {
-					width: 120pt;
-				}
-				.col-vendor {
-					width: 80pt;
-				}
-				.col-account {
-					width: 100pt;
-				}
-				.col-amount {
-					width: 70pt;
-					text-align: right;
-					font-family: monospace;
-				}
-				.col-evidence {
-					width: 40pt;
-					text-align: center;
-				}
-				.amount {
-					text-align: right;
-					font-family: monospace;
-				}
-				.sub-row td {
-					border-top: none;
-					padding-top: 2pt;
-				}
-				.sub-row .col-date,
-				.sub-row .col-description,
-				.sub-row .col-vendor,
-				.sub-row .col-evidence {
-					border-top: none;
-					border-bottom: none;
-				}
-				.journal-separator td {
-					border-bottom: 2px solid #666;
-				}
-				tr {
-					page-break-inside: avoid;
-				}
-				thead {
-					display: table-header-group;
-				}
-				@page {
-					margin: 15mm;
-					size: A4 landscape;
-				}
-				.summary {
-					margin-top: 15pt;
-					font-size: 9pt;
-					text-align: right;
-				}
-			</style>
-		`;
-	}
+	// 勘定科目マップ（印刷用）
+	const accountMap = $derived(new Map(accounts.map((a) => [a.code, a.name])));
 
-	/**
-	 * HTMLエスケープ
-	 */
-	function escapeHtml(text: string): string {
-		return text
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;');
-	}
+	// 印刷用の日付昇順ソート
+	const sortedJournalsForPrint = $derived(
+		[...filteredJournals].sort((a, b) => a.date.localeCompare(b.date))
+	);
+
+	// 印刷用の合計計算
+	const printTotalDebit = $derived(
+		sortedJournalsForPrint.reduce(
+			(sum, j) => sum + j.lines.filter((l) => l.type === 'debit').reduce((s, l) => s + l.amount, 0),
+			0
+		)
+	);
+
+	const printTotalCredit = $derived(
+		sortedJournalsForPrint.reduce(
+			(sum, j) =>
+				sum + j.lines.filter((l) => l.type === 'credit').reduce((s, l) => s + l.amount, 0),
+			0
+		)
+	);
 
 	/**
 	 * 証跡ステータスのラベル
@@ -397,110 +304,10 @@
 		}
 	}
 
-	/**
-	 * 印刷用HTMLを生成
-	 */
-	function generatePrintHTML(): string {
-		const accountMap = new Map(accounts.map((a) => [a.code, a.name]));
-		const targetJournals = [...filteredJournals].sort((a, b) => a.date.localeCompare(b.date));
-
-		let rows = '';
-		let totalDebit = 0;
-		let totalCredit = 0;
-
-		for (const journal of targetJournals) {
-			const debitLines = journal.lines.filter((l) => l.type === 'debit');
-			const creditLines = journal.lines.filter((l) => l.type === 'credit');
-			const maxLines = Math.max(debitLines.length, creditLines.length);
-
-			for (let i = 0; i < maxLines; i++) {
-				const debit = debitLines[i];
-				const credit = creditLines[i];
-				const isFirstLine = i === 0;
-				const isLastLine = i === maxLines - 1;
-
-				if (debit) totalDebit += debit.amount;
-				if (credit) totalCredit += credit.amount;
-
-				const rowClass = !isFirstLine ? 'sub-row' : '';
-				const lastRowClass = isLastLine ? 'journal-separator' : '';
-
-				rows += `
-					<tr class="${rowClass} ${lastRowClass}">
-						${isFirstLine ? `<td class="col-date" rowspan="${maxLines}">${journal.date}</td>` : ''}
-						${isFirstLine ? `<td class="col-description" rowspan="${maxLines}">${escapeHtml(journal.description)}</td>` : ''}
-						${isFirstLine ? `<td class="col-vendor" rowspan="${maxLines}">${escapeHtml(journal.vendor)}</td>` : ''}
-						<td class="col-account">${debit ? escapeHtml(accountMap.get(debit.accountCode) || debit.accountCode) : ''}</td>
-						<td class="col-amount">${debit ? debit.amount.toLocaleString() : ''}</td>
-						<td class="col-account">${credit ? escapeHtml(accountMap.get(credit.accountCode) || credit.accountCode) : ''}</td>
-						<td class="col-amount">${credit ? credit.amount.toLocaleString() : ''}</td>
-						${isFirstLine ? `<td class="col-evidence" rowspan="${maxLines}">${getEvidenceLabel(journal.evidenceStatus)}</td>` : ''}
-					</tr>
-				`;
-			}
-		}
-
-		const periodLabel = isSearching
-			? `検索結果: ${targetJournals.length}件`
-			: `${fiscalYear.selectedYear}年1月1日〜${fiscalYear.selectedYear}年12月31日`;
-
-		return `
-			<!DOCTYPE html>
-			<html>
-			<head>
-				<meta charset="utf-8">
-				<title>仕訳帳 - ${fiscalYear.selectedYear}年度</title>
-				${getPrintStyles()}
-			</head>
-			<body>
-				<div class="print-header">
-					<h1>仕訳帳</h1>
-					<p>${periodLabel}</p>
-				</div>
-				<table>
-					<thead>
-						<tr>
-							<th class="col-date">日付</th>
-							<th class="col-description">摘要</th>
-							<th class="col-vendor">取引先</th>
-							<th class="col-account">借方科目</th>
-							<th class="col-amount">借方金額</th>
-							<th class="col-account">貸方科目</th>
-							<th class="col-amount">貸方金額</th>
-							<th class="col-evidence">証跡</th>
-						</tr>
-					</thead>
-					<tbody>
-						${rows}
-					</tbody>
-				</table>
-				<div class="summary">
-					合計: 借方 ¥${totalDebit.toLocaleString()} / 貸方 ¥${totalCredit.toLocaleString()}
-					（${targetJournals.length}件）
-				</div>
-			</body>
-			</html>
-		`;
-	}
-
-	// 印刷
+	// 印刷（window.print() で印刷用テーブルを出力）
 	function handlePrint() {
 		if (filteredJournals.length === 0) return;
-
-		const printWindow = window.open('', '_blank');
-		if (!printWindow) {
-			alert('ポップアップがブロックされました。ポップアップを許可してください。');
-			return;
-		}
-
-		printWindow.document.write(generatePrintHTML());
-		printWindow.document.close();
-		printWindow.focus();
-
-		// 少し待ってから印刷ダイアログを開く
-		setTimeout(() => {
-			printWindow.print();
-		}, 300);
+		window.print();
 	}
 
 	// CSV エクスポート
@@ -663,11 +470,11 @@
 		</div>
 	{:else}
 		{#if isSearching}
-			<p class="text-sm text-muted-foreground">
+			<p class="print-hidden text-sm text-muted-foreground">
 				全年度から {filteredJournals.length}件の仕訳が見つかりました
 			</p>
 		{/if}
-		<div class="space-y-4">
+		<div class="print-hidden space-y-4">
 			{#each filteredJournals as journal (journal.id)}
 				<JournalRow
 					{journal}
@@ -684,6 +491,92 @@
 			{/each}
 		</div>
 	{/if}
+</div>
+
+<!-- 印刷用テーブル（画面では非表示、印刷時のみ表示） -->
+<div class="print-only">
+	<div class="print-header">
+		<h2>仕訳帳</h2>
+		<p>
+			{#if isSearching}
+				検索結果: {sortedJournalsForPrint.length}件
+			{:else}
+				{fiscalYear.selectedYear}年1月1日〜{fiscalYear.selectedYear}年12月31日
+			{/if}
+		</p>
+	</div>
+
+	<Table.Root class="print-table">
+		<Table.Header>
+			<Table.Row>
+				<Table.Head class="w-24">日付</Table.Head>
+				<Table.Head class="w-40">摘要</Table.Head>
+				<Table.Head class="w-28">取引先</Table.Head>
+				<Table.Head class="w-32">借方科目</Table.Head>
+				<Table.Head class="w-24 text-right">借方金額</Table.Head>
+				<Table.Head class="w-32">貸方科目</Table.Head>
+				<Table.Head class="w-24 text-right">貸方金額</Table.Head>
+				<Table.Head class="w-16 text-center">証跡</Table.Head>
+			</Table.Row>
+		</Table.Header>
+		<Table.Body>
+			{#each sortedJournalsForPrint as journal (journal.id)}
+				{@const debitLines = journal.lines.filter((l) => l.type === 'debit')}
+				{@const creditLines = journal.lines.filter((l) => l.type === 'credit')}
+				{@const maxLines = Math.max(debitLines.length, creditLines.length)}
+				{#each [...Array(maxLines).keys()] as i (i)}
+					{@const debit = debitLines[i]}
+					{@const credit = creditLines[i]}
+					{@const isFirstLine = i === 0}
+					{@const isLastLine = i === maxLines - 1}
+					<Table.Row class={isLastLine ? 'journal-separator' : ''}>
+						{#if isFirstLine}
+							<Table.Cell rowspan={maxLines} class="align-top font-mono text-sm">
+								{journal.date}
+							</Table.Cell>
+							<Table.Cell rowspan={maxLines} class="align-top">
+								<div class="max-w-40 truncate">{journal.description}</div>
+							</Table.Cell>
+							<Table.Cell rowspan={maxLines} class="align-top text-sm">
+								{journal.vendor}
+							</Table.Cell>
+						{/if}
+						<Table.Cell class="text-sm">
+							{debit ? accountMap.get(debit.accountCode) || debit.accountCode : ''}
+						</Table.Cell>
+						<Table.Cell class="text-right font-mono">
+							{debit ? debit.amount.toLocaleString() : ''}
+						</Table.Cell>
+						<Table.Cell class="text-sm">
+							{credit ? accountMap.get(credit.accountCode) || credit.accountCode : ''}
+						</Table.Cell>
+						<Table.Cell class="text-right font-mono">
+							{credit ? credit.amount.toLocaleString() : ''}
+						</Table.Cell>
+						{#if isFirstLine}
+							<Table.Cell rowspan={maxLines} class="text-center align-top text-sm">
+								{getEvidenceLabel(journal.evidenceStatus)}
+							</Table.Cell>
+						{/if}
+					</Table.Row>
+				{/each}
+			{/each}
+			<!-- 合計行 -->
+			<Table.Row class="print-total">
+				<Table.Cell colspan={4} class="text-right">合計</Table.Cell>
+				<Table.Cell class="text-right font-mono">
+					{printTotalDebit.toLocaleString()}
+				</Table.Cell>
+				<Table.Cell></Table.Cell>
+				<Table.Cell class="text-right font-mono">
+					{printTotalCredit.toLocaleString()}
+				</Table.Cell>
+				<Table.Cell class="text-center text-sm">
+					{sortedJournalsForPrint.length}件
+				</Table.Cell>
+			</Table.Row>
+		</Table.Body>
+	</Table.Root>
 </div>
 
 <!-- 削除確認ダイアログ -->
