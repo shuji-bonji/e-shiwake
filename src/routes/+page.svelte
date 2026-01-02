@@ -6,7 +6,7 @@
 	import { Plus, Search, X, Download, Printer } from '@lucide/svelte';
 	import JournalRow from '$lib/components/journal/JournalRow.svelte';
 	import SearchHelp from '$lib/components/journal/SearchHelp.svelte';
-	import type { JournalEntry, Account, Vendor } from '$lib/types';
+	import type { JournalEntry, Account, Vendor, EvidenceStatus } from '$lib/types';
 	import {
 		initializeDatabase,
 		getAllAccounts,
@@ -265,9 +265,242 @@
 			!/Chrome/.test(navigator.userAgent)
 	);
 
+	/**
+	 * 印刷用スタイルを生成
+	 */
+	function getPrintStyles(): string {
+		return `
+			<style>
+				* {
+					margin: 0;
+					padding: 0;
+					box-sizing: border-box;
+				}
+				body {
+					font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+					font-size: 10pt;
+					line-height: 1.4;
+					color: #000;
+				}
+				.print-header {
+					text-align: center;
+					margin-bottom: 20pt;
+					padding-bottom: 10pt;
+					border-bottom: 2px solid #000;
+				}
+				.print-header h1 {
+					font-size: 16pt;
+					margin-bottom: 5pt;
+				}
+				.print-header p {
+					font-size: 10pt;
+					color: #333;
+				}
+				table {
+					width: 100%;
+					border-collapse: collapse;
+					font-size: 9pt;
+				}
+				th, td {
+					border: 1px solid #333;
+					padding: 4pt 6pt;
+					text-align: left;
+					vertical-align: top;
+				}
+				th {
+					background-color: #f0f0f0;
+					font-weight: bold;
+					white-space: nowrap;
+				}
+				.col-date {
+					width: 70pt;
+					white-space: nowrap;
+				}
+				.col-description {
+					width: 120pt;
+				}
+				.col-vendor {
+					width: 80pt;
+				}
+				.col-account {
+					width: 100pt;
+				}
+				.col-amount {
+					width: 70pt;
+					text-align: right;
+					font-family: monospace;
+				}
+				.col-evidence {
+					width: 40pt;
+					text-align: center;
+				}
+				.amount {
+					text-align: right;
+					font-family: monospace;
+				}
+				.sub-row td {
+					border-top: none;
+					padding-top: 2pt;
+				}
+				.sub-row .col-date,
+				.sub-row .col-description,
+				.sub-row .col-vendor,
+				.sub-row .col-evidence {
+					border-top: none;
+					border-bottom: none;
+				}
+				.journal-separator td {
+					border-bottom: 2px solid #666;
+				}
+				tr {
+					page-break-inside: avoid;
+				}
+				thead {
+					display: table-header-group;
+				}
+				@page {
+					margin: 15mm;
+					size: A4 landscape;
+				}
+				.summary {
+					margin-top: 15pt;
+					font-size: 9pt;
+					text-align: right;
+				}
+			</style>
+		`;
+	}
+
+	/**
+	 * HTMLエスケープ
+	 */
+	function escapeHtml(text: string): string {
+		return text
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#039;');
+	}
+
+	/**
+	 * 証跡ステータスのラベル
+	 */
+	function getEvidenceLabel(status: EvidenceStatus): string {
+		switch (status) {
+			case 'digital':
+				return '電子';
+			case 'paper':
+				return '紙';
+			default:
+				return '-';
+		}
+	}
+
+	/**
+	 * 印刷用HTMLを生成
+	 */
+	function generatePrintHTML(): string {
+		const accountMap = new Map(accounts.map((a) => [a.code, a.name]));
+		const targetJournals = [...filteredJournals].sort((a, b) => a.date.localeCompare(b.date));
+
+		let rows = '';
+		let totalDebit = 0;
+		let totalCredit = 0;
+
+		for (const journal of targetJournals) {
+			const debitLines = journal.lines.filter((l) => l.type === 'debit');
+			const creditLines = journal.lines.filter((l) => l.type === 'credit');
+			const maxLines = Math.max(debitLines.length, creditLines.length);
+
+			for (let i = 0; i < maxLines; i++) {
+				const debit = debitLines[i];
+				const credit = creditLines[i];
+				const isFirstLine = i === 0;
+				const isLastLine = i === maxLines - 1;
+
+				if (debit) totalDebit += debit.amount;
+				if (credit) totalCredit += credit.amount;
+
+				const rowClass = !isFirstLine ? 'sub-row' : '';
+				const lastRowClass = isLastLine ? 'journal-separator' : '';
+
+				rows += `
+					<tr class="${rowClass} ${lastRowClass}">
+						${isFirstLine ? `<td class="col-date" rowspan="${maxLines}">${journal.date}</td>` : ''}
+						${isFirstLine ? `<td class="col-description" rowspan="${maxLines}">${escapeHtml(journal.description)}</td>` : ''}
+						${isFirstLine ? `<td class="col-vendor" rowspan="${maxLines}">${escapeHtml(journal.vendor)}</td>` : ''}
+						<td class="col-account">${debit ? escapeHtml(accountMap.get(debit.accountCode) || debit.accountCode) : ''}</td>
+						<td class="col-amount">${debit ? debit.amount.toLocaleString() : ''}</td>
+						<td class="col-account">${credit ? escapeHtml(accountMap.get(credit.accountCode) || credit.accountCode) : ''}</td>
+						<td class="col-amount">${credit ? credit.amount.toLocaleString() : ''}</td>
+						${isFirstLine ? `<td class="col-evidence" rowspan="${maxLines}">${getEvidenceLabel(journal.evidenceStatus)}</td>` : ''}
+					</tr>
+				`;
+			}
+		}
+
+		const periodLabel = isSearching
+			? `検索結果: ${targetJournals.length}件`
+			: `${fiscalYear.selectedYear}年1月1日〜${fiscalYear.selectedYear}年12月31日`;
+
+		return `
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<meta charset="utf-8">
+				<title>仕訳帳 - ${fiscalYear.selectedYear}年度</title>
+				${getPrintStyles()}
+			</head>
+			<body>
+				<div class="print-header">
+					<h1>仕訳帳</h1>
+					<p>${periodLabel}</p>
+				</div>
+				<table>
+					<thead>
+						<tr>
+							<th class="col-date">日付</th>
+							<th class="col-description">摘要</th>
+							<th class="col-vendor">取引先</th>
+							<th class="col-account">借方科目</th>
+							<th class="col-amount">借方金額</th>
+							<th class="col-account">貸方科目</th>
+							<th class="col-amount">貸方金額</th>
+							<th class="col-evidence">証跡</th>
+						</tr>
+					</thead>
+					<tbody>
+						${rows}
+					</tbody>
+				</table>
+				<div class="summary">
+					合計: 借方 ¥${totalDebit.toLocaleString()} / 貸方 ¥${totalCredit.toLocaleString()}
+					（${targetJournals.length}件）
+				</div>
+			</body>
+			</html>
+		`;
+	}
+
 	// 印刷
 	function handlePrint() {
-		window.print();
+		if (filteredJournals.length === 0) return;
+
+		const printWindow = window.open('', '_blank');
+		if (!printWindow) {
+			alert('ポップアップがブロックされました。ポップアップを許可してください。');
+			return;
+		}
+
+		printWindow.document.write(generatePrintHTML());
+		printWindow.document.close();
+		printWindow.focus();
+
+		// 少し待ってから印刷ダイアログを開く
+		setTimeout(() => {
+			printWindow.print();
+		}, 300);
 	}
 
 	// CSV エクスポート
@@ -337,34 +570,19 @@
 	<!-- ヘッダー -->
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="print-hidden text-2xl font-bold">仕訳帳</h1>
-			<p class="print-hidden text-sm text-muted-foreground">{fiscalYear.selectedYear}年度</p>
-			<!-- 印刷用ヘッダー -->
-			<div class="print-header hidden">
-				<h1 class="text-xl font-bold">仕訳帳</h1>
-				<p class="text-sm">{fiscalYear.selectedYear}年度</p>
-			</div>
+			<h1 class="text-2xl font-bold">仕訳帳</h1>
+			<p class="text-sm text-muted-foreground">{fiscalYear.selectedYear}年度</p>
 		</div>
 		<div class="flex items-center gap-2">
-			<Button
-				variant="outline"
-				onclick={exportCSV}
-				disabled={filteredJournals.length === 0}
-				class="print-hidden"
-			>
+			<Button variant="outline" onclick={exportCSV} disabled={filteredJournals.length === 0}>
 				<Download class="mr-2 size-4" />
 				CSV
 			</Button>
-			<Button
-				variant="outline"
-				onclick={handlePrint}
-				disabled={filteredJournals.length === 0}
-				class="print-hidden"
-			>
+			<Button variant="outline" onclick={handlePrint} disabled={filteredJournals.length === 0}>
 				<Printer class="mr-2 size-4" />
 				{isSafari ? '印刷' : '保存'}
 			</Button>
-			<Button onclick={handleAddJournal} class="print-hidden">
+			<Button onclick={handleAddJournal}>
 				<Plus class="mr-2 size-4" />
 				新規仕訳
 			</Button>
