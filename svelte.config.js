@@ -19,10 +19,17 @@ const config = {
 			handleHttpError: 'warn', // プリレンダリング時のエラーを警告に
 			handleMissingId: 'warn',
 			handleUnseenRoutes: 'ignore', // クロールで見つからないルートは無視
-			// 動的なページはプリレンダリングしない（404.htmlフォールバックに任せる）
-			// プリレンダリングすると相対パスになり、GitHub Pages CDNキャッシュ問題が発生する
+			// すべてのページをプリレンダリング（GitHub Pagesで404を回避）
 			entries: [
 				'/',
+				'/accounts',
+				'/data',
+				'/ledger',
+				'/trial-balance',
+				'/balance-sheet',
+				'/profit-loss',
+				'/tax-summary',
+				'/export',
 				'/help',
 				'/help/getting-started',
 				'/help/journal',
