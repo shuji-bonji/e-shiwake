@@ -2,8 +2,6 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as RadioGroup from '$lib/components/ui/radio-group/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
@@ -1492,10 +1490,12 @@
 
 		<div class="space-y-4 py-4">
 			<div class="flex items-start gap-3">
-				<Checkbox
+				<input
+					type="checkbox"
 					id="delete-confirm-check"
 					checked={deleteConfirmChecked}
-					onCheckedChange={(v) => (deleteConfirmChecked = !!v)}
+					onchange={(e) => (deleteConfirmChecked = e.currentTarget.checked)}
+					class="size-4 rounded border-gray-300"
 				/>
 				<Label for="delete-confirm-check" class="text-sm leading-relaxed">
 					エクスポート済みであることを確認しました
@@ -1506,12 +1506,13 @@
 				<Label for="delete-confirm-input" class="text-sm">
 					削除を確定するには「{deletingYear}」と入力：
 				</Label>
-				<Input
+				<input
+					type="text"
 					id="delete-confirm-input"
 					value={deleteConfirmInput}
 					oninput={(e) => (deleteConfirmInput = e.currentTarget.value)}
 					placeholder={String(deletingYear)}
-					class="max-w-32"
+					class="flex h-9 max-w-32 rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs outline-none"
 				/>
 			</div>
 		</div>
