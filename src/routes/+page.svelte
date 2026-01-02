@@ -154,6 +154,13 @@
 		allJournals = await getAllJournals();
 	}
 
+	// 日付が有効かチェック（YYYY-MM-DD形式で存在する日付か）
+	function isValidDate(dateStr: string): boolean {
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+		const date = new Date(dateStr);
+		return !isNaN(date.getTime()) && dateStr === date.toISOString().split('T')[0];
+	}
+
 	// 仕訳の更新
 	async function handleUpdateJournal(journal: JournalEntry) {
 		// Svelte 5のリアクティブプロキシを除去してプレーンオブジェクトに変換
@@ -166,12 +173,18 @@
 		const dateChanged = oldJournal && oldJournal.date !== plainJournal.date;
 
 		await updateJournal(plainJournal.id, plainJournal);
-		// ローカル状態も更新し、日付順にソート（編集中は上に固定）
+
+		// ローカル状態を更新
 		const updated = journals.map((j) => (j.id === journal.id ? plainJournal : j));
-		journals = sortJournals(updated, editingJournalId);
+
+		// ソート条件：
+		// - 編集中の仕訳は常に上に固定
+		// - 日付が有効な形式の場合のみソート（入力途中はソートしない）
+		const shouldSort = editingJournalId === journal.id || isValidDate(plainJournal.date);
+		journals = shouldSort ? sortJournals(updated, editingJournalId) : updated;
 
 		// 日付が変更された場合、年度リストを更新（新しい年度が追加される可能性）
-		if (dateChanged) {
+		if (dateChanged && isValidDate(plainJournal.date)) {
 			await refreshAvailableYears();
 		}
 
@@ -182,7 +195,7 @@
 		refreshAllJournals();
 
 		// 既存仕訳で日付が変わったらフラッシュ
-		if (isExisting && dateChanged) {
+		if (isExisting && dateChanged && isValidDate(plainJournal.date)) {
 			flashJournal(journal.id);
 		}
 	}
@@ -224,6 +237,9 @@
 
 	// 仕訳をコピーして新規作成
 	async function handleCopyJournal(journal: JournalEntry) {
+		// 検索フィルタを解除（コピーした仕訳が見えるように）
+		searchQuery = '';
+
 		const copiedData = copyJournalForNew(journal);
 		const newId = await addJournal(copiedData);
 		const newJournal = await getJournalById(newId);
