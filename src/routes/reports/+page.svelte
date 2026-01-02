@@ -18,6 +18,7 @@
 	import { generateProfitLoss } from '$lib/utils/profit-loss';
 	import { generateBalanceSheet } from '$lib/utils/balance-sheet';
 	import { generateConsumptionTax } from '$lib/utils/consumption-tax';
+	import { getSelectedYear } from '$lib/stores/fiscalYear.svelte';
 	import type { Account, JournalEntry } from '$lib/types';
 	import JSZip from 'jszip';
 
@@ -28,8 +29,8 @@
 	let accounts = $state<Account[]>([]);
 	let journals = $state<JournalEntry[]>([]);
 
-	const currentYear = new Date().getFullYear();
-	let selectedYear = $state(currentYear);
+	// サイドバーで選択中の年度を初期値として使用
+	let selectedYear = $state(getSelectedYear());
 	let availableYears = $state<number[]>([]);
 
 	// 出力対象の選択

@@ -47,7 +47,7 @@
 			href: `${base}/help/data-management`,
 			label: '設定・データ管理',
 			icon: Database,
-			description: '証憑保存設定・エクスポート・インポート・バックアップ'
+			description: '証憑保存・エクスポート・インポート・帳簿出力'
 		},
 		{
 			href: `${base}/help/pwa`,

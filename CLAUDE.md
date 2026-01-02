@@ -54,7 +54,8 @@ Svelte MCP server を利用可能。Svelte 5 と SvelteKit のドキュメント
 - **証憑管理**: PDF を仕訳に紐付け、自動リネームして保存
 - **PWA**: オフライン動作、インストール可能
 - **全年度横断検索**: 摘要、取引先、勘定科目、金額、日付で検索可能
-- **帳簿機能**: 総勘定元帳、試算表（CSV出力対応）
+- **帳簿機能**: 総勘定元帳、試算表、損益計算書、貸借対照表、消費税集計
+- **帳簿出力**: 複数帳簿の一括印刷、CSV ZIP出力
 
 ### ターゲットユーザー
 
@@ -289,6 +290,7 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 ├── /profit-loss            # 損益計算書
 ├── /balance-sheet          # 貸借対照表
 ├── /tax-summary            # 消費税集計
+├── /reports                # 帳簿出力（一括印刷・CSV ZIP）
 ├── /accounts               # 勘定科目管理
 ├── /data                   # データ管理（エクスポート/インポート/削除）
 ├── /export                 # エクスポート（レガシー）
@@ -782,6 +784,7 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 - [x] 損益計算書（売上総利益、営業利益、当期純利益、CSV出力、印刷/PDF）
 - [x] 貸借対照表（流動/固定資産・負債、純資産、貸借一致チェック、CSV出力、印刷/PDF）
 - [x] 消費税集計（課税売上/仕入、納付税額計算、免税・簡易課税判定、CSV出力）
+- [x] 帳簿出力（複数帳簿の一括印刷、CSV ZIP出力）
 - [ ] 青色申告決算書生成
 - [x] 完全バックアップ（ZIP: JSON + PDF）
 
@@ -794,6 +797,7 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 - `/profit-loss` - 損益計算書ページ
 - `/balance-sheet` - 貸借対照表ページ
 - `/tax-summary` - 消費税集計ページ
+- `/reports` - 帳簿出力ページ（一括印刷・CSV ZIP出力）
 
 ### Phase 4: 国際展開
 
@@ -841,12 +845,15 @@ src/
 ├── routes/
 │   ├── +layout.svelte        # サイドバーレイアウト
 │   ├── +page.svelte          # 仕訳帳（ホーム）
-│   ├── accounts/
-│   │   └── +page.svelte      # 勘定科目管理
-│   ├── settings/
-│   │   └── +page.svelte      # 設定
-│   └── data/
-│       └── +page.svelte      # データ管理（エクスポート+インポート）
+│   ├── ledger/               # 総勘定元帳
+│   ├── trial-balance/        # 試算表
+│   ├── profit-loss/          # 損益計算書
+│   ├── balance-sheet/        # 貸借対照表
+│   ├── tax-summary/          # 消費税集計
+│   ├── reports/              # 帳簿出力（一括印刷・CSV ZIP）
+│   ├── accounts/             # 勘定科目管理
+│   ├── data/                 # データ管理（エクスポート+インポート）
+│   └── help/                 # ヘルプ
 ```
 
 ### 命名規則
