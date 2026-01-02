@@ -286,6 +286,9 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 /                           # 仕訳帳（ホーム）
 ├── /ledger                 # 総勘定元帳
 ├── /trial-balance          # 試算表
+├── /profit-loss            # 損益計算書
+├── /balance-sheet          # 貸借対照表
+├── /tax-summary            # 消費税集計
 ├── /accounts               # 勘定科目管理
 ├── /data                   # データ管理（エクスポート/インポート/削除）
 ├── /export                 # エクスポート（レガシー）
@@ -774,12 +777,23 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 - `/trial-balance` - 試算表ページ（表示モード切替、貸借一致チェック、印刷/PDF）
 - `src/routes/layout.css` - 印刷用スタイル（@media print）
 
-### Phase 3: 確定申告対応
+### Phase 3: 確定申告対応 ✅ 完了
 
-- [ ] 損益計算書
-- [ ] 貸借対照表
+- [x] 損益計算書（売上総利益、営業利益、当期純利益、CSV出力、印刷/PDF）
+- [x] 貸借対照表（流動/固定資産・負債、純資産、貸借一致チェック、CSV出力、印刷/PDF）
+- [x] 消費税集計（課税売上/仕入、納付税額計算、免税・簡易課税判定、CSV出力）
 - [ ] 青色申告決算書生成
 - [x] 完全バックアップ（ZIP: JSON + PDF）
+
+**実装詳細**:
+
+- `$lib/types/index.ts` - 決算・申告関連の型定義（ProfitLossData, BalanceSheetData, ConsumptionTaxData）
+- `$lib/utils/profit-loss.ts` - 損益計算書生成ロジック
+- `$lib/utils/balance-sheet.ts` - 貸借対照表生成ロジック
+- `$lib/utils/consumption-tax.ts` - 消費税集計ロジック
+- `/profit-loss` - 損益計算書ページ
+- `/balance-sheet` - 貸借対照表ページ
+- `/tax-summary` - 消費税集計ページ
 
 ### Phase 4: 国際展開
 

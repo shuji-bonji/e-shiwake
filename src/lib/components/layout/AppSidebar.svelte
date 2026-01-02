@@ -8,7 +8,11 @@
 		Settings,
 		List,
 		AlertTriangle,
-		CircleHelp
+		CircleHelp,
+		TrendingUp,
+		Landmark,
+		Receipt,
+		FileText
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -144,6 +148,50 @@
 								<a href="{base}/trial-balance" {...props}>
 									<Scale class="size-4" />
 									<span>試算表</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+			</Sidebar.GroupContent>
+		</Sidebar.Group>
+
+		<Sidebar.Separator />
+
+		<!-- 決算・申告セクション -->
+		<Sidebar.Group>
+			<Sidebar.GroupLabel>
+				<FileText class="size-4" />
+				決算・申告
+			</Sidebar.GroupLabel>
+			<Sidebar.GroupContent>
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={pathname === '/profit-loss'}>
+							{#snippet child({ props })}
+								<a href="{base}/profit-loss" {...props}>
+									<TrendingUp class="size-4" />
+									<span>損益計算書</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={pathname === '/balance-sheet'}>
+							{#snippet child({ props })}
+								<a href="{base}/balance-sheet" {...props}>
+									<Landmark class="size-4" />
+									<span>貸借対照表</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={pathname === '/tax-summary'}>
+							{#snippet child({ props })}
+								<a href="{base}/tax-summary" {...props}>
+									<Receipt class="size-4" />
+									<span>消費税集計</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>

@@ -244,3 +244,97 @@ export interface StorageUsage {
 	quota: number; // 上限（bytes）
 	percentage: number; // 使用率（0-100）
 }
+
+// ============================================================
+// 決算・申告関連の型定義
+// ============================================================
+
+/**
+ * 損益計算書の行
+ */
+export interface ProfitLossRow {
+	accountCode: string;
+	accountName: string;
+	amount: number;
+}
+
+/**
+ * 損益計算書データ
+ */
+export interface ProfitLossData {
+	fiscalYear: number;
+	// 収益
+	salesRevenue: ProfitLossRow[]; // 売上高
+	otherRevenue: ProfitLossRow[]; // 雑収入など
+	totalRevenue: number; // 収益合計
+	// 費用
+	costOfSales: ProfitLossRow[]; // 売上原価（仕入など）
+	operatingExpenses: ProfitLossRow[]; // 販売費及び一般管理費
+	totalExpenses: number; // 費用合計
+	// 利益
+	grossProfit: number; // 売上総利益（売上 - 売上原価）
+	operatingIncome: number; // 営業利益
+	netIncome: number; // 当期純利益
+}
+
+/**
+ * 貸借対照表の行
+ */
+export interface BalanceSheetRow {
+	accountCode: string;
+	accountName: string;
+	amount: number;
+}
+
+/**
+ * 貸借対照表データ
+ */
+export interface BalanceSheetData {
+	fiscalYear: number;
+	// 資産の部
+	currentAssets: BalanceSheetRow[]; // 流動資産
+	fixedAssets: BalanceSheetRow[]; // 固定資産
+	totalAssets: number; // 資産合計
+	// 負債の部
+	currentLiabilities: BalanceSheetRow[]; // 流動負債
+	fixedLiabilities: BalanceSheetRow[]; // 固定負債
+	totalLiabilities: number; // 負債合計
+	// 純資産の部
+	equity: BalanceSheetRow[]; // 純資産
+	retainedEarnings: number; // 繰越利益（当期純利益）
+	totalEquity: number; // 純資産合計
+	// 貸借バランス
+	totalLiabilitiesAndEquity: number; // 負債・純資産合計
+}
+
+/**
+ * 消費税集計の行
+ */
+export interface ConsumptionTaxRow {
+	taxCategory: TaxCategory;
+	taxCategoryLabel: string;
+	taxableAmount: number; // 税抜金額
+	taxAmount: number; // 消費税額
+}
+
+/**
+ * 消費税集計データ
+ */
+export interface ConsumptionTaxData {
+	fiscalYear: number;
+	// 課税売上
+	salesRows: ConsumptionTaxRow[];
+	totalTaxableSales: number; // 課税売上合計（税抜）
+	totalSalesTax: number; // 売上に係る消費税額
+	// 課税仕入
+	purchaseRows: ConsumptionTaxRow[];
+	totalTaxablePurchases: number; // 課税仕入合計（税抜）
+	totalPurchaseTax: number; // 仕入に係る消費税額
+	// 納付税額
+	netTaxPayable: number; // 納付すべき消費税額（売上税額 - 仕入税額）
+	// 非課税・不課税の参考情報
+	exemptSales: number; // 非課税売上
+	outOfScopeSales: number; // 不課税売上
+	exemptPurchases: number; // 非課税仕入
+	outOfScopePurchases: number; // 不課税仕入
+}
