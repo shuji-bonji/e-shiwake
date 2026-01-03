@@ -15,7 +15,9 @@
 		FileText,
 		FileOutput,
 		Package,
-		ClipboardList
+		ClipboardList,
+		Calculator,
+		FileCheck
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -161,11 +163,11 @@
 
 		<Sidebar.Separator />
 
-		<!-- 決算・申告セクション -->
+		<!-- 決算書類セクション -->
 		<Sidebar.Group>
 			<Sidebar.GroupLabel>
-				<FileText class="size-4" />
-				決算・申告
+				<Calculator class="size-4" />
+				決算書類
 			</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
@@ -209,6 +211,20 @@
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+			</Sidebar.GroupContent>
+		</Sidebar.Group>
+
+		<Sidebar.Separator />
+
+		<!-- 確定申告セクション -->
+		<Sidebar.Group>
+			<Sidebar.GroupLabel>
+				<FileCheck class="size-4" />
+				確定申告
+			</Sidebar.GroupLabel>
+			<Sidebar.GroupContent>
+				<Sidebar.Menu>
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton isActive={pathname === '/blue-return'}>
 							{#snippet child({ props })}

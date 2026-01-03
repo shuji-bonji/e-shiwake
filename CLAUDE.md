@@ -290,6 +290,8 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 ├── /profit-loss            # 損益計算書
 ├── /balance-sheet          # 貸借対照表
 ├── /tax-summary            # 消費税集計
+├── /fixed-assets           # 固定資産台帳
+├── /blue-return            # 青色申告決算書
 ├── /reports                # 帳簿出力（一括印刷・CSV ZIP）
 ├── /accounts               # 勘定科目管理
 ├── /data                   # データ管理（エクスポート/インポート/削除）
@@ -785,7 +787,8 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 - [x] 貸借対照表（流動/固定資産・負債、純資産、貸借一致チェック、CSV出力、印刷/PDF）
 - [x] 消費税集計（課税売上/仕入、納付税額計算、免税・簡易課税判定、CSV出力）
 - [x] 帳簿出力（複数帳簿の一括印刷、CSV ZIP出力）
-- [ ] 青色申告決算書生成
+- [x] 固定資産台帳（CRUD、減価償却シミュレーション、CSV出力）
+- [x] 青色申告決算書生成（4ページプレビュー、設定ダイアログ、印刷/CSV出力）
 - [x] 完全バックアップ（ZIP: JSON + PDF）
 
 **実装詳細**:
@@ -802,6 +805,8 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 - `/balance-sheet` - 貸借対照表ページ
 - `/tax-summary` - 消費税集計ページ
 - `/reports` - 帳簿出力ページ（一括印刷・CSV ZIP出力）
+- `/fixed-assets` - 固定資産台帳ページ（CRUD、減価償却シミュレーション）
+- `/blue-return` - 青色申告決算書ページ（4ページプレビュー、設定、印刷/CSV出力）
 
 ### Phase 4: 国際展開
 
