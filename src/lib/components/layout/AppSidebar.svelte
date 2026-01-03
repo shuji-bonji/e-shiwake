@@ -13,7 +13,9 @@
 		Landmark,
 		Receipt,
 		FileText,
-		FileOutput
+		FileOutput,
+		Package,
+		ClipboardList
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -193,6 +195,26 @@
 								<a href="{base}/tax-summary" {...props}>
 									<Receipt class="size-4" />
 									<span>消費税集計</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={pathname === '/fixed-assets'}>
+							{#snippet child({ props })}
+								<a href="{base}/fixed-assets" {...props}>
+									<Package class="size-4" />
+									<span>固定資産台帳</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={pathname === '/blue-return'}>
+							{#snippet child({ props })}
+								<a href="{base}/blue-return" {...props}>
+									<ClipboardList class="size-4" />
+									<span>青色申告決算書</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
