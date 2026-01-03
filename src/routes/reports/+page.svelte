@@ -530,7 +530,6 @@
 	}
 
 	function getPrintStyles(): string {
-		// layout.css の @media print スタイルと統一
 		return `
       <style>
         * {
@@ -544,22 +543,6 @@
           line-height: 1.4;
           color: #333;
           background: #fff;
-        }
-        /* layout.css の print-header と統一 */
-        .print-header {
-          text-align: center;
-          margin-bottom: 1rem;
-          padding-bottom: 0.5rem;
-          border-bottom: 2px solid #333;
-        }
-        .print-header h1 {
-          font-size: 16pt;
-          margin: 0;
-        }
-        .print-header p {
-          font-size: 10pt;
-          color: #666;
-          margin: 0.25rem 0 0;
         }
         .report-section {
           margin-bottom: 30pt;
@@ -767,10 +750,6 @@
           ${getPrintStyles()}
         </head>
         <body>
-          <div class="print-header">
-            <h1>e-shiwake 帳簿出力</h1>
-            <p>${selectedYear}年度</p>
-          </div>
           ${content}
         </body>
         </html>
@@ -1204,7 +1183,8 @@
 					<strong>CSV一括ダウンロード:</strong> 選択した帳簿をCSVファイルとしてZIPにまとめてダウンロードします。ExcelやGoogleスプレッドシートで開けます。
 				</p>
 				<p class="pt-2 text-xs">
-					※ 各帳簿ページ（仕訳帳、試算表など）からはCSV出力のみ可能です。印刷・PDF保存はこのページから行ってください。
+					※
+					各帳簿ページ（仕訳帳、試算表など）からはCSV出力のみ可能です。印刷・PDF保存はこのページから行ってください。
 				</p>
 			</Card.Content>
 		</Card.Root>
