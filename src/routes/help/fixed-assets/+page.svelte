@@ -1,0 +1,120 @@
+<script lang="ts">
+	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
+</script>
+
+<div>
+	<h1 class="mb-6 text-2xl font-bold">固定資産台帳</h1>
+
+	<HelpSection title="固定資産台帳とは">
+		<p>
+			固定資産台帳は、事業用の固定資産（建物、車両、備品、ソフトウェアなど）を管理し、
+			減価償却費を計算するための帳簿です。青色申告決算書の3ページ目に必要な情報を管理します。
+		</p>
+		<HelpNote type="info">
+			<p>10万円以上の資産は固定資産として計上し、耐用年数に応じて減価償却を行います。</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="固定資産の登録">
+		<ol class="ml-4 list-decimal space-y-2">
+			<li>サイドバーから「固定資産台帳」を選択</li>
+			<li>「資産を追加」ボタンをクリック</li>
+			<li>必要な情報を入力して「保存」</li>
+		</ol>
+		<HelpNote type="tip">
+			<p>
+				資産区分を選択すると、一般的な耐用年数が自動で設定されます。 必要に応じて変更してください。
+			</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="登録項目">
+		<HelpTable
+			headers={['項目', '説明', '例']}
+			rows={[
+				['資産名', '固定資産の名称', 'MacBook Pro 14インチ'],
+				['資産区分', '資産の種類', '器具備品、車両運搬具など'],
+				['取得年月日', '購入または取得した日', '2024-04-01'],
+				['取得価額', '購入価格（税込）', '200,000円'],
+				['耐用年数', '法定耐用年数', '4年（パソコン）'],
+				['償却方法', '定額法または定率法', '定額法'],
+				['事業専用割合', '事業使用の割合', '100%（100%事業用）']
+			]}
+		/>
+	</HelpSection>
+
+	<HelpSection title="資産区分と耐用年数">
+		<p>主な資産区分と法定耐用年数は以下のとおりです。</p>
+		<HelpTable
+			headers={['資産区分', '耐用年数']}
+			rows={[
+				['建物（木造）', '22年'],
+				['建物（鉄骨造）', '34年'],
+				['建物附属設備', '15年'],
+				['車両運搬具', '6年'],
+				['器具備品', '4〜15年'],
+				['ソフトウェア', '3〜5年']
+			]}
+		/>
+		<HelpNote type="info">
+			<p>
+				パソコンは器具備品で4年、サーバー用は5年です。 詳細は国税庁の耐用年数表をご確認ください。
+			</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="償却方法">
+		<p>減価償却の計算方法は2種類あります。</p>
+		<HelpTable
+			headers={['方法', '特徴', '計算式']}
+			rows={[
+				['定額法', '毎年同額を償却', '取得価額 × 定額法償却率'],
+				['定率法', '初期に多く償却', '未償却残高 × 定率法償却率']
+			]}
+		/>
+		<HelpNote type="tip">
+			<p>個人事業主の場合、届出をしなければ定額法が適用されます。</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="減価償却シミュレーション">
+		<p>
+			資産を選択して「減価償却シミュレーション」ボタンをクリックすると、
+			耐用年数終了までの償却費推移を確認できます。
+		</p>
+		<ul class="mt-2 ml-4 list-disc space-y-1">
+			<li>各年度の償却費と帳簿価額を一覧表示</li>
+			<li>事業専用割合を考慮した必要経費算入額も表示</li>
+			<li>償却完了までの残り年数を確認</li>
+		</ul>
+	</HelpSection>
+
+	<HelpSection title="CSVエクスポート">
+		<p>固定資産台帳のデータをCSVファイルとしてダウンロードできます。</p>
+		<ol class="ml-4 list-decimal space-y-2">
+			<li>「CSV出力」ボタンをクリック</li>
+			<li>ファイルが自動的にダウンロードされます</li>
+		</ol>
+		<HelpNote type="info">
+			<p>
+				エクスポートには資産名、取得日、取得価額、耐用年数、本年分の償却費、
+				帳簿価額などが含まれます。
+			</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="注意事項">
+		<HelpNote type="warning">
+			<p>
+				少額減価償却資産の特例（30万円未満）や一括償却資産（20万円未満）は、
+				この台帳とは別に管理する必要があります。
+			</p>
+		</HelpNote>
+		<HelpNote type="info">
+			<p>
+				固定資産の除却・売却時は、資産を削除する前に仕訳を入力してください。
+				除却損・売却損益の計上が必要です。
+			</p>
+		</HelpNote>
+	</HelpSection>
+</div>

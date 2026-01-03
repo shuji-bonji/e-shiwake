@@ -1,0 +1,142 @@
+<script lang="ts">
+	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
+</script>
+
+<div>
+	<h1 class="mb-6 text-2xl font-bold">青色申告決算書</h1>
+
+	<HelpSection title="青色申告決算書とは">
+		<p>
+			青色申告決算書は、個人事業主が確定申告で提出する書類で、
+			1年間の事業の収支を記載します。一般用は4ページで構成されています。
+		</p>
+		<HelpNote type="info">
+			<p>
+				青色申告を行うと、最大65万円の特別控除が受けられます。
+				e-shiwakeで作成したデータを元に、決算書を作成できます。
+			</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="4ページの構成">
+		<HelpTable
+			headers={['ページ', '内容', '説明']}
+			rows={[
+				['1ページ目', '損益計算書', '売上・経費・所得金額の計算'],
+				['2ページ目', '月別売上・経費', '月別の売上・仕入金額と経費内訳'],
+				['3ページ目', '減価償却費の計算', '固定資産の減価償却明細'],
+				['4ページ目', '貸借対照表', '資産・負債・資本の状況']
+			]}
+		/>
+	</HelpSection>
+
+	<HelpSection title="基本的な使い方">
+		<ol class="ml-4 list-decimal space-y-2">
+			<li>サイドバーから「青色申告決算書」を選択</li>
+			<li>タブで各ページを切り替えて内容を確認</li>
+			<li>「設定」ボタンで事業者情報や控除額を設定</li>
+			<li>「印刷」ボタンで印刷またはPDF保存</li>
+		</ol>
+	</HelpSection>
+
+	<HelpSection title="設定項目">
+		<p>「設定」ボタンから以下の項目を設定できます。</p>
+		<HelpTable
+			headers={['項目', '説明']}
+			rows={[
+				['氏名', '申告者の氏名'],
+				['屋号', '事業の屋号（任意）'],
+				['住所', '事業所の住所'],
+				['事業の種類', '業種（例：システム開発業）'],
+				['青色申告特別控除', '65万円/55万円/10万円から選択'],
+				['期首/期末棚卸高', '商品・製品がある場合'],
+				['事業主貸/借', '事業とプライベート間の資金移動']
+			]}
+		/>
+	</HelpSection>
+
+	<HelpSection title="青色申告特別控除">
+		<p>控除額は申告方法によって異なります。</p>
+		<HelpTable
+			headers={['控除額', '条件']}
+			rows={[
+				['65万円', 'e-Tax + 複式簿記 + 貸借対照表'],
+				['55万円', '紙提出 + 複式簿記 + 貸借対照表'],
+				['10万円', '簡易簿記']
+			]}
+		/>
+		<HelpNote type="tip">
+			<p>e-shiwakeは複式簿記で記帳されるため、e-Taxで申告すれば65万円控除が適用できます。</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="1ページ目：損益計算書">
+		<p>仕訳データから自動で以下の金額が計算されます。</p>
+		<ul class="mt-2 ml-4 list-disc space-y-1">
+			<li>売上（収入）金額</li>
+			<li>売上原価（期首棚卸 + 仕入 - 期末棚卸）</li>
+			<li>経費の内訳と合計</li>
+			<li>青色申告特別控除前の所得金額</li>
+			<li>所得金額（青色申告特別控除後）</li>
+		</ul>
+	</HelpSection>
+
+	<HelpSection title="2ページ目：月別売上・経費">
+		<p>仕訳データから月別の売上・仕入金額が自動集計されます。</p>
+		<ul class="mt-2 ml-4 list-disc space-y-1">
+			<li>月別売上金額（1月〜12月）</li>
+			<li>月別仕入金額（1月〜12月）</li>
+			<li>雑収入、給料賃金、地代家賃の合計</li>
+		</ul>
+	</HelpSection>
+
+	<HelpSection title="3ページ目：減価償却費の計算">
+		<p>固定資産台帳に登録した資産の減価償却情報が表示されます。</p>
+		<HelpNote type="info">
+			<p>
+				固定資産台帳に資産を登録しておく必要があります。
+				未登録の場合は「減価償却資産がありません」と表示されます。
+			</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="4ページ目：貸借対照表">
+		<p>期末時点の資産・負債・資本の状況が表示されます。</p>
+		<ul class="mt-2 ml-4 list-disc space-y-1">
+			<li>流動資産（現金、預金、売掛金など）</li>
+			<li>固定資産（建物、車両、備品など）</li>
+			<li>流動負債（買掛金、未払金など）</li>
+			<li>固定負債（借入金など）</li>
+			<li>資本（元入金、事業主貸/借）</li>
+		</ul>
+		<HelpNote type="warning">
+			<p>
+				貸借バランスが一致しない場合は警告が表示されます。
+				仕訳の入力漏れや誤りがないか確認してください。
+			</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="印刷・CSV出力">
+		<p>作成した決算書を印刷またはCSV出力できます。</p>
+		<ul class="mt-2 ml-4 list-disc space-y-1">
+			<li>「印刷」ボタン：全4ページを印刷（PDFとして保存可能）</li>
+			<li>「CSV出力」ボタン：サマリーデータをCSVでダウンロード</li>
+		</ul>
+		<HelpNote type="tip">
+			<p>
+				印刷時は全4ページが自動的に出力されます。
+				ブラウザの印刷ダイアログで「PDFとして保存」を選択すると、PDFファイルになります。
+			</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="バリデーション">
+		<p>データに問題がある場合、画面上部に警告メッセージが表示されます。</p>
+		<ul class="mt-2 ml-4 list-disc space-y-1">
+			<li>月別売上合計と損益計算書の売上が一致しない場合</li>
+			<li>貸借対照表のバランスが一致しない場合</li>
+			<li>青色申告特別控除額が不正な場合</li>
+		</ul>
+	</HelpSection>
+</div>

@@ -9,7 +9,9 @@
 		Database,
 		Smartphone,
 		Keyboard,
-		BookA
+		BookA,
+		Package,
+		ClipboardList
 	} from '@lucide/svelte';
 
 	const sections = [
@@ -42,6 +44,18 @@
 			label: '勘定科目管理',
 			icon: FolderCog,
 			description: '勘定科目の追加・編集'
+		},
+		{
+			href: `${base}/help/fixed-assets`,
+			label: '固定資産台帳',
+			icon: Package,
+			description: '固定資産の登録と減価償却計算'
+		},
+		{
+			href: `${base}/help/blue-return`,
+			label: '青色申告決算書',
+			icon: ClipboardList,
+			description: '青色申告決算書の作成と印刷'
 		},
 		{
 			href: `${base}/help/data-management`,
