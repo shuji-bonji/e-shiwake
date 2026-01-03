@@ -301,9 +301,11 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
     ├── /journal            # 仕訳入力
     ├── /ledger             # 総勘定元帳
     ├── /trial-balance      # 試算表
-    ├── /accounts           # 勘定科目
-    ├── /evidence           # 証憑管理
     ├── /tax-category       # 消費税区分
+    ├── /evidence           # 証憑管理
+    ├── /accounts           # 勘定科目
+    ├── /fixed-assets       # 固定資産台帳
+    ├── /blue-return        # 青色申告決算書
     ├── /data-management    # データ管理
     ├── /pwa                # PWA・インストール
     ├── /shortcuts          # キーボードショートカット

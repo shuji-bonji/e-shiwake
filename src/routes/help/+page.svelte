@@ -11,7 +11,9 @@
 		Keyboard,
 		BookA,
 		Package,
-		ClipboardList
+		ClipboardList,
+		BookText,
+		Scale
 	} from '@lucide/svelte';
 
 	const sections = [
@@ -26,6 +28,18 @@
 			label: '仕訳入力',
 			icon: FileText,
 			description: '仕訳の入力・編集・削除方法'
+		},
+		{
+			href: `${base}/help/ledger`,
+			label: '総勘定元帳',
+			icon: BookText,
+			description: '勘定科目別の取引履歴と残高'
+		},
+		{
+			href: `${base}/help/trial-balance`,
+			label: '試算表',
+			icon: Scale,
+			description: '貸借一致の確認と勘定科目一覧'
 		},
 		{
 			href: `${base}/help/tax-category`,
