@@ -791,9 +791,13 @@ PWA化とUX改善を行うフェーズ。帳簿機能追加前に基盤を固め
 **実装詳細**:
 
 - `$lib/types/index.ts` - 決算・申告関連の型定義（ProfitLossData, BalanceSheetData, ConsumptionTaxData）
+- `$lib/types/blue-return-types.ts` - 青色申告決算書関連の型定義（BlueReturnData, FixedAsset, DepreciationAssetRow等）
 - `$lib/utils/profit-loss.ts` - 損益計算書生成ロジック
 - `$lib/utils/balance-sheet.ts` - 貸借対照表生成ロジック
 - `$lib/utils/consumption-tax.ts` - 消費税集計ロジック
+- `$lib/utils/monthly-summary.ts` - 月別売上・仕入集計、2ページ目データ生成
+- `$lib/utils/depreciation.ts` - 減価償却費計算、3ページ目データ生成
+- `$lib/utils/blue-return.ts` - 青色申告決算書統合生成、1・4ページ目データ生成
 - `/profit-loss` - 損益計算書ページ
 - `/balance-sheet` - 貸借対照表ページ
 - `/tax-summary` - 消費税集計ページ
@@ -841,7 +845,10 @@ src/
 │       ├── journal-search.ts        # 仕訳検索（クエリパース、フィルタリング）
 │       ├── journal-copy.ts          # 仕訳コピー
 │       ├── business-ratio.ts        # 家事按分（適用、解除、自動計算）
-│       └── clone.ts                 # ディープクローン（Blob保持）
+│       ├── clone.ts                 # ディープクローン（Blob保持）
+│       ├── monthly-summary.ts       # 月別売上・仕入集計
+│       ├── depreciation.ts          # 減価償却費計算
+│       └── blue-return.ts           # 青色申告決算書生成
 ├── routes/
 │   ├── +layout.svelte        # サイドバーレイアウト
 │   ├── +page.svelte          # 仕訳帳（ホーム）
