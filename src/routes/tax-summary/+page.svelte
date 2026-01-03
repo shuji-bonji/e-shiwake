@@ -4,7 +4,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Receipt, Download, Info } from '@lucide/svelte';
+	import { Receipt, Download, Info, ExternalLink } from '@lucide/svelte';
 	import { initializeDatabase, getJournalsByYear } from '$lib/db';
 	import {
 		generateConsumptionTax,
@@ -318,5 +318,45 @@
 				</Card.Content>
 			</Card.Root>
 		{/if}
+
+		<!-- 参考資料リンク -->
+		<div class="mt-8 rounded-lg border border-dashed p-4 print:hidden">
+			<h3 class="mb-2 text-sm font-medium text-muted-foreground">参考資料</h3>
+			<ul class="space-y-1 text-sm">
+				<li>
+					<a
+						href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/consumption-tax/overview.md"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-primary hover:underline"
+					>
+						消費税の基礎知識
+						<ExternalLink class="size-3" />
+					</a>
+				</li>
+				<li>
+					<a
+						href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/consumption-tax/calculation-methods.md"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-primary hover:underline"
+					>
+						本則課税・簡易課税・2割特例の比較
+						<ExternalLink class="size-3" />
+					</a>
+				</li>
+				<li>
+					<a
+						href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/consumption-tax/invoice-system.md"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-primary hover:underline"
+					>
+						インボイス制度
+						<ExternalLink class="size-3" />
+					</a>
+				</li>
+			</ul>
+		</div>
 	{/if}
 </div>

@@ -5,7 +5,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { Download, Settings2, Printer, AlertCircle } from '@lucide/svelte';
+	import { Download, Settings2, Printer, AlertCircle, ExternalLink } from '@lucide/svelte';
 	import type { BlueReturnData, BusinessInfo, FixedAsset } from '$lib/types/blue-return-types';
 	import type { JournalEntry, Account, ProfitLossData, BalanceSheetData } from '$lib/types';
 	import {
@@ -571,6 +571,57 @@
 					</p>
 				</div>
 			</div>
+		</div>
+
+		<!-- 参考資料リンク -->
+		<div class="mt-8 rounded-lg border border-dashed p-4 print:hidden">
+			<h3 class="mb-2 text-sm font-medium text-muted-foreground">参考資料</h3>
+			<ul class="space-y-1 text-sm">
+				<li>
+					<a
+						href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/blue-tax-return/blue-return-flow.md"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-primary hover:underline"
+					>
+						青色申告の決算フロー
+						<ExternalLink class="size-3" />
+					</a>
+				</li>
+				<li>
+					<a
+						href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/blue-tax-return/tax-return-timeline.md"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-primary hover:underline"
+					>
+						確定申告タイムライン
+						<ExternalLink class="size-3" />
+					</a>
+				</li>
+				<li>
+					<a
+						href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/blue-tax-return/closing-entries.md"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-primary hover:underline"
+					>
+						決算整理仕訳
+						<ExternalLink class="size-3" />
+					</a>
+				</li>
+				<li>
+					<a
+						href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/blue-tax-return/types-of-accounting-books.md"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex items-center gap-1 text-primary hover:underline"
+					>
+						青色申告で必要な帳簿
+						<ExternalLink class="size-3" />
+					</a>
+				</li>
+			</ul>
 		</div>
 	{/if}
 </div>

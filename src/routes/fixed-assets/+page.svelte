@@ -14,7 +14,8 @@
 		Car,
 		Laptop,
 		Wrench,
-		Package
+		Package,
+		ExternalLink
 	} from '@lucide/svelte';
 	import type {
 		FixedAsset,
@@ -413,6 +414,24 @@
 			</table>
 		</div>
 	{/if}
+
+	<!-- 参考資料リンク -->
+	<div class="mt-8 rounded-lg border border-dashed p-4 print:hidden">
+		<h3 class="mb-2 text-sm font-medium text-muted-foreground">参考資料</h3>
+		<ul class="space-y-1 text-sm">
+			<li>
+				<a
+					href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/blue-tax-return/closing-entries.md"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="inline-flex items-center gap-1 text-primary hover:underline"
+				>
+					決算整理仕訳（減価償却）
+					<ExternalLink class="size-3" />
+				</a>
+			</li>
+		</ul>
+	</div>
 </div>
 
 <!-- 追加/編集ダイアログ -->

@@ -17,7 +17,9 @@
 		Package,
 		ClipboardList,
 		Calculator,
-		FileCheck
+		FileCheck,
+		BookMarked,
+		ExternalLink
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -307,6 +309,24 @@
 						<a href="{base}/help" {...props}>
 							<CircleHelp class="size-4" />
 							<span>ヘルプ</span>
+						</a>
+					{/snippet}
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<!-- 簿記ガイド（外部リンク） -->
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton>
+					{#snippet child({ props })}
+						<a
+							href="https://github.com/shuji-bonji/Note-on-bookkeeping"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="flex items-center gap-2"
+							{...props}
+						>
+							<BookMarked class="size-4" />
+							<span>簿記ガイド</span>
+							<ExternalLink class="ml-auto size-3 opacity-50" />
 						</a>
 					{/snippet}
 				</Sidebar.MenuButton>

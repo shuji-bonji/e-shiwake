@@ -110,4 +110,40 @@
 			</p>
 		</HelpNote>
 	</HelpSection>
+
+	<HelpSection title="もっと詳しく">
+		<p>消費税の詳細な解説は外部ドキュメントを参照してください。</p>
+		<ul class="mt-2 space-y-1">
+			<li>
+				<a
+					href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/consumption-tax/journal-examples.md"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="text-primary hover:underline"
+				>
+					消費税関連の仕訳例 →
+				</a>
+			</li>
+			<li>
+				<a
+					href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/consumption-tax/overview.md"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="text-primary hover:underline"
+				>
+					消費税の基礎知識 →
+				</a>
+			</li>
+			<li>
+				<a
+					href="https://github.com/shuji-bonji/Note-on-bookkeeping/blob/main/consumption-tax/taxable-vs-exempt.md"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="text-primary hover:underline"
+				>
+					課税事業者と免税事業者 →
+				</a>
+			</li>
+		</ul>
+	</HelpSection>
 </div>
