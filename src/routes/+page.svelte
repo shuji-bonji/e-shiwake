@@ -3,11 +3,10 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import * as Table from '$lib/components/ui/table/index.js';
-	import { Plus, Search, X, Download, Printer } from '@lucide/svelte';
+	import { Plus, Search, X, Download } from '@lucide/svelte';
 	import JournalRow from '$lib/components/journal/JournalRow.svelte';
 	import SearchHelp from '$lib/components/journal/SearchHelp.svelte';
-	import type { JournalEntry, Account, Vendor, EvidenceStatus } from '$lib/types';
+	import type { JournalEntry, Account, Vendor } from '$lib/types';
 	import {
 		initializeDatabase,
 		getAllAccounts,
@@ -259,57 +258,6 @@
 		searchQuery = '';
 	}
 
-	// Safari判定（SafariはChromeと異なりuser agentに"Chrome"を含まない）
-	const isSafari = $derived(
-		typeof navigator !== 'undefined' &&
-			/Safari/.test(navigator.userAgent) &&
-			!/Chrome/.test(navigator.userAgent)
-	);
-
-	// 勘定科目マップ（印刷用）
-	const accountMap = $derived(new Map(accounts.map((a) => [a.code, a.name])));
-
-	// 印刷用の日付昇順ソート
-	const sortedJournalsForPrint = $derived(
-		[...filteredJournals].sort((a, b) => a.date.localeCompare(b.date))
-	);
-
-	// 印刷用の合計計算
-	const printTotalDebit = $derived(
-		sortedJournalsForPrint.reduce(
-			(sum, j) => sum + j.lines.filter((l) => l.type === 'debit').reduce((s, l) => s + l.amount, 0),
-			0
-		)
-	);
-
-	const printTotalCredit = $derived(
-		sortedJournalsForPrint.reduce(
-			(sum, j) =>
-				sum + j.lines.filter((l) => l.type === 'credit').reduce((s, l) => s + l.amount, 0),
-			0
-		)
-	);
-
-	/**
-	 * 証跡ステータスのラベル
-	 */
-	function getEvidenceLabel(status: EvidenceStatus): string {
-		switch (status) {
-			case 'digital':
-				return '電子';
-			case 'paper':
-				return '紙';
-			default:
-				return '-';
-		}
-	}
-
-	// 印刷（window.print() で印刷用テーブルを出力）
-	function handlePrint() {
-		if (filteredJournals.length === 0) return;
-		window.print();
-	}
-
 	// CSV エクスポート
 	function exportCSV() {
 		// 表示中の仕訳をエクスポート（検索中は検索結果、通常時は選択年度）
@@ -385,10 +333,6 @@
 				<Download class="mr-2 size-4" />
 				CSV
 			</Button>
-			<Button variant="outline" onclick={handlePrint} disabled={filteredJournals.length === 0}>
-				<Printer class="mr-2 size-4" />
-				{isSafari ? '印刷' : '保存'}
-			</Button>
 			<Button onclick={handleAddJournal}>
 				<Plus class="mr-2 size-4" />
 				新規仕訳
@@ -397,7 +341,7 @@
 	</div>
 
 	<!-- 検索ボックス -->
-	<div class="print-hidden flex items-center gap-2">
+	<div class="flex items-center gap-2">
 		<div class="relative flex-1">
 			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 			<Input
@@ -470,11 +414,11 @@
 		</div>
 	{:else}
 		{#if isSearching}
-			<p class="print-hidden text-sm text-muted-foreground">
+			<p class="text-sm text-muted-foreground">
 				全年度から {filteredJournals.length}件の仕訳が見つかりました
 			</p>
 		{/if}
-		<div class="print-hidden space-y-4">
+		<div class="space-y-4">
 			{#each filteredJournals as journal (journal.id)}
 				<JournalRow
 					{journal}
@@ -491,92 +435,6 @@
 			{/each}
 		</div>
 	{/if}
-</div>
-
-<!-- 印刷用テーブル（画面では非表示、印刷時のみ表示） -->
-<div class="print-only">
-	<div class="print-header">
-		<h2>仕訳帳</h2>
-		<p>
-			{#if isSearching}
-				検索結果: {sortedJournalsForPrint.length}件
-			{:else}
-				{fiscalYear.selectedYear}年1月1日〜{fiscalYear.selectedYear}年12月31日
-			{/if}
-		</p>
-	</div>
-
-	<Table.Root class="print-table">
-		<Table.Header>
-			<Table.Row>
-				<Table.Head class="w-24">日付</Table.Head>
-				<Table.Head class="w-40">摘要</Table.Head>
-				<Table.Head class="w-28">取引先</Table.Head>
-				<Table.Head class="w-32">借方科目</Table.Head>
-				<Table.Head class="w-24 text-right">借方金額</Table.Head>
-				<Table.Head class="w-32">貸方科目</Table.Head>
-				<Table.Head class="w-24 text-right">貸方金額</Table.Head>
-				<Table.Head class="w-16 text-center">証跡</Table.Head>
-			</Table.Row>
-		</Table.Header>
-		<Table.Body>
-			{#each sortedJournalsForPrint as journal (journal.id)}
-				{@const debitLines = journal.lines.filter((l) => l.type === 'debit')}
-				{@const creditLines = journal.lines.filter((l) => l.type === 'credit')}
-				{@const maxLines = Math.max(debitLines.length, creditLines.length)}
-				{#each [...Array(maxLines).keys()] as i (i)}
-					{@const debit = debitLines[i]}
-					{@const credit = creditLines[i]}
-					{@const isFirstLine = i === 0}
-					{@const isLastLine = i === maxLines - 1}
-					<Table.Row class={isLastLine ? 'journal-separator' : ''}>
-						{#if isFirstLine}
-							<Table.Cell rowspan={maxLines} class="align-top font-mono text-sm">
-								{journal.date}
-							</Table.Cell>
-							<Table.Cell rowspan={maxLines} class="align-top">
-								<div class="max-w-40 truncate">{journal.description}</div>
-							</Table.Cell>
-							<Table.Cell rowspan={maxLines} class="align-top text-sm">
-								{journal.vendor}
-							</Table.Cell>
-						{/if}
-						<Table.Cell class="text-sm">
-							{debit ? accountMap.get(debit.accountCode) || debit.accountCode : ''}
-						</Table.Cell>
-						<Table.Cell class="text-right font-mono">
-							{debit ? debit.amount.toLocaleString() : ''}
-						</Table.Cell>
-						<Table.Cell class="text-sm">
-							{credit ? accountMap.get(credit.accountCode) || credit.accountCode : ''}
-						</Table.Cell>
-						<Table.Cell class="text-right font-mono">
-							{credit ? credit.amount.toLocaleString() : ''}
-						</Table.Cell>
-						{#if isFirstLine}
-							<Table.Cell rowspan={maxLines} class="text-center align-top text-sm">
-								{getEvidenceLabel(journal.evidenceStatus)}
-							</Table.Cell>
-						{/if}
-					</Table.Row>
-				{/each}
-			{/each}
-			<!-- 合計行 -->
-			<Table.Row class="print-total">
-				<Table.Cell colspan={4} class="text-right">合計</Table.Cell>
-				<Table.Cell class="text-right font-mono">
-					{printTotalDebit.toLocaleString()}
-				</Table.Cell>
-				<Table.Cell></Table.Cell>
-				<Table.Cell class="text-right font-mono">
-					{printTotalCredit.toLocaleString()}
-				</Table.Cell>
-				<Table.Cell class="text-center text-sm">
-					{sortedJournalsForPrint.length}件
-				</Table.Cell>
-			</Table.Row>
-		</Table.Body>
-	</Table.Root>
 </div>
 
 <!-- 削除確認ダイアログ -->

@@ -1090,7 +1090,7 @@
 			<Card.Header>
 				<Card.Title>出力する帳簿を選択</Card.Title>
 				<Card.Description>
-					確定申告や税理士提出用に、複数の帳簿を一括で出力できます
+					各種帳簿の印刷・PDF保存はこのページから行います。確定申告や税理士提出用に、複数の帳簿を一括で出力できます。
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-4">
@@ -1198,12 +1198,13 @@
 			</Card.Header>
 			<Card.Content class="space-y-2 text-sm text-muted-foreground">
 				<p>
-					<strong>一括印刷:</strong> 選択した帳簿をまとめて印刷します。 印刷ダイアログで「PDF として保存」を選ぶと、1つの
-					PDF ファイルに全帳簿を含めることができます。
+					<strong>一括印刷:</strong> 選択した帳簿をまとめて印刷します。印刷ダイアログで「PDFとして保存」を選ぶと、1つのPDFファイルに全帳簿を含めることができます。
 				</p>
 				<p>
-					<strong>CSV一括ダウンロード:</strong> 選択した帳簿を CSV ファイルとして ZIP にまとめてダウンロードします。
-					Excel やスプレッドシートで開けます。
+					<strong>CSV一括ダウンロード:</strong> 選択した帳簿をCSVファイルとしてZIPにまとめてダウンロードします。ExcelやGoogleスプレッドシートで開けます。
+				</p>
+				<p class="pt-2 text-xs">
+					※ 各帳簿ページ（仕訳帳、試算表など）からはCSV出力のみ可能です。印刷・PDF保存はこのページから行ってください。
 				</p>
 			</Card.Content>
 		</Card.Root>

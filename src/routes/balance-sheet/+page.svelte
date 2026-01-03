@@ -4,7 +4,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Landmark, Download, Printer, Check, AlertTriangle } from '@lucide/svelte';
+	import { Landmark, Download, Check, AlertTriangle } from '@lucide/svelte';
 	import { initializeDatabase, getJournalsByYear, getAllAccounts } from '$lib/db';
 	import {
 		generateBalanceSheet,
@@ -19,13 +19,6 @@
 	let accounts = $state<Account[]>([]);
 	let journals = $state<JournalEntry[]>([]);
 	let balanceSheet = $state<BalanceSheetData | null>(null);
-
-	// Safari判定
-	const isSafari = $derived(
-		typeof navigator !== 'undefined' &&
-			/Safari/.test(navigator.userAgent) &&
-			!/Chrome/.test(navigator.userAgent)
-	);
 
 	const fiscalYear = useFiscalYear();
 
@@ -52,10 +45,6 @@
 	async function handleYearChange(year: number) {
 		setSelectedYear(year);
 		await loadData();
-	}
-
-	function handlePrint() {
-		window.print();
 	}
 
 	function exportCSV() {
@@ -100,22 +89,11 @@
 				</Select.Content>
 			</Select.Root>
 
-			<Button variant="outline" onclick={exportCSV} disabled={!balanceSheet} class="print-hidden">
+			<Button variant="outline" onclick={exportCSV} disabled={!balanceSheet}>
 				<Download class="mr-2 size-4" />
 				CSV
 			</Button>
-
-			<Button variant="outline" onclick={handlePrint} disabled={!balanceSheet} class="print-hidden">
-				<Printer class="mr-2 size-4" />
-				{isSafari ? '印刷' : '保存'}
-			</Button>
 		</div>
-	</div>
-
-	<!-- 印刷用ヘッダー -->
-	<div class="print-header hidden">
-		<h2>貸借対照表</h2>
-		<p>{fiscalYear.selectedYear}年度</p>
 	</div>
 
 	{#if isLoading}

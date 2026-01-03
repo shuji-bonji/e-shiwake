@@ -4,7 +4,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Receipt, Download, Printer, Info } from '@lucide/svelte';
+	import { Receipt, Download, Info } from '@lucide/svelte';
 	import { initializeDatabase, getJournalsByYear } from '$lib/db';
 	import {
 		generateConsumptionTax,
@@ -19,13 +19,6 @@
 	let isLoading = $state(true);
 	let journals = $state<JournalEntry[]>([]);
 	let taxData = $state<ConsumptionTaxData | null>(null);
-
-	// Safari判定
-	const isSafari = $derived(
-		typeof navigator !== 'undefined' &&
-			/Safari/.test(navigator.userAgent) &&
-			!/Chrome/.test(navigator.userAgent)
-	);
 
 	const fiscalYear = useFiscalYear();
 
@@ -43,10 +36,6 @@
 	async function handleYearChange(year: number) {
 		setSelectedYear(year);
 		await loadData();
-	}
-
-	function handlePrint() {
-		window.print();
 	}
 
 	function exportCSV() {
@@ -95,22 +84,11 @@
 				</Select.Content>
 			</Select.Root>
 
-			<Button variant="outline" onclick={exportCSV} disabled={!taxData} class="print-hidden">
+			<Button variant="outline" onclick={exportCSV} disabled={!taxData}>
 				<Download class="mr-2 size-4" />
 				CSV
 			</Button>
-
-			<Button variant="outline" onclick={handlePrint} disabled={!taxData} class="print-hidden">
-				<Printer class="mr-2 size-4" />
-				{isSafari ? '印刷' : '保存'}
-			</Button>
 		</div>
-	</div>
-
-	<!-- 印刷用ヘッダー -->
-	<div class="print-header hidden">
-		<h2>消費税集計表</h2>
-		<p>{fiscalYear.selectedYear}年度</p>
 	</div>
 
 	{#if isLoading}
