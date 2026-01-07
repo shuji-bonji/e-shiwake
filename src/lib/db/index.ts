@@ -1321,12 +1321,23 @@ export async function importData(
 			}
 		}
 
-		// 勘定科目のインポート（ユーザー追加のみ）
+		// 勘定科目のインポート
 		for (const account of data.accounts) {
-			// システム科目はスキップ
-			if (account.isSystem) continue;
-
 			const existing = await db.accounts.get(account.code);
+
+			if (account.isSystem) {
+				// システム科目の場合：設定（税区分、家事按分）のみ更新
+				if (existing) {
+					await db.accounts.update(account.code, {
+						defaultTaxCategory: account.defaultTaxCategory,
+						businessRatioEnabled: account.businessRatioEnabled,
+						defaultBusinessRatio: account.defaultBusinessRatio
+					});
+				}
+				continue;
+			}
+
+			// ユーザー追加科目のインポート
 			if (!existing) {
 				// DataCloneError回避のため、明示的にプロパティを指定
 				await db.accounts.add({
@@ -1334,6 +1345,9 @@ export async function importData(
 					name: account.name,
 					type: account.type,
 					isSystem: false,
+					defaultTaxCategory: account.defaultTaxCategory,
+					businessRatioEnabled: account.businessRatioEnabled,
+					defaultBusinessRatio: account.defaultBusinessRatio,
 					createdAt: account.createdAt
 				});
 				result.accountsImported++;
@@ -1341,7 +1355,10 @@ export async function importData(
 				// 上書きモードでも既存のユーザー科目は更新
 				await db.accounts.update(account.code, {
 					name: account.name,
-					type: account.type
+					type: account.type,
+					defaultTaxCategory: account.defaultTaxCategory,
+					businessRatioEnabled: account.businessRatioEnabled,
+					defaultBusinessRatio: account.defaultBusinessRatio
 				});
 				result.accountsImported++;
 			}

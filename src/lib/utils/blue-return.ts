@@ -20,6 +20,38 @@ import { generatePage2Details } from './monthly-summary';
 import { generatePage3Depreciation } from './depreciation';
 
 // ============================================================
+// ヘルパー関数
+// ============================================================
+
+/**
+ * 仕訳データから事業主貸/事業主借の発生額を計算
+ * - 事業主貸（3002）: 借方発生額を集計
+ * - 事業主借（3003）: 貸方発生額を集計
+ */
+export function calculateOwnerTransactions(journals: JournalEntry[]): {
+	ownerWithdrawal: number; // 事業主貸
+	ownerDeposit: number; // 事業主借
+} {
+	let ownerWithdrawal = 0;
+	let ownerDeposit = 0;
+
+	for (const journal of journals) {
+		for (const line of journal.lines) {
+			// 事業主貸（3002）の借方発生額
+			if (line.accountCode === '3002' && line.type === 'debit') {
+				ownerWithdrawal += line.amount;
+			}
+			// 事業主借（3003）の貸方発生額
+			if (line.accountCode === '3003' && line.type === 'credit') {
+				ownerDeposit += line.amount;
+			}
+		}
+	}
+
+	return { ownerWithdrawal, ownerDeposit };
+}
+
+// ============================================================
 // 1ページ目: 損益計算書データ変換
 // ============================================================
 
@@ -257,8 +289,6 @@ export function generateBlueReturnData(
 		inventoryEnd?: number;
 		specialDeduction?: number;
 		blueReturnDeduction?: BlueReturnDeductionType;
-		ownerWithdrawal?: number;
-		ownerDeposit?: number;
 		rentDetails?: RentDetailRow[];
 	}
 ): BlueReturnData {
@@ -270,10 +300,11 @@ export function generateBlueReturnData(
 		inventoryEnd = 0,
 		specialDeduction = 0,
 		blueReturnDeduction = 65,
-		ownerWithdrawal = 0,
-		ownerDeposit = 0,
 		rentDetails = []
 	} = options;
+
+	// 仕訳データから事業主貸/事業主借を自動計算
+	const { ownerWithdrawal, ownerDeposit } = calculateOwnerTransactions(journals);
 
 	// 各ページのデータを生成
 	const page1 = generatePage1(profitLoss, {

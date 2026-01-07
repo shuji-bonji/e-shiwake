@@ -47,8 +47,6 @@
 	let inventoryEnd = $state(0);
 	let specialDeduction = $state(0);
 	let blueReturnDeduction = $state<65 | 55 | 10>(65);
-	let ownerWithdrawal = $state(0);
-	let ownerDeposit = $state(0);
 
 	// データ
 	let journals = $state<JournalEntry[]>([]);
@@ -115,9 +113,7 @@
 				inventoryStart,
 				inventoryEnd,
 				specialDeduction,
-				blueReturnDeduction,
-				ownerWithdrawal,
-				ownerDeposit
+				blueReturnDeduction
 			}
 		);
 
@@ -699,21 +695,6 @@
 					<div class="space-y-2">
 						<Label for="inventoryEnd">期末棚卸高</Label>
 						<Input id="inventoryEnd" type="number" bind:value={inventoryEnd} />
-					</div>
-				</div>
-			</div>
-
-			<!-- 事業主勘定 -->
-			<div class="space-y-4">
-				<h3 class="font-medium">事業主勘定（年間累計）</h3>
-				<div class="grid grid-cols-2 gap-4 pl-2">
-					<div class="space-y-2">
-						<Label for="ownerWithdrawal">事業主貸</Label>
-						<Input id="ownerWithdrawal" type="number" bind:value={ownerWithdrawal} />
-					</div>
-					<div class="space-y-2">
-						<Label for="ownerDeposit">事業主借</Label>
-						<Input id="ownerDeposit" type="number" bind:value={ownerDeposit} />
 					</div>
 				</div>
 			</div>
