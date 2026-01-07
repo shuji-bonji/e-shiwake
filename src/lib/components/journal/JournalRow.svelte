@@ -110,6 +110,14 @@
 	let pdfDropZoneRef: { focus: () => void } | undefined = $state();
 	let dateInputRef = $state<HTMLInputElement>(null!);
 
+	// 日付のローカル状態（blurタイミングでのみ親に伝播）
+	// propsから同期しつつローカル編集も可能にするため、$state + $effect を使用
+	// eslint-disable-next-line svelte/prefer-writable-derived
+	let localDate = $state(journal.date);
+	$effect(() => {
+		localDate = journal.date;
+	});
+
 	// ダイアログ用の派生値
 	const mainDebitLine = $derived(journal.lines.find((l) => l.type === 'debit' && l.accountCode));
 	const mainAccountType = $derived(
@@ -230,6 +238,15 @@
 	// フィールド更新（即時、証憑同期なし）
 	function updateField<K extends keyof JournalEntry>(field: K, value: JournalEntry[K]) {
 		onupdate({ ...journal, [field]: value });
+	}
+
+	// 日付のblurハンドラ（日付が変更された場合のみ親に伝播）
+	async function handleDateBlur() {
+		if (localDate !== journal.date) {
+			updateField('date', localDate);
+		}
+		// 証憑同期
+		await syncAttachmentsOnBlur();
 	}
 
 	// 取引先保存と証憑同期（blurタイミング）
@@ -549,13 +566,13 @@
 					</Tooltip.Root>
 				</Tooltip.Provider>
 
-				<!-- 日付 -->
+				<!-- 日付（blurタイミングでのみ保存、入力中の自動ソートを防止） -->
 				<Input
 					bind:ref={dateInputRef}
 					type="date"
-					value={journal.date}
-					onchange={(e) => updateField('date', e.currentTarget.value)}
-					onblur={syncAttachmentsOnBlur}
+					value={localDate}
+					oninput={(e) => (localDate = e.currentTarget.value)}
+					onblur={handleDateBlur}
 					class="w-32 shrink-0"
 				/>
 
