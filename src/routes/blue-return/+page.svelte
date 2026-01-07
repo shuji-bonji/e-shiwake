@@ -77,7 +77,13 @@
 
 			if (journals.length > 0 && accounts.length > 0) {
 				profitLoss = generateProfitLoss(journals, accounts, fiscalYear.selectedYear);
-				balanceSheet = generateBalanceSheet(journals, accounts, fiscalYear.selectedYear);
+				// 貸借対照表に当期純利益を渡す
+				balanceSheet = generateBalanceSheet(
+					journals,
+					accounts,
+					fiscalYear.selectedYear,
+					profitLoss.netIncome
+				);
 				generateBlueReturn();
 			} else {
 				blueReturnData = null;
