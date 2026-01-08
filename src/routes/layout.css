@@ -156,3 +156,38 @@ input[type='date']::-webkit-calendar-picker-indicator {
 .dark input[type='date']::-webkit-calendar-picker-indicator {
 	filter: invert(0.8);
 }
+
+/* 印刷用スタイル: サイドバーとヘッダーを非表示 */
+@media print {
+	/* サイドバーを非表示 */
+	[data-sidebar='sidebar'],
+	[data-sidebar='rail'] {
+		display: none !important;
+	}
+
+	/* ヘッダーを非表示 */
+	header {
+		display: none !important;
+	}
+
+	/* メインコンテンツを全幅に */
+	[data-slot='sidebar-inset'],
+	main {
+		margin-left: 0 !important;
+		padding-left: 0 !important;
+		width: 100% !important;
+		max-width: 100% !important;
+	}
+
+	/* Sidebar.Providerのラッパーをリセット */
+	.group\/sidebar-wrapper {
+		display: block !important;
+		min-height: auto !important;
+	}
+
+	/* ページ設定 */
+	@page {
+		margin: 1.5cm;
+		size: A4;
+	}
+}
