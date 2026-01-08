@@ -234,6 +234,13 @@ export interface Page3Depreciation {
 
 /**
  * 4ページ目: 貸借対照表
+ *
+ * 国税庁の青色申告決算書様式に準拠:
+ * - 事業主貸は「資産の部」の最後に配置
+ * - 事業主借は「負債・資本の部」に配置
+ *
+ * 貸借の等式:
+ * 資産 + 事業主貸 = 負債 + 事業主借 + 元入金 + 青色申告特別控除前の所得金額
  */
 export interface Page4BalanceSheet {
 	fiscalYear: number;
@@ -241,8 +248,9 @@ export interface Page4BalanceSheet {
 	assets: {
 		current: BalanceSheetDetailRow[]; // 流動資産
 		fixed: BalanceSheetDetailRow[]; // 固定資産
+		ownerWithdrawal: number; // 事業主貸（資産の部に配置）
 		totalBeginning: number; // 資産合計（期首）
-		totalEnding: number; // 資産合計（期末）
+		totalEnding: number; // 資産合計（期末）※事業主貸を含む
 	};
 	// 負債の部
 	liabilities: {
@@ -253,11 +261,10 @@ export interface Page4BalanceSheet {
 	};
 	// 資本（元入金）
 	equity: {
-		capital: number; // 元入金（期首）
-		netIncome: number; // 青色申告特別控除前の所得
-		ownerWithdrawal: number; // 事業主貸
 		ownerDeposit: number; // 事業主借
+		capital: number; // 元入金（期首）
 		capitalEnding: number; // 元入金（期末）
+		netIncome: number; // 青色申告特別控除前の所得
 	};
 	// 貸借バランス
 	isBalanced: boolean;

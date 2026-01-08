@@ -152,12 +152,24 @@ describe('blue-return', () => {
 			expect(result.liabilities.current).toHaveLength(1);
 		});
 
-		it('資産合計を正しく計算する', () => {
+		it('資産合計を正しく計算する（事業主貸なしの場合）', () => {
 			const result = generatePage4(mockBalanceSheet, null);
 
 			// 流動資産: 100,000 + 3,000,000 = 3,100,000
 			// 固定資産: 500,000
+			// 事業主貸: 0
 			expect(result.assets.totalEnding).toBe(3600000);
+		});
+
+		it('資産合計に事業主貸が含まれること', () => {
+			const result = generatePage4(mockBalanceSheet, null, {
+				ownerWithdrawal: 500000,
+				ownerDeposit: 0
+			});
+
+			// 流動資産: 3,100,000 + 固定資産: 500,000 + 事業主貸: 500,000 = 4,100,000
+			expect(result.assets.ownerWithdrawal).toBe(500000);
+			expect(result.assets.totalEnding).toBe(4100000);
 		});
 
 		it('期首残高を正しく設定する', () => {
@@ -176,14 +188,56 @@ describe('blue-return', () => {
 			expect(deposit?.endingBalance).toBe(3000000);
 		});
 
-		it('事業主勘定を正しく反映する', () => {
+		it('事業主勘定を正しく反映する（事業主貸は資産、事業主借は資本）', () => {
 			const result = generatePage4(mockBalanceSheet, null, {
 				ownerWithdrawal: 500000,
 				ownerDeposit: 100000
 			});
 
-			expect(result.equity.ownerWithdrawal).toBe(500000);
+			// 事業主貸は資産の部に配置
+			expect(result.assets.ownerWithdrawal).toBe(500000);
+			// 事業主借は資本の部に配置
 			expect(result.equity.ownerDeposit).toBe(100000);
+		});
+
+		it('貸借バランスの計算式が正しいこと（国税庁様式）', () => {
+			// 資産 + 事業主貸 = 負債 + 事業主借 + 元入金 + 所得
+			// バランスするデータを作成
+			const balancedBS: BalanceSheetData = {
+				fiscalYear: 2025,
+				currentAssets: [{ accountCode: '1003', accountName: '普通預金', amount: 1000000 }],
+				fixedAssets: [],
+				currentLiabilities: [{ accountCode: '2003', accountName: '未払金', amount: 100000 }],
+				fixedLiabilities: [],
+				equity: [],
+				totalAssets: 1000000,
+				totalLiabilities: 100000,
+				totalEquity: 0,
+				retainedEarnings: 500000, // 所得
+				totalLiabilitiesAndEquity: 1000000
+			};
+
+			// 事業主貸: 600000, 事業主借: 200000
+			// 左辺: 1000000 + 600000 = 1600000
+			// 右辺: 100000 + 200000 + 0 + 500000 = 800000 → バランスしない
+
+			// バランスするように: ownerDeposit = 1000000
+			// 左辺: 1000000 + 600000 = 1600000
+			// 右辺: 100000 + 1000000 + 0 + 500000 = 1600000 → バランス！
+			const result = generatePage4(balancedBS, null, {
+				ownerWithdrawal: 600000,
+				ownerDeposit: 1000000
+			});
+
+			const leftSide = result.assets.totalEnding;
+			const rightSide =
+				result.liabilities.totalEnding +
+				result.equity.ownerDeposit +
+				result.equity.capitalEnding +
+				result.equity.netIncome;
+
+			expect(result.isBalanced).toBe(true);
+			expect(Math.abs(leftSide - rightSide)).toBeLessThan(100);
 		});
 	});
 

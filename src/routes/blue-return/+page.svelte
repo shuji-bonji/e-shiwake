@@ -474,6 +474,17 @@
 							</div>
 						{/if}
 
+						<!-- 事業主貸（資産の部の最後に表示） -->
+						<div class="space-y-1">
+							<div class="grid grid-cols-3 gap-2 px-3 text-sm">
+								<div>事業主貸</div>
+								<div class="text-right font-mono text-muted-foreground">0</div>
+								<div class="text-right font-mono">
+									{formatAmount(blueReturnData.page4.assets.ownerWithdrawal)}
+								</div>
+							</div>
+						</div>
+
 						<div class="grid grid-cols-3 gap-2 border-t px-3 pt-2">
 							<div class="font-medium">資産合計</div>
 							<div class="text-right font-mono text-muted-foreground">
@@ -506,6 +517,15 @@
 
 						<div class="space-y-1">
 							<p class="px-3 text-sm text-muted-foreground">資本</p>
+							<!-- 事業主借 -->
+							<div class="grid grid-cols-3 gap-2 px-3 text-sm">
+								<div>事業主借</div>
+								<div class="text-right font-mono text-muted-foreground">0</div>
+								<div class="text-right font-mono">
+									{formatAmount(blueReturnData.page4.equity.ownerDeposit)}
+								</div>
+							</div>
+							<!-- 元入金 -->
 							<div class="grid grid-cols-3 gap-2 px-3 text-sm">
 								<div>元入金</div>
 								<div class="text-right font-mono text-muted-foreground">
@@ -515,25 +535,12 @@
 									{formatAmount(blueReturnData.page4.equity.capitalEnding)}
 								</div>
 							</div>
+							<!-- 青色申告特別控除前の所得金額 -->
 							<div class="grid grid-cols-3 gap-2 px-3 text-sm">
 								<div>青色申告特別控除前の所得金額</div>
 								<div></div>
 								<div class="text-right font-mono">
 									{formatAmount(blueReturnData.page4.equity.netIncome)}
-								</div>
-							</div>
-							<div class="grid grid-cols-3 gap-2 px-3 text-sm">
-								<div>事業主貸</div>
-								<div></div>
-								<div class="text-right font-mono">
-									{formatAmount(blueReturnData.page4.equity.ownerWithdrawal)}
-								</div>
-							</div>
-							<div class="grid grid-cols-3 gap-2 px-3 text-sm">
-								<div>事業主借</div>
-								<div></div>
-								<div class="text-right font-mono">
-									{formatAmount(blueReturnData.page4.equity.ownerDeposit)}
 								</div>
 							</div>
 						</div>
@@ -549,7 +556,9 @@
 							<div class="text-right font-mono font-medium">
 								{formatAmount(
 									blueReturnData.page4.liabilities.totalEnding +
-										blueReturnData.page4.equity.capitalEnding
+										blueReturnData.page4.equity.ownerDeposit +
+										blueReturnData.page4.equity.capitalEnding +
+										blueReturnData.page4.equity.netIncome
 								)}
 							</div>
 						</div>

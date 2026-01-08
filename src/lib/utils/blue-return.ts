@@ -139,6 +139,13 @@ export function generatePage1(
 
 /**
  * 既存のBalanceSheetDataから4ページ目データを生成
+ *
+ * 国税庁の青色申告決算書様式に準拠:
+ * - 事業主貸は「資産の部」の最後に配置
+ * - 事業主借は「負債・資本の部」に配置
+ *
+ * 貸借の等式:
+ * 資産 + 事業主貸 = 負債 + 事業主借 + 元入金 + 青色申告特別控除前の所得金額
  */
 export function generatePage4(
 	balanceSheet: BalanceSheetData,
@@ -218,14 +225,19 @@ export function generatePage4(
 		balanceSheet.fixedLiabilities
 	);
 
-	// 合計計算
-	const assetsTotalBeginning =
+	// 資産合計（事業主貸を除く）
+	const assetsWithoutOwnerBeginning =
 		currentAssets.reduce((sum, a) => sum + a.beginningBalance, 0) +
 		fixedAssets.reduce((sum, a) => sum + a.beginningBalance, 0);
-	const assetsTotalEnding =
+	const assetsWithoutOwnerEnding =
 		currentAssets.reduce((sum, a) => sum + a.endingBalance, 0) +
 		fixedAssets.reduce((sum, a) => sum + a.endingBalance, 0);
 
+	// 資産合計（事業主貸を含む）
+	const assetsTotalBeginning = assetsWithoutOwnerBeginning; // 期首の事業主貸は0と仮定
+	const assetsTotalEnding = assetsWithoutOwnerEnding + ownerWithdrawal;
+
+	// 負債合計
 	const liabilitiesTotalBeginning =
 		currentLiabilities.reduce((sum, a) => sum + a.beginningBalance, 0) +
 		fixedLiabilities.reduce((sum, a) => sum + a.beginningBalance, 0);
@@ -237,17 +249,24 @@ export function generatePage4(
 	const capitalBeginning = beginningBalanceSheet?.totalEquity ?? 0;
 	const netIncome = balanceSheet.retainedEarnings;
 
-	// 期末元入金 = 期首元入金 + 所得 + 事業主借 - 事業主貸
-	const capitalEnding = capitalBeginning + netIncome + ownerDeposit - ownerWithdrawal;
+	// 期末元入金の計算
+	// 翌年の期首元入金 = 期首元入金 + 所得 + 事業主借 - 事業主貸
+	// ただし青色申告決算書の貸借対照表では元入金は変動しないのが一般的
+	const capitalEnding = capitalBeginning;
 
 	// 貸借バランス確認
-	const isBalanced = assetsTotalEnding === liabilitiesTotalEnding + capitalEnding;
+	// 左辺: 資産 + 事業主貸
+	// 右辺: 負債 + 事業主借 + 元入金 + 所得
+	const leftSide = assetsTotalEnding;
+	const rightSide = liabilitiesTotalEnding + ownerDeposit + capitalEnding + netIncome;
+	const isBalanced = Math.abs(leftSide - rightSide) < 100; // 端数誤差を許容
 
 	return {
 		fiscalYear: balanceSheet.fiscalYear,
 		assets: {
 			current: currentAssets,
 			fixed: fixedAssets,
+			ownerWithdrawal,
 			totalBeginning: assetsTotalBeginning,
 			totalEnding: assetsTotalEnding
 		},
@@ -258,11 +277,10 @@ export function generatePage4(
 			totalEnding: liabilitiesTotalEnding
 		},
 		equity: {
-			capital: capitalBeginning,
-			netIncome,
-			ownerWithdrawal,
 			ownerDeposit,
-			capitalEnding
+			capital: capitalBeginning,
+			capitalEnding,
+			netIncome
 		},
 		isBalanced
 	};
@@ -389,12 +407,20 @@ export function blueReturnSummaryToCsv(data: BlueReturnData): string {
 
 	// 4ページ目: 貸借対照表サマリー
 	lines.push('【4ページ目: 貸借対照表】');
+	lines.push('');
+	lines.push('資産の部');
 	lines.push(`資産合計（期首）,${data.page4.assets.totalBeginning}`);
+	lines.push(`事業主貸,${data.page4.assets.ownerWithdrawal}`);
 	lines.push(`資産合計（期末）,${data.page4.assets.totalEnding}`);
+	lines.push('');
+	lines.push('負債・資本の部');
 	lines.push(`負債合計（期首）,${data.page4.liabilities.totalBeginning}`);
 	lines.push(`負債合計（期末）,${data.page4.liabilities.totalEnding}`);
+	lines.push(`事業主借,${data.page4.equity.ownerDeposit}`);
 	lines.push(`元入金（期首）,${data.page4.equity.capital}`);
 	lines.push(`元入金（期末）,${data.page4.equity.capitalEnding}`);
+	lines.push(`青色申告特別控除前の所得金額,${data.page4.equity.netIncome}`);
+	lines.push('');
 	lines.push(`貸借バランス,${data.page4.isBalanced ? '一致' : '不一致'}`);
 
 	return lines.join('\n');
