@@ -18,7 +18,8 @@
 		Database,
 		Smartphone,
 		Keyboard,
-		BookA
+		BookA,
+		FileCode2
 	} from '@lucide/svelte';
 	import { cn } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
@@ -28,6 +29,16 @@
 	}
 
 	let { children }: Props = $props();
+
+	const currentPath = $derived($page.url.pathname);
+
+	// llms.txt リンクを表示するページかどうか（/help 以外の個別ページ）
+	const hasLlmsTxt = $derived(
+		currentPath !== `${base}/help` && currentPath.startsWith(`${base}/help/`)
+	);
+
+	// 現在のページの llms.txt URL（末尾スラッシュを除去）
+	const llmsTxtUrl = $derived(`${currentPath.replace(/\/$/, '')}/llms.txt`);
 
 	const navItems = [
 		{ href: `${base}/help/getting-started`, label: 'はじめに', icon: BookOpen },
@@ -44,8 +55,6 @@
 		{ href: `${base}/help/shortcuts`, label: 'ショートカット', icon: Keyboard },
 		{ href: `${base}/help/glossary`, label: '用語集', icon: BookA }
 	];
-
-	const currentPath = $derived($page.url.pathname);
 </script>
 
 <div class="flex h-screen flex-col">
@@ -97,6 +106,18 @@
 			<!-- コンテンツ -->
 			<main class="flex-1 overflow-y-auto">
 				<div class="mx-auto max-w-3xl px-6 py-8">
+					{#if hasLlmsTxt}
+						<div class="mb-4 flex justify-end">
+							<a
+								href={llmsTxtUrl}
+								class="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+								title="LLM用プレーンテキスト版"
+							>
+								<FileCode2 class="size-3.5" />
+								llms.txt
+							</a>
+						</div>
+					{/if}
 					{@render children()}
 				</div>
 			</main>

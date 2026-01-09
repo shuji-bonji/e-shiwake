@@ -889,3 +889,80 @@ src/
 - **サーバーサイドなし**: SvelteKit の SSR は使わない、SPA モード
 - **iPad 対応**: File System Access API が使えないため、IndexedDB + エクスポートで対応
 - **PWA**: Service Worker でオフライン動作必須
+
+## ヘルプページ・llms.txt 管理
+
+### 概要
+
+ヘルプページには2種類のコンテンツがある：
+
+1. **Svelteコンポーネント** (`+page.svelte`) - ブラウザ表示用（スタイリング付き）
+2. **Markdownファイル** (`content.md`) - LLM用プレーンテキスト（llms.txt経由で配信）
+
+### ファイル構造
+
+```
+src/routes/help/{slug}/
+├── +page.svelte          # ブラウザ表示用（HelpSection, HelpTable等を使用）
+├── content.md            # LLM用Markdownコンテンツ
+└── llms.txt/
+    └── +server.ts        # content.mdを配信するエンドポイント
+```
+
+### 更新手順
+
+ヘルプページを更新・追加する際は、以下の両方を更新する：
+
+1. **`+page.svelte`** - UIコンポーネントを使ったHTML版
+2. **`content.md`** - 同じ内容のMarkdown版
+
+**注意**: 内容の一貫性を保つため、片方だけ更新しないこと。
+
+### 新規ヘルプページ追加時
+
+1. `src/routes/help/{slug}/+page.svelte` を作成
+2. `src/routes/help/{slug}/content.md` を作成（同じ内容をMarkdownで）
+3. `src/routes/help/{slug}/llms.txt/+server.ts` を作成：
+   ```typescript
+   import content from '../content.md?raw';
+
+   export const prerender = true;
+
+   export function GET() {
+     return new Response(content, {
+       headers: {
+         'Content-Type': 'text/plain; charset=utf-8'
+       }
+     });
+   }
+   ```
+4. `svelte.config.js` の `prerender.entries` に追加：
+   - `/help/{slug}`
+   - `/help/{slug}/llms.txt`
+
+### llms.txtエンドポイント一覧
+
+| URL | 内容 |
+|-----|------|
+| `/llms.txt` | サービス概要・機能一覧・各ヘルプへのリンク |
+| `/help/getting-started/llms.txt` | はじめに |
+| `/help/journal/llms.txt` | 仕訳入力 |
+| `/help/ledger/llms.txt` | 総勘定元帳 |
+| `/help/trial-balance/llms.txt` | 試算表 |
+| `/help/tax-category/llms.txt` | 消費税区分 |
+| `/help/evidence/llms.txt` | 証憑管理 |
+| `/help/accounts/llms.txt` | 勘定科目管理 |
+| `/help/fixed-assets/llms.txt` | 固定資産台帳 |
+| `/help/blue-return/llms.txt` | 青色申告決算書 |
+| `/help/data-management/llms.txt` | 設定・データ管理 |
+| `/help/pwa/llms.txt` | PWA・オフライン |
+| `/help/shortcuts/llms.txt` | ショートカット |
+| `/help/glossary/llms.txt` | 用語集 |
+
+### Markdownの書式ガイドライン
+
+- `# 見出し1` はページタイトルに使用
+- `## 見出し2` はセクション（HelpSectionのtitleに対応）
+- `> **INFO**:` / `> **TIP**:` / `> **WARNING**:` でノートを表現
+- テーブルはMarkdown形式で記述
+- コードブロックは ``` で囲む

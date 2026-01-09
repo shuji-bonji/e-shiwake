@@ -42,7 +42,24 @@ const config = {
 				'/help/data-management',
 				'/help/pwa',
 				'/help/shortcuts',
-				'/help/glossary'
+				'/help/glossary',
+				'/help/fixed-assets',
+				'/help/blue-return',
+				// LLM用テキストエンドポイント
+				'/llms.txt',
+				'/help/getting-started/llms.txt',
+				'/help/journal/llms.txt',
+				'/help/ledger/llms.txt',
+				'/help/trial-balance/llms.txt',
+				'/help/tax-category/llms.txt',
+				'/help/evidence/llms.txt',
+				'/help/accounts/llms.txt',
+				'/help/fixed-assets/llms.txt',
+				'/help/blue-return/llms.txt',
+				'/help/data-management/llms.txt',
+				'/help/pwa/llms.txt',
+				'/help/shortcuts/llms.txt',
+				'/help/glossary/llms.txt'
 			]
 		}
 	}
