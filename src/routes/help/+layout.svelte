@@ -63,7 +63,7 @@
 		<Button variant="ghost" size="icon" href="{base}/">
 			<ArrowLeft class="size-5" />
 		</Button>
-		<h1 class="text-lg font-semibold">e-shiwake ヘルプ</h1>
+		<span class="text-lg font-semibold">e-shiwake ヘルプ</span>
 	</header>
 
 	<div class="flex flex-1 overflow-hidden">
