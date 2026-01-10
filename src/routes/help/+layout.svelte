@@ -33,8 +33,10 @@
 	const currentPath = $derived($page.url.pathname);
 
 	// llms.txt リンクを表示するページかどうか（/help 以外の個別ページ）
+	// 末尾スラッシュを正規化してから比較
+	const normalizedPath = $derived(currentPath.replace(/\/$/, ''));
 	const hasLlmsTxt = $derived(
-		currentPath !== `${base}/help` && currentPath.startsWith(`${base}/help/`)
+		normalizedPath !== `${base}/help` && normalizedPath.startsWith(`${base}/help/`)
 	);
 
 	// 現在のページの llms.txt URL（末尾スラッシュを除去）
