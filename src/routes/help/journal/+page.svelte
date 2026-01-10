@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
+
+	const pageDescription =
+		'仕訳の追加・編集・削除・検索方法を解説。複合仕訳や家事按分にも対応。 - e-shiwake ヘルプ';
 </script>
+
+<svelte:head>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:description" content={pageDescription} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
 <div>
 	<h1 class="mb-6 text-2xl font-bold">仕訳入力</h1>

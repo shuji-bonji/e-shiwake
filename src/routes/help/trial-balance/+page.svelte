@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
+
+	const pageDescription =
+		'試算表の作成と貸借一致の確認方法。決算前のチェックに活用。 - e-shiwake ヘルプ';
 </script>
+
+<svelte:head>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:description" content={pageDescription} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
 <div>
 	<h1 class="mb-6 text-2xl font-bold">試算表</h1>

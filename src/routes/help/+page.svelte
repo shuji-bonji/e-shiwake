@@ -16,6 +16,9 @@
 		Scale
 	} from '@lucide/svelte';
 
+	const pageDescription =
+		'e-shiwakeの使い方ガイド。仕訳入力、帳簿出力、青色申告決算書の作成方法を解説。';
+
 	const sections = [
 		{
 			href: `${base}/help/getting-started`,
@@ -97,6 +100,12 @@
 		}
 	];
 </script>
+
+<svelte:head>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:description" content={pageDescription} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
 <div>
 	<h1 class="mb-2 text-2xl font-bold">e-shiwake ヘルプ</h1>

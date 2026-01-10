@@ -21,6 +21,15 @@ export default defineConfig({
 			// GitHub Pages のベースパスを考慮
 			base: pwaBase,
 			scope: pwaBase,
+			// SvelteKit の trailingSlash 設定に合わせる
+			integration: {
+				configureOptions(viteOptions, options) {
+					// トレイリングスラッシュを有効化
+					options.kit = {
+						trailingSlash: 'always'
+					};
+				}
+			},
 			manifest: {
 				name: 'e-shiwake - 電子仕訳',
 				short_name: 'e-shiwake',
@@ -55,6 +64,26 @@ export default defineConfig({
 				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
 				// ナビゲーションフォールバックを無効化（GitHub Pages の 404.html に任せる）
 				navigateFallback: null,
+				// 内部パスを実際の公開パスに変換してトレイリングスラッシュを追加
+				manifestTransforms: [
+					async (entries) => {
+						const manifest = entries.map((entry) => {
+							let url = entry.url;
+							// prerendered/pages/ と client/ プレフィックスを除去
+							url = url.replace(/^prerendered\/pages\//, '');
+							url = url.replace(/^client\//, '');
+							// index.html を / に変換
+							url = url.replace(/index\.html$/, '');
+							// HTMLページ（拡張子なし・空以外）にトレイリングスラッシュを追加
+							if (!url.includes('.') && url !== '' && !url.endsWith('/')) {
+								url = `${url}/`;
+							}
+							entry.url = url;
+							return entry;
+						});
+						return { manifest };
+					}
+				],
 				runtimeCaching: [
 					{
 						urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

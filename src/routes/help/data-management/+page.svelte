@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { HelpSection, HelpNote, HelpTable } from '$lib/components/help';
+
+	const pageDescription =
+		'データのエクスポート・インポート・バックアップ方法。JSON/ZIP対応。 - e-shiwake ヘルプ';
 </script>
+
+<svelte:head>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:description" content={pageDescription} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
 <div>
 	<h1 class="mb-6 text-2xl font-bold">設定・データ管理</h1>

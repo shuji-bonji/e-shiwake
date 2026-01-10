@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
+	import { page } from '$app/stores';
 	import favicon from '$lib/assets/favicon.svg';
 	import AppHeader from '$lib/components/layout/AppHeader.svelte';
 	import AppSidebar from '$lib/components/layout/AppSidebar.svelte';
@@ -33,6 +34,10 @@
 
 	// PWA webmanifest link
 	const webManifest = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
+
+	// ヘルプページかどうか（ヘルプページは個別にdescriptionを設定するため除外）
+	// route.id を使用することでプリレンダリング時も正しく判定できる
+	const isHelpPage = $derived($page.route.id?.startsWith('/help') ?? false);
 
 	onMount(() => {
 		// テーマを初期化
@@ -118,6 +123,30 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 	<title>e-shiwake - 電子仕訳</title>
+	<!-- ヘルプページは個別にdescriptionを設定するため、ここでは除外 -->
+	{#if !isHelpPage}
+		<meta
+			name="description"
+			content="e-shiwake（電子仕訳）- フリーランス・個人事業主向けの無料青色申告会計アプリ。複式簿記、証憑管理、決算書作成をブラウザで完結。オフライン対応PWA。"
+		/>
+		<meta
+			property="og:description"
+			content="e-shiwake（電子仕訳）- フリーランス・個人事業主向けの無料青色申告会計アプリ。複式簿記、証憑管理、決算書作成をブラウザで完結。オフライン対応PWA。"
+		/>
+		<meta
+			name="twitter:description"
+			content="e-shiwake（電子仕訳）- フリーランス・個人事業主向けの無料青色申告会計アプリ。複式簿記、証憑管理、決算書作成をブラウザで完結。オフライン対応PWA。"
+		/>
+	{/if}
+	<meta property="og:title" content="e-shiwake - 電子仕訳" />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://shuji-bonji.github.io/e-shiwake/" />
+	<meta property="og:image" content="https://shuji-bonji.github.io/e-shiwake/ogimage.png" />
+	<meta property="og:site_name" content="e-shiwake" />
+	<meta property="og:locale" content="ja_JP" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="e-shiwake - 電子仕訳" />
+	<meta name="twitter:image" content="https://shuji-bonji.github.io/e-shiwake/ogimage.png" />
 	<!-- PWA manifest（ビルド時に挿入） -->
 	{@html webManifest}
 </svelte:head>

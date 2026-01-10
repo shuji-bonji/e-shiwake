@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { HelpNote, HelpSection } from '$lib/components/help';
+
+	const pageDescription =
+		'e-shiwakeの概要と基本的な使い方。初めての方はこちらから。 - e-shiwake ヘルプ';
 </script>
+
+<svelte:head>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:description" content={pageDescription} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
 <div>
 	<h1 class="mb-6 text-2xl font-bold">はじめに</h1>

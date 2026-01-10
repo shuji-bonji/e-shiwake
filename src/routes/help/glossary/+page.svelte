@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { HelpSection } from '$lib/components/help';
 
+	const pageDescription = '簿記・会計用語集。複式簿記の基本用語を解説。 - e-shiwake ヘルプ';
+
 	const glossaryGroups = [
 		{
 			title: '基本用語',
@@ -195,6 +197,12 @@
 		}
 	];
 </script>
+
+<svelte:head>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:description" content={pageDescription} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
 <div>
 	<h1 class="mb-6 text-2xl font-bold">用語集</h1>

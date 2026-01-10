@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { HelpSection, HelpTable } from '$lib/components/help';
+
+	const pageDescription =
+		'キーボードショートカット一覧。効率的な仕訳入力に活用。 - e-shiwake ヘルプ';
 </script>
+
+<svelte:head>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:description" content={pageDescription} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
 <div>
 	<h1 class="mb-6 text-2xl font-bold">ショートカット</h1>

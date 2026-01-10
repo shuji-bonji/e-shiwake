@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
+
+	const pageDescription =
+		'青色申告決算書（一般用）の作成方法。65万円控除に必要な帳簿を出力。 - e-shiwake ヘルプ';
 </script>
+
+<svelte:head>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:description" content={pageDescription} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
 <div>
 	<h1 class="mb-6 text-2xl font-bold">青色申告決算書</h1>

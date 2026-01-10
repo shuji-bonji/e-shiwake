@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
+
+	const pageDescription =
+		'証憑（領収書・請求書PDF）の紐付けと管理方法。電子帳簿保存法対応。 - e-shiwake ヘルプ';
 </script>
+
+<svelte:head>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:description" content={pageDescription} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
 <div>
 	<h1 class="mb-6 text-2xl font-bold">証憑管理</h1>
