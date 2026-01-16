@@ -122,7 +122,7 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<title>e-shiwake - 電子仕訳</title>
+	<title>e-shiwake（電子仕訳）- フリーランス・個人事業主のための無料青色申告会計アプリ</title>
 	<!-- ヘルプページは個別にdescriptionを設定するため、ここでは除外 -->
 	{#if !isHelpPage}
 		<meta
@@ -138,14 +138,14 @@
 			content="e-shiwake（電子仕訳）- フリーランス・個人事業主向けの無料青色申告会計アプリ。複式簿記、証憑管理、決算書作成をブラウザで完結。オフライン対応PWA。"
 		/>
 	{/if}
-	<meta property="og:title" content="e-shiwake - 電子仕訳" />
+	<meta property="og:title" content="e-shiwake（電子仕訳）- フリーランス・個人事業主のための無料青色申告会計アプリ" />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="https://shuji-bonji.github.io/e-shiwake/" />
 	<meta property="og:image" content="https://shuji-bonji.github.io/e-shiwake/ogimage.png" />
 	<meta property="og:site_name" content="e-shiwake" />
 	<meta property="og:locale" content="ja_JP" />
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="e-shiwake - 電子仕訳" />
+	<meta name="twitter:title" content="e-shiwake（電子仕訳）- フリーランス・個人事業主のための無料青色申告会計アプリ" />
 	<meta name="twitter:image" content="https://shuji-bonji.github.io/e-shiwake/ogimage.png" />
 	<!-- PWA manifest（ビルド時に挿入） -->
 	{@html webManifest}
