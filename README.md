@@ -2,7 +2,9 @@
 
 フリーランス・個人事業主向けの仕訳帳 + 証憑管理 PWAアプリ
 
-個人事業主になったので、自身が必要に迫られて作りました。=°ω°=
+[**利用はこちら**](https://shuji-bonji.github.io/e-shiwake/)で提供してます。👉 https://shuji-bonji.github.io/e-shiwake/
+
+個人事業主になったので、自身が必要に迫られて作りました。=°ω°=  
 
 ![e-shiwake](static/readme_top.png)
 
