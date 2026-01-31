@@ -190,4 +190,247 @@ input[type='date']::-webkit-calendar-picker-indicator {
 		margin: 1.5cm;
 		size: A4;
 	}
+
+	/* 請求書印刷スタイル */
+	.invoice-print {
+		font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+		font-size: 10pt;
+		line-height: 1.5;
+		color: #000;
+		background: #fff;
+	}
+
+	.invoice-title {
+		text-align: center;
+		font-size: 18pt;
+		font-weight: bold;
+		margin-bottom: 20pt;
+		letter-spacing: 4pt;
+	}
+
+	.invoice-header {
+		display: flex;
+		justify-content: space-between;
+		margin-bottom: 20pt;
+	}
+
+	.invoice-recipient {
+		flex: 1;
+	}
+
+	.recipient-name {
+		font-size: 14pt;
+		font-weight: bold;
+		border-bottom: 1px solid #000;
+		padding-bottom: 4pt;
+		margin-bottom: 4pt;
+	}
+
+	.recipient-address {
+		font-size: 9pt;
+		color: #333;
+	}
+
+	.invoice-issuer {
+		text-align: right;
+	}
+
+	.invoice-meta {
+		margin-bottom: 10pt;
+	}
+
+	.invoice-number {
+		font-size: 11pt;
+		font-weight: bold;
+	}
+
+	.invoice-date,
+	.invoice-due {
+		font-size: 9pt;
+	}
+
+	.issuer-info {
+		font-size: 9pt;
+		line-height: 1.4;
+	}
+
+	.issuer-trade-name {
+		font-size: 11pt;
+		font-weight: bold;
+	}
+
+	.issuer-name {
+		font-size: 10pt;
+	}
+
+	.issuer-contact {
+		margin-top: 2pt;
+	}
+
+	.issuer-contact .issuer-phone {
+		margin-right: 10pt;
+	}
+
+	.issuer-invoice-number {
+		margin-top: 4pt;
+		font-size: 8pt;
+	}
+
+	.invoice-summary {
+		background: #f5f5f5;
+		border: 2px solid #000;
+		padding: 10pt 15pt;
+		margin-bottom: 20pt;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.summary-label {
+		font-size: 12pt;
+		font-weight: bold;
+	}
+
+	.summary-amount {
+		font-size: 18pt;
+		font-weight: bold;
+	}
+
+	.invoice-items {
+		width: 100%;
+		border-collapse: collapse;
+		margin-bottom: 20pt;
+	}
+
+	.invoice-items th,
+	.invoice-items td {
+		border: 1px solid #333;
+		padding: 6pt 8pt;
+	}
+
+	.invoice-items th {
+		background: #e0e0e0;
+		font-weight: bold;
+		text-align: center;
+	}
+
+	.invoice-items .col-date {
+		width: 12%;
+		text-align: center;
+	}
+
+	.invoice-items .col-description {
+		width: 36%;
+		text-align: left;
+	}
+
+	.invoice-items .col-quantity {
+		width: 10%;
+		text-align: right;
+	}
+
+	.invoice-items .col-unit-price {
+		width: 14%;
+		text-align: right;
+	}
+
+	.invoice-items .col-tax-rate {
+		width: 8%;
+		text-align: center;
+	}
+
+	.invoice-items .col-amount {
+		width: 14%;
+		text-align: right;
+	}
+
+	.invoice-items .empty-row td {
+		height: 20pt;
+	}
+
+	/* 振込先と金額内訳の横並びコンテナ */
+	.invoice-footer-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 20pt;
+		margin-bottom: 20pt;
+	}
+
+	.invoice-bank {
+		flex: 1;
+		max-width: 45%;
+		border: 1px solid #333;
+		padding: 10pt;
+	}
+
+	.bank-title {
+		font-weight: bold;
+		margin-bottom: 6pt;
+		border-bottom: 1px solid #ccc;
+		padding-bottom: 4pt;
+	}
+
+	.bank-info {
+		font-size: 10pt;
+	}
+
+	.bank-line {
+		margin-bottom: 2pt;
+	}
+
+	.bank-line span {
+		margin-right: 8pt;
+	}
+
+	.account-holder {
+		font-size: 9pt;
+		margin-top: 6pt;
+		padding-top: 4pt;
+		border-top: 1px dotted #ccc;
+	}
+
+	.invoice-totals {
+		flex-shrink: 0;
+	}
+
+	.totals-table {
+		width: 250pt;
+		border-collapse: collapse;
+	}
+
+	.totals-table td {
+		padding: 4pt 8pt;
+		border: 1px solid #333;
+	}
+
+	.totals-table .label {
+		background: #f0f0f0;
+		text-align: left;
+	}
+
+	.totals-table .amount {
+		text-align: right;
+		font-weight: bold;
+	}
+
+	.totals-table .total-row td {
+		background: #e0e0e0;
+		font-size: 12pt;
+	}
+
+	.invoice-note {
+		border: 1px solid #ccc;
+		padding: 10pt;
+	}
+
+	.note-title {
+		font-weight: bold;
+		margin-bottom: 6pt;
+	}
+
+	.note-content {
+		font-size: 9pt;
+		white-space: pre-wrap;
+	}
 }

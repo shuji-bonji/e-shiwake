@@ -13,7 +13,8 @@
 		Package,
 		ClipboardList,
 		BookText,
-		Scale
+		Scale,
+		FileSpreadsheet
 	} from '@lucide/svelte';
 
 	const pageDescription =
@@ -73,6 +74,12 @@
 			label: '青色申告決算書',
 			icon: ClipboardList,
 			description: '青色申告決算書の作成と印刷'
+		},
+		{
+			href: `${base}/help/invoice`,
+			label: '請求書',
+			icon: FileSpreadsheet,
+			description: '請求書の作成・印刷と仕訳生成'
 		},
 		{
 			href: `${base}/help/data-management`,

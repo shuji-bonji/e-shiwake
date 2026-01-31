@@ -50,6 +50,7 @@ async function clearAllTables() {
 	await db.journals.clear();
 	await db.vendors.clear();
 	await db.settings.clear();
+	await db.invoices.clear();
 	// attachmentsテーブルは仕訳に埋め込まれているため個別クリア不要
 	// （journalsクリアで一緒に削除される）
 }
@@ -1436,6 +1437,463 @@ describe('インポート/エクスポート', () => {
 
 			const debitLine2 = journal?.lines.find((l) => l.id === 'line-2');
 			expect(debitLine2?._businessRatioGenerated).toBe(true);
+		});
+	});
+});
+
+describe('請求書管理', () => {
+	beforeEach(async () => {
+		await clearAllTables();
+		await initializeDatabase();
+	});
+
+	afterEach(async () => {
+		await clearAllTables();
+	});
+
+	// テスト用の請求書データを作成するヘルパー
+	function createTestInvoiceInput(overrides = {}) {
+		return {
+			invoiceNumber: 'INV-2026-0001',
+			issueDate: '2026-01-15',
+			dueDate: '2026-01-31',
+			vendorId: 'vendor-1',
+			items: [
+				{
+					id: 'item-1',
+					date: '1月分',
+					description: 'コンサルティング',
+					quantity: 1,
+					unitPrice: 100000,
+					amount: 100000,
+					taxRate: 10 as const
+				}
+			],
+			subtotal: 100000,
+			taxAmount: 10000,
+			total: 110000,
+			taxBreakdown: {
+				taxable10: 100000,
+				tax10: 10000,
+				taxable8: 0,
+				tax8: 0
+			},
+			status: 'draft' as const,
+			...overrides
+		};
+	}
+
+	describe('addInvoice', () => {
+		it('請求書を追加できる', async () => {
+			const { addInvoice, getInvoiceById } = await import('./index');
+
+			const invoiceInput = createTestInvoiceInput();
+			const id = await addInvoice(invoiceInput);
+
+			expect(id).toBeDefined();
+
+			const invoice = await getInvoiceById(id);
+			expect(invoice).toBeDefined();
+			expect(invoice?.invoiceNumber).toBe('INV-2026-0001');
+			expect(invoice?.total).toBe(110000);
+			expect(invoice?.createdAt).toBeDefined();
+			expect(invoice?.updatedAt).toBeDefined();
+		});
+	});
+
+	describe('updateInvoice', () => {
+		it('請求書を更新できる', async () => {
+			const { addInvoice, updateInvoice, getInvoiceById } = await import('./index');
+
+			const id = await addInvoice(createTestInvoiceInput());
+
+			await updateInvoice(id, { status: 'issued' });
+
+			const updated = await getInvoiceById(id);
+			expect(updated?.status).toBe('issued');
+		});
+
+		it('明細行を更新できる', async () => {
+			const { addInvoice, updateInvoice, getInvoiceById } = await import('./index');
+
+			const id = await addInvoice(createTestInvoiceInput());
+
+			await updateInvoice(id, {
+				items: [
+					{
+						id: 'item-1',
+						date: '2月分',
+						description: '更新後のサービス',
+						quantity: 2,
+						unitPrice: 50000,
+						amount: 100000,
+						taxRate: 10
+					}
+				]
+			});
+
+			const updated = await getInvoiceById(id);
+			expect(updated?.items[0].description).toBe('更新後のサービス');
+			expect(updated?.items[0].quantity).toBe(2);
+		});
+	});
+
+	describe('deleteInvoice', () => {
+		it('請求書を削除できる', async () => {
+			const { addInvoice, deleteInvoice, getInvoiceById } = await import('./index');
+
+			const id = await addInvoice(createTestInvoiceInput());
+			await deleteInvoice(id);
+
+			const deleted = await getInvoiceById(id);
+			expect(deleted).toBeUndefined();
+		});
+	});
+
+	describe('getInvoicesByYear', () => {
+		it('年度別に請求書を取得できる', async () => {
+			const { addInvoice, getInvoicesByYear } = await import('./index');
+
+			// 2026年の請求書
+			await addInvoice(createTestInvoiceInput({ issueDate: '2026-03-15' }));
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0002', issueDate: '2026-06-20' })
+			);
+
+			// 2025年の請求書
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2025-0001', issueDate: '2025-12-01' })
+			);
+
+			const invoices2026 = await getInvoicesByYear(2026);
+			expect(invoices2026).toHaveLength(2);
+
+			const invoices2025 = await getInvoicesByYear(2025);
+			expect(invoices2025).toHaveLength(1);
+		});
+
+		it('日付降順でソートされる', async () => {
+			const { addInvoice, getInvoicesByYear } = await import('./index');
+
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0001', issueDate: '2026-01-15' })
+			);
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0002', issueDate: '2026-06-20' })
+			);
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0003', issueDate: '2026-03-10' })
+			);
+
+			const invoices = await getInvoicesByYear(2026);
+			expect(invoices[0].issueDate).toBe('2026-06-20');
+			expect(invoices[1].issueDate).toBe('2026-03-10');
+			expect(invoices[2].issueDate).toBe('2026-01-15');
+		});
+	});
+
+	describe('getInvoicesByStatus', () => {
+		it('ステータス別に請求書を取得できる', async () => {
+			const { addInvoice, getInvoicesByStatus } = await import('./index');
+
+			await addInvoice(createTestInvoiceInput({ status: 'draft' }));
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0002', status: 'issued' })
+			);
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0003', status: 'issued' })
+			);
+			await addInvoice(createTestInvoiceInput({ invoiceNumber: 'INV-2026-0004', status: 'paid' }));
+
+			const drafts = await getInvoicesByStatus('draft');
+			expect(drafts).toHaveLength(1);
+
+			const issued = await getInvoicesByStatus('issued');
+			expect(issued).toHaveLength(2);
+
+			const paid = await getInvoicesByStatus('paid');
+			expect(paid).toHaveLength(1);
+		});
+	});
+
+	describe('getInvoicesByVendor', () => {
+		it('取引先別に請求書を取得できる', async () => {
+			const { addInvoice, getInvoicesByVendor } = await import('./index');
+
+			await addInvoice(createTestInvoiceInput({ vendorId: 'vendor-1' }));
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0002', vendorId: 'vendor-1' })
+			);
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0003', vendorId: 'vendor-2' })
+			);
+
+			const vendor1Invoices = await getInvoicesByVendor('vendor-1');
+			expect(vendor1Invoices).toHaveLength(2);
+
+			const vendor2Invoices = await getInvoicesByVendor('vendor-2');
+			expect(vendor2Invoices).toHaveLength(1);
+		});
+	});
+
+	describe('generateNextInvoiceNumber', () => {
+		it('最初の請求書番号を生成できる', async () => {
+			const { generateNextInvoiceNumber } = await import('./index');
+
+			const number = await generateNextInvoiceNumber(2026);
+			expect(number).toBe('INV-2026-0001');
+		});
+
+		it('連番で請求書番号を生成できる', async () => {
+			const { addInvoice, generateNextInvoiceNumber } = await import('./index');
+
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0001', issueDate: '2026-01-15' })
+			);
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0002', issueDate: '2026-02-15' })
+			);
+
+			const number = await generateNextInvoiceNumber(2026);
+			expect(number).toBe('INV-2026-0003');
+		});
+
+		it('年度が異なる場合は別カウント', async () => {
+			const { addInvoice, generateNextInvoiceNumber } = await import('./index');
+
+			await addInvoice(
+				createTestInvoiceInput({ invoiceNumber: 'INV-2025-0005', issueDate: '2025-12-15' })
+			);
+
+			const number2026 = await generateNextInvoiceNumber(2026);
+			expect(number2026).toBe('INV-2026-0001');
+		});
+
+		it('年度を省略すると現在年度を使用', async () => {
+			const { generateNextInvoiceNumber } = await import('./index');
+
+			const number = await generateNextInvoiceNumber();
+			const currentYear = new Date().getFullYear();
+			expect(number).toBe(`INV-${currentYear}-0001`);
+		});
+	});
+});
+
+describe('取引先管理（拡張）', () => {
+	beforeEach(async () => {
+		await clearAllTables();
+		await initializeDatabase();
+	});
+
+	afterEach(async () => {
+		await clearAllTables();
+	});
+
+	describe('addVendorWithDetails', () => {
+		it('取引先を詳細情報付きで追加できる', async () => {
+			const { addVendorWithDetails, getVendorById } = await import('./index');
+
+			const id = await addVendorWithDetails({
+				name: 'テスト株式会社',
+				address: '東京都渋谷区1-2-3',
+				contactName: '田中太郎',
+				email: 'tanaka@test.co.jp',
+				phone: '03-1234-5678',
+				paymentTerms: '月末締め翌月末払い'
+			});
+
+			const vendor = await getVendorById(id);
+			expect(vendor).toBeDefined();
+			expect(vendor?.name).toBe('テスト株式会社');
+			expect(vendor?.address).toBe('東京都渋谷区1-2-3');
+			expect(vendor?.contactName).toBe('田中太郎');
+			expect(vendor?.email).toBe('tanaka@test.co.jp');
+			expect(vendor?.phone).toBe('03-1234-5678');
+			expect(vendor?.paymentTerms).toBe('月末締め翌月末払い');
+		});
+
+		it('createdAtとupdatedAtが設定される', async () => {
+			const { addVendorWithDetails, getVendorById } = await import('./index');
+
+			const id = await addVendorWithDetails({
+				name: 'テスト株式会社'
+			});
+
+			const vendor = await getVendorById(id);
+			expect(vendor?.createdAt).toBeDefined();
+			expect(vendor?.updatedAt).toBeDefined();
+		});
+	});
+
+	describe('updateVendor', () => {
+		it('取引先情報を更新できる', async () => {
+			const { addVendorWithDetails, updateVendor, getVendorById } = await import('./index');
+
+			const id = await addVendorWithDetails({
+				name: '元の名前',
+				address: '東京都'
+			});
+
+			await updateVendor(id, {
+				name: '更新後の名前',
+				address: '大阪府'
+			});
+
+			const updated = await getVendorById(id);
+			expect(updated?.name).toBe('更新後の名前');
+			expect(updated?.address).toBe('大阪府');
+		});
+
+		it('updatedAtが更新される', async () => {
+			const { addVendorWithDetails, updateVendor, getVendorById } = await import('./index');
+
+			const id = await addVendorWithDetails({ name: 'テスト' });
+			const original = await getVendorById(id);
+			const originalUpdatedAt = original?.updatedAt;
+
+			// 少し待ってから更新
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			await updateVendor(id, { name: '更新後' });
+
+			const updated = await getVendorById(id);
+			expect(updated?.updatedAt).not.toBe(originalUpdatedAt);
+		});
+	});
+
+	describe('isVendorInUseByInvoice', () => {
+		it('請求書で使用中の取引先を判定できる', async () => {
+			const { addVendorWithDetails, addInvoice, isVendorInUseByInvoice } = await import('./index');
+
+			const vendorId = await addVendorWithDetails({ name: 'テスト取引先' });
+
+			// 請求書で使用
+			await addInvoice({
+				invoiceNumber: 'INV-001',
+				issueDate: '2026-01-15',
+				dueDate: '2026-01-31',
+				vendorId,
+				items: [],
+				subtotal: 0,
+				taxAmount: 0,
+				total: 0,
+				taxBreakdown: { taxable10: 0, tax10: 0, taxable8: 0, tax8: 0 },
+				status: 'draft'
+			});
+
+			const inUse = await isVendorInUseByInvoice(vendorId);
+			expect(inUse).toBe(true);
+		});
+
+		it('請求書で未使用の取引先を判定できる', async () => {
+			const { addVendorWithDetails, isVendorInUseByInvoice } = await import('./index');
+
+			const vendorId = await addVendorWithDetails({ name: '未使用取引先' });
+
+			const inUse = await isVendorInUseByInvoice(vendorId);
+			expect(inUse).toBe(false);
+		});
+	});
+
+	describe('isVendorInUseByJournal', () => {
+		it('仕訳で使用中の取引先を判定できる', async () => {
+			const { addVendorWithDetails, isVendorInUseByJournal } = await import('./index');
+
+			// 取引先を追加
+			const vendorId = await addVendorWithDetails({ name: 'JournalTestCorp' });
+
+			// 仕訳で取引先を使用（取引先名で参照）
+			await db.journals.add({
+				id: 'test-journal-vendor',
+				date: '2026-01-15',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 1000 },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 1000 }
+				],
+				vendor: 'JournalTestCorp',
+				description: 'テスト',
+				evidenceStatus: 'none',
+				attachments: [],
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
+			});
+
+			const inUse = await isVendorInUseByJournal(vendorId);
+			expect(inUse).toBe(true);
+		});
+
+		it('仕訳で未使用の取引先を判定できる', async () => {
+			const { addVendorWithDetails, isVendorInUseByJournal } = await import('./index');
+
+			const vendorId = await addVendorWithDetails({ name: '未使用取引先' });
+
+			const inUse = await isVendorInUseByJournal(vendorId);
+			expect(inUse).toBe(false);
+		});
+	});
+
+	describe('deleteVendor', () => {
+		it('取引先を削除できる', async () => {
+			const { addVendorWithDetails, deleteVendor, getVendorById } = await import('./index');
+
+			const id = await addVendorWithDetails({ name: 'テスト取引先' });
+			await deleteVendor(id);
+
+			const deleted = await getVendorById(id);
+			expect(deleted).toBeUndefined();
+		});
+
+		it('請求書で使用中の取引先は削除できない', async () => {
+			const { addVendorWithDetails, addInvoice, deleteVendor } = await import('./index');
+
+			const vendorId = await addVendorWithDetails({ name: 'テスト取引先' });
+
+			await addInvoice({
+				invoiceNumber: 'INV-001',
+				issueDate: '2026-01-15',
+				dueDate: '2026-01-31',
+				vendorId,
+				items: [],
+				subtotal: 0,
+				taxAmount: 0,
+				total: 0,
+				taxBreakdown: { taxable10: 0, tax10: 0, taxable8: 0, tax8: 0 },
+				status: 'draft'
+			});
+
+			await expect(deleteVendor(vendorId)).rejects.toThrow(
+				'この取引先は請求書で使用されているため削除できません'
+			);
+		});
+
+		it('仕訳で使用中の取引先は削除できない', async () => {
+			const { deleteVendor } = await import('./index');
+
+			// 仕訳で取引先を使用（取引先名で参照）
+			await db.vendors.add({
+				id: 'vendor-test',
+				name: 'TestCorp',
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
+			});
+
+			await db.journals.add({
+				id: 'test-journal',
+				date: '2026-01-15',
+				lines: [
+					{ id: '1', type: 'debit', accountCode: '5006', amount: 1000 },
+					{ id: '2', type: 'credit', accountCode: '1002', amount: 1000 }
+				],
+				vendor: 'TestCorp',
+				description: 'テスト',
+				evidenceStatus: 'none',
+				attachments: [],
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
+			});
+
+			await expect(deleteVendor('vendor-test')).rejects.toThrow(
+				'この取引先は仕訳で使用されているため削除できません'
+			);
 		});
 	});
 });

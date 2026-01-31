@@ -19,7 +19,9 @@
 		Calculator,
 		FileCheck,
 		BookMarked,
-		ExternalLink
+		ExternalLink,
+		FileSpreadsheet,
+		Users
 	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -257,6 +259,40 @@
 								<a href="{base}/reports" {...props}>
 									<FileText class="size-4" />
 									<span>帳簿出力</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+			</Sidebar.GroupContent>
+		</Sidebar.Group>
+
+		<Sidebar.Separator />
+
+		<!-- 請求書セクション -->
+		<Sidebar.Group>
+			<Sidebar.GroupLabel>
+				<FileSpreadsheet class="size-4" />
+				請求書
+			</Sidebar.GroupLabel>
+			<Sidebar.GroupContent>
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={pathname === '/invoice'}>
+							{#snippet child({ props })}
+								<a href="{base}/invoice" {...props}>
+									<FileSpreadsheet class="size-4" />
+									<span>請求書一覧</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={pathname === '/vendors'}>
+							{#snippet child({ props })}
+								<a href="{base}/vendors" {...props}>
+									<Users class="size-4" />
+									<span>取引先管理</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>

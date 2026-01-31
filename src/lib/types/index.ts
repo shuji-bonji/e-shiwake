@@ -83,7 +83,14 @@ export interface Account {
 export interface Vendor {
 	id: string; // UUID
 	name: string; // 取引先名
+	address?: string; // 住所
+	contactName?: string; // 担当者名
+	email?: string; // メールアドレス
+	phone?: string; // 電話番号
+	paymentTerms?: string; // 支払条件（"月末締め翌月末払い"など）
+	note?: string; // メモ
 	createdAt: string; // 作成日時 ISO8601
+	updatedAt?: string; // 更新日時 ISO8601
 }
 
 /**
@@ -195,13 +202,17 @@ export type SettingsKey =
 	| 'storageMode'
 	| 'lastExportedAt'
 	| 'autoPurgeBlobAfterExport'
-	| 'blobRetentionDays';
+	| 'blobRetentionDays'
+	| 'businessInfo';
 
+// BusinessInfoはblue-return-types.tsで定義（循環参照を避けるため、ここではanyを使用）
+// 実際の型は $lib/types/blue-return-types.ts の BusinessInfo を参照
 export type SettingsValueMap = {
 	storageMode: StorageType;
 	lastExportedAt: string;
 	autoPurgeBlobAfterExport: boolean;
 	blobRetentionDays: number;
+	businessInfo: import('./blue-return-types').BusinessInfo;
 };
 
 export interface Settings {

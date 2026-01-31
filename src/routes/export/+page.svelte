@@ -1,27 +1,28 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import {
-		Download,
-		FileJson,
-		FileSpreadsheet,
-		Archive,
-		AlertTriangle,
-		Check
-	} from '@lucide/svelte';
-	import {
-		initializeDatabase,
-		getAvailableYears,
-		getJournalsByYear,
 		getAllAccounts,
 		getAllVendors,
-		getUnexportedAttachmentCount,
+		getAvailableYears,
+		getJournalsByYear,
 		getStorageMode,
-		setLastExportedAt,
-		markAttachmentAsExported
+		getUnexportedAttachmentCount,
+		initializeDatabase,
+		markAttachmentAsExported,
+		setLastExportedAt
 	} from '$lib/db';
 	import type { ExportData, StorageType } from '$lib/types';
+	import {
+		AlertTriangle,
+		Archive,
+		Check,
+		Download,
+		FileJson,
+		FileSpreadsheet
+	} from '@lucide/svelte';
+	import { onMount } from 'svelte';
+	import { omit } from '$lib/utils';
 
 	// 状態
 	let availableYears = $state<number[]>([]);
@@ -51,11 +52,7 @@
 		// Blobは除外してJSONに含める
 		const journalsWithoutBlob = journals.map((journal) => ({
 			...journal,
-			attachments: journal.attachments.map((att) => {
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				const { blob, ...rest } = att;
-				return rest;
-			})
+			attachments: journal.attachments.map((att) => omit(att, ['blob']))
 		}));
 
 		return {

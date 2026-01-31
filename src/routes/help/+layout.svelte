@@ -19,7 +19,8 @@
 		Smartphone,
 		Keyboard,
 		BookA,
-		FileCode2
+		FileCode2,
+		FileSpreadsheet
 	} from '@lucide/svelte';
 	import { cn } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
@@ -52,6 +53,7 @@
 		{ href: `${base}/help/accounts`, label: '勘定科目管理', icon: FolderCog },
 		{ href: `${base}/help/fixed-assets`, label: '固定資産台帳', icon: Package },
 		{ href: `${base}/help/blue-return`, label: '青色申告決算書', icon: ClipboardList },
+		{ href: `${base}/help/invoice`, label: '請求書', icon: FileSpreadsheet },
 		{ href: `${base}/help/data-management`, label: '設定・データ管理', icon: Database },
 		{ href: `${base}/help/pwa`, label: 'PWA・オフライン', icon: Smartphone },
 		{ href: `${base}/help/shortcuts`, label: 'ショートカット', icon: Keyboard },

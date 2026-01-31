@@ -25,7 +25,7 @@ export default defineConfig({
 			integration: {
 				configureOptions(viteOptions, options) {
 					// トレイリングスラッシュを有効化
-					options.kit = {
+					(options as { kit?: { trailingSlash: string } }).kit = {
 						trailingSlash: 'always'
 					};
 				}

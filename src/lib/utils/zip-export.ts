@@ -9,6 +9,7 @@ import type {
 	ExportAttachment
 } from '$lib/types';
 import { getAttachmentBlob } from '$lib/db';
+import { omit } from '$lib/utils';
 
 /**
  * 取得失敗した証憑情報
@@ -227,12 +228,9 @@ function prepareExportData(data: ExportData): ExportDataDTO {
 		...data,
 		journals: data.journals.map((journal) => ({
 			...journal,
-			attachments: journal.attachments.map((attachment): ExportAttachment => {
-				// blob を除外、メタデータのみ保持
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				const { blob, ...rest } = attachment;
-				return rest;
-			})
+			attachments: journal.attachments.map(
+				(attachment): ExportAttachment => omit(attachment, ['blob'])
+			)
 		}))
 	};
 }

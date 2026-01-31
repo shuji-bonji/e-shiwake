@@ -32,7 +32,9 @@ export default defineConfig(
 			// このアプリはbaseパスを使用しないため、絶対パスでのナビゲーションは問題なし
 			'svelte/no-navigation-without-resolve': 'off',
 			// PWAマニフェストなど信頼できるソースからの@htmlは許可
-			'svelte/no-at-html-tags': 'warn'
+			'svelte/no-at-html-tags': 'warn',
+			// propsからローカル状態を同期しつつローカル編集も可能にするパターンで使用
+			'svelte/prefer-writable-derived': 'off'
 		}
 	},
 	{

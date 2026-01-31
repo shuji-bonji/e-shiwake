@@ -56,6 +56,7 @@ Svelte MCP server を利用可能。Svelte 5 と SvelteKit のドキュメント
 - **全年度横断検索**: 摘要、取引先、勘定科目、金額、日付で検索可能
 - **帳簿機能**: 総勘定元帳、試算表、損益計算書、貸借対照表、消費税集計
 - **帳簿出力**: 複数帳簿の一括印刷、CSV ZIP出力
+- **請求書管理**: 請求書の作成・編集・印刷、仕訳自動生成
 
 ### ターゲットユーザー
 
@@ -236,9 +237,67 @@ type AccountType =
 interface Vendor {
 	id: string;
 	name: string; // 取引先名
+	address?: string; // 住所
+	contactName?: string; // 担当者名
+	email?: string; // メールアドレス
+	phone?: string; // 電話番号
+	paymentTerms?: string; // 支払条件
 	createdAt: string;
+	updatedAt: string;
 }
 ```
+
+### Invoice（請求書）
+
+```typescript
+interface Invoice {
+	id: string; // UUID
+	invoiceNumber: string; // 請求書番号（自動採番、例: INV-2026-0001）
+	issueDate: string; // 発行日（YYYY-MM-DD）
+	dueDate: string; // 支払期限（YYYY-MM-DD）
+	vendorId: string; // 取引先ID
+	items: InvoiceItem[]; // 明細行
+	subtotal: number; // 税抜合計
+	taxAmount: number; // 消費税合計
+	total: number; // 税込合計
+	taxBreakdown: {
+		taxable10: number; // 10%対象（税抜）
+		tax10: number; // 10%消費税
+		taxable8: number; // 8%対象（税抜）
+		tax8: number; // 8%消費税
+	};
+	status: 'draft' | 'issued' | 'paid'; // ステータス
+	note?: string; // 備考
+	journalId?: string; // 紐付く仕訳ID（売掛金計上時）
+	createdAt: string;
+	updatedAt: string;
+}
+
+interface InvoiceItem {
+	id: string; // UUID
+	date: string; // 自由記述（"1月分", "1/1〜1/31"など）
+	description: string; // 品名・サービス名
+	quantity: number; // 数量
+	unitPrice: number; // 単価
+	amount: number; // 金額（自動計算: quantity × unitPrice）
+	taxRate: 10 | 8; // 消費税率
+}
+```
+
+**請求書ステータス**:
+
+- `draft`: 下書き - 作成中の請求書
+- `issued`: 発行済み - 取引先に送付した請求書
+- `paid`: 入金済み - 入金が確認された請求書
+
+**仕訳自動生成**:
+
+- 売掛金仕訳: 請求書から売上計上仕訳を生成
+  - 借方: 売掛金（税込合計）
+  - 貸方: 売上高（10%対象、8%対象それぞれ）
+- 入金仕訳: 入金日を指定して入金仕訳を生成
+  - 借方: 普通預金（税込合計）
+  - 貸方: 売掛金（税込合計）
 
 ### Settings（設定）
 
@@ -293,6 +352,9 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 ├── /fixed-assets           # 固定資産台帳
 ├── /blue-return            # 青色申告決算書
 ├── /reports                # 帳簿出力（一括印刷・CSV ZIP）
+├── /invoice                # 請求書一覧
+├── /invoice/[id]           # 請求書編集
+├── /vendors                # 取引先管理
 ├── /accounts               # 勘定科目管理
 ├── /data                   # データ管理（エクスポート/インポート/削除）
 ├── /export                 # エクスポート（レガシー）
@@ -306,6 +368,7 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
     ├── /accounts           # 勘定科目
     ├── /fixed-assets       # 固定資産台帳
     ├── /blue-return        # 青色申告決算書
+    ├── /invoice            # 請求書
     ├── /data-management    # データ管理
     ├── /pwa                # PWA・インストール
     ├── /shortcuts          # キーボードショートカット
@@ -855,7 +918,10 @@ src/
 │       ├── clone.ts                 # ディープクローン（Blob保持）
 │       ├── monthly-summary.ts       # 月別売上・仕入集計
 │       ├── depreciation.ts          # 減価償却費計算
-│       └── blue-return.ts           # 青色申告決算書生成
+│       ├── blue-return.ts           # 青色申告決算書生成
+│       ├── invoice.ts               # 請求書ユーティリティ（金額計算、日付処理等）
+│       ├── invoice-journal.ts       # 請求書→仕訳生成（売掛金、入金）
+│       └── debounce.ts              # デバウンスユーティリティ（共通）
 ├── routes/
 │   ├── +layout.svelte        # サイドバーレイアウト
 │   ├── +page.svelte          # 仕訳帳（ホーム）
@@ -865,6 +931,9 @@ src/
 │   ├── balance-sheet/        # 貸借対照表
 │   ├── tax-summary/          # 消費税集計
 │   ├── reports/              # 帳簿出力（一括印刷・CSV ZIP）
+│   ├── invoice/              # 請求書一覧
+│   ├── invoice/[id]/         # 請求書編集（自動保存）
+│   ├── vendors/              # 取引先管理
 │   ├── accounts/             # 勘定科目管理
 │   ├── data/                 # データ管理（エクスポート+インポート）
 │   └── help/                 # ヘルプ
@@ -923,41 +992,44 @@ src/routes/help/{slug}/
 1. `src/routes/help/{slug}/+page.svelte` を作成
 2. `src/routes/help/{slug}/content.md` を作成（同じ内容をMarkdownで）
 3. `src/routes/help/{slug}/llms.txt/+server.ts` を作成：
+
    ```typescript
    import content from '../content.md?raw';
 
    export const prerender = true;
 
    export function GET() {
-     return new Response(content, {
-       headers: {
-         'Content-Type': 'text/plain; charset=utf-8'
-       }
-     });
+   	return new Response(content, {
+   		headers: {
+   			'Content-Type': 'text/plain; charset=utf-8'
+   		}
+   	});
    }
    ```
+
 4. `svelte.config.js` の `prerender.entries` に追加：
    - `/help/{slug}`
    - `/help/{slug}/llms.txt`
 
 ### llms.txtエンドポイント一覧
 
-| URL | 内容 |
-|-----|------|
-| `/llms.txt` | サービス概要・機能一覧・各ヘルプへのリンク |
-| `/help/getting-started/llms.txt` | はじめに |
-| `/help/journal/llms.txt` | 仕訳入力 |
-| `/help/ledger/llms.txt` | 総勘定元帳 |
-| `/help/trial-balance/llms.txt` | 試算表 |
-| `/help/tax-category/llms.txt` | 消費税区分 |
-| `/help/evidence/llms.txt` | 証憑管理 |
-| `/help/accounts/llms.txt` | 勘定科目管理 |
-| `/help/fixed-assets/llms.txt` | 固定資産台帳 |
-| `/help/blue-return/llms.txt` | 青色申告決算書 |
-| `/help/data-management/llms.txt` | 設定・データ管理 |
-| `/help/pwa/llms.txt` | PWA・オフライン |
-| `/help/shortcuts/llms.txt` | ショートカット |
-| `/help/glossary/llms.txt` | 用語集 |
+| URL                              | 内容                                       |
+| -------------------------------- | ------------------------------------------ |
+| `/llms.txt`                      | サービス概要・機能一覧・各ヘルプへのリンク |
+| `/help/getting-started/llms.txt` | はじめに                                   |
+| `/help/journal/llms.txt`         | 仕訳入力                                   |
+| `/help/ledger/llms.txt`          | 総勘定元帳                                 |
+| `/help/trial-balance/llms.txt`   | 試算表                                     |
+| `/help/tax-category/llms.txt`    | 消費税区分                                 |
+| `/help/evidence/llms.txt`        | 証憑管理                                   |
+| `/help/accounts/llms.txt`        | 勘定科目管理                               |
+| `/help/fixed-assets/llms.txt`    | 固定資産台帳                               |
+| `/help/blue-return/llms.txt`     | 青色申告決算書                             |
+| `/help/invoice/llms.txt`         | 請求書                                     |
+| `/help/data-management/llms.txt` | 設定・データ管理                           |
+| `/help/pwa/llms.txt`             | PWA・オフライン                            |
+| `/help/shortcuts/llms.txt`       | ショートカット                             |
+| `/help/glossary/llms.txt`        | 用語集                                     |
 
 ### Markdownの書式ガイドライン
 

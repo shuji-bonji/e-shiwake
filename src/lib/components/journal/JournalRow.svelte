@@ -1,49 +1,21 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import {
-		Circle,
-		FileText,
-		Paperclip,
-		Trash2,
-		Plus,
-		ArrowUp,
-		ArrowDown,
-		Check,
-		Copy,
-		Percent,
-		X
-	} from '@lucide/svelte';
-	import AccountSelect from './AccountSelect.svelte';
-	import TaxCategorySelect from './TaxCategorySelect.svelte';
-	import VendorInput from './VendorInput.svelte';
-	import PdfDropZone from './PdfDropZone.svelte';
-	import AttachmentDialog from './AttachmentDialog.svelte';
-	import AttachmentEditDialog from './AttachmentEditDialog.svelte';
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
-	import {
-		applyBusinessRatio,
-		removeBusinessRatio,
-		getBusinessRatioTargetLine,
-		hasBusinessRatioApplied,
-		getAppliedBusinessRatio
-	} from '$lib/utils/business-ratio';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { suggestDocumentType, validateJournal } from '$lib/db';
 	import type {
-		JournalEntry,
-		JournalLine,
 		Account,
 		AccountType,
-		EvidenceStatus,
-		Vendor,
 		Attachment,
 		DocumentType,
-		TaxCategory
+		EvidenceStatus,
+		JournalEntry,
+		JournalLine,
+		TaxCategory,
+		Vendor
 	} from '$lib/types';
-	import { validateJournal, suggestDocumentType } from '$lib/db';
-	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
-	import { cn } from '$lib/utils.js';
 	import {
 		addJournalAttachment,
 		confirmEvidenceStatusChange as confirmEvidenceStatusChangeUseCase,
@@ -53,6 +25,34 @@
 		syncAttachmentsOnBlur as syncAttachmentsOnBlurUseCase,
 		updateJournalAttachment
 	} from '$lib/usecases/journal-attachments';
+	import { cn } from '$lib/utils.js';
+	import {
+		applyBusinessRatio,
+		getAppliedBusinessRatio,
+		getBusinessRatioTargetLine,
+		hasBusinessRatioApplied,
+		removeBusinessRatio
+	} from '$lib/utils/business-ratio';
+	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
+	import {
+		ArrowDown,
+		ArrowUp,
+		Check,
+		Circle,
+		Copy,
+		FileText,
+		Paperclip,
+		Percent,
+		Plus,
+		Trash2,
+		X
+	} from '@lucide/svelte';
+	import AccountSelect from './AccountSelect.svelte';
+	import AttachmentDialog from './AttachmentDialog.svelte';
+	import AttachmentEditDialog from './AttachmentEditDialog.svelte';
+	import PdfDropZone from './PdfDropZone.svelte';
+	import TaxCategorySelect from './TaxCategorySelect.svelte';
+	import VendorInput from './VendorInput.svelte';
 
 	interface Props {
 		journal: JournalEntry;
@@ -112,7 +112,6 @@
 
 	// 日付のローカル状態（blurタイミングでのみ親に伝播）
 	// propsから同期しつつローカル編集も可能にするため、$state + $effect を使用
-	// eslint-disable-next-line svelte/prefer-writable-derived
 	let localDate = $state(journal.date);
 	$effect(() => {
 		localDate = journal.date;

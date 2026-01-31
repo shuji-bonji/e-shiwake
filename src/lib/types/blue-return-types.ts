@@ -9,6 +9,19 @@
 // ============================================================
 
 /**
+ * 口座種別
+ */
+export type AccountType = 'ordinary' | 'current';
+
+/**
+ * 口座種別のラベル
+ */
+export const AccountTypeLabels: Record<AccountType, string> = {
+	ordinary: '普通',
+	current: '当座'
+};
+
+/**
  * 事業者情報
  */
 export interface BusinessInfo {
@@ -17,6 +30,15 @@ export interface BusinessInfo {
 	address: string; // 住所
 	businessType: string; // 事業の種類
 	phoneNumber?: string; // 電話番号
+	email?: string; // メールアドレス
+	// 振込先情報（請求書用）
+	bankName?: string; // 銀行名
+	branchName?: string; // 支店名
+	accountType?: AccountType; // 口座種別
+	accountNumber?: string; // 口座番号
+	accountHolder?: string; // 口座名義
+	// インボイス制度対応
+	invoiceRegistrationNumber?: string; // 適格請求書発行事業者登録番号（T + 13桁）
 }
 
 // ============================================================

@@ -12,7 +12,9 @@ import type {
 	TaxCategory
 } from '$lib/types';
 import type { FixedAsset } from '$lib/types/blue-return-types';
+import type { Invoice, InvoiceStatus } from '$lib/types/invoice';
 import { defaultAccounts, getDefaultTaxCategory } from './seed';
+import { omit } from '$lib/utils';
 
 /**
  * 設定レコード（キーバリュー形式）
@@ -35,6 +37,7 @@ class EShiwakeDatabase extends Dexie {
 	attachments!: EntityTable<Attachment, 'id'>;
 	settings!: EntityTable<SettingsRecord, 'key'>;
 	fixedAssets!: EntityTable<FixedAsset, 'id'>;
+	invoices!: EntityTable<Invoice, 'id'>;
 
 	constructor() {
 		super('e-shiwake');
@@ -139,6 +142,30 @@ class EShiwakeDatabase extends Dexie {
 			settings: 'key',
 			fixedAssets: '&id, name, category, acquisitionDate, status'
 		});
+
+		// Version 7: 請求書テーブルを追加、取引先にタイムスタンプ追加
+		this.version(7)
+			.stores({
+				accounts: 'code, name, type, isSystem',
+				vendors: 'id, name',
+				journals: 'id, date, vendor, evidenceStatus',
+				attachments: 'id, journalEntryId',
+				settings: 'key',
+				fixedAssets: '&id, name, category, acquisitionDate, status',
+				invoices: '&id, invoiceNumber, issueDate, vendorId, status'
+			})
+			.upgrade(async (tx) => {
+				const now = new Date().toISOString();
+				// 既存の取引先に updatedAt を追加
+				await tx
+					.table('vendors')
+					.toCollection()
+					.modify((vendor: Vendor) => {
+						if (!vendor.updatedAt) {
+							vendor.updatedAt = vendor.createdAt || now;
+						}
+					});
+			});
 	}
 }
 
@@ -681,16 +708,27 @@ export async function getSetting<K extends SettingsKey>(
 
 /**
  * 設定値を保存
+ * 注意: Svelte 5のproxyオブジェクトを完全に除去するため、JSON round-tripを行う
  */
 export async function setSetting<K extends SettingsKey>(
 	key: K,
 	value: SettingsValueMap[K]
 ): Promise<void> {
-	await db.settings.put({
+	// JSON round-tripでproxyを完全に除去
+	const plainValue = JSON.parse(JSON.stringify(value)) as SettingsValueMap[K];
+	const record = {
 		key,
-		value,
+		value: plainValue,
 		updatedAt: new Date().toISOString()
-	});
+	};
+	// デバッグ用: 構造化クローン可能かテスト
+	try {
+		structuredClone(record);
+	} catch (e) {
+		console.error('setSetting: structuredClone failed for record:', record);
+		throw e;
+	}
+	await db.settings.put(record);
 }
 
 /**
@@ -876,9 +914,7 @@ export async function purgeExportedBlobs(): Promise<number> {
 					modified = true;
 					purgedCount++;
 					// Blobを削除し、削除日時を記録
-					// eslint-disable-next-line @typescript-eslint/no-unused-vars
-					const { blob, ...rest } = attachment;
-					return { ...rest, blobPurgedAt: purgedAt };
+					return { ...omit(attachment, ['blob']), blobPurgedAt: purgedAt };
 				}
 			}
 			return attachment;
@@ -918,9 +954,7 @@ export async function purgeAllExportedBlobs(): Promise<number> {
 				modified = true;
 				purgedCount++;
 				// Blobを削除し、削除日時を記録
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				const { blob, ...rest } = attachment;
-				return { ...rest, blobPurgedAt: now };
+				return { ...omit(attachment, ['blob']), blobPurgedAt: now };
 			}
 			return attachment;
 		});
@@ -1688,10 +1722,8 @@ export async function migrateAttachmentToFilesystem(
 	// 添付ファイルを更新（Blobを削除し、filePathを設定）
 	const updatedAttachments = journal.attachments.map((a) => {
 		if (a.id === item.attachmentId) {
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			const { blob, exportedAt, blobPurgedAt, ...rest } = a;
 			return {
-				...rest,
+				...omit(a, ['blob', 'exportedAt', 'blobPurgedAt']),
 				storageType: 'filesystem' as StorageType,
 				filePath
 			};
@@ -1729,10 +1761,8 @@ export async function migrateAttachmentToIndexedDB(
 	// 添付ファイルを更新（filePathを削除し、Blobを設定）
 	const updatedAttachments = journal.attachments.map((a) => {
 		if (a.id === item.attachmentId) {
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			const { filePath, ...rest } = a;
 			return {
-				...rest,
+				...omit(a, ['filePath']),
 				storageType: 'indexeddb' as StorageType,
 				blob
 			};
@@ -2091,4 +2121,185 @@ export async function seedTestData2024(): Promise<number> {
 	}
 
 	return count;
+}
+
+// ==================== 請求書関連 ====================
+
+/**
+ * 全請求書の取得（発行日降順）
+ */
+export async function getAllInvoices(): Promise<Invoice[]> {
+	return db.invoices.orderBy('issueDate').reverse().toArray();
+}
+
+/**
+ * 請求書の取得（ID指定）
+ */
+export async function getInvoiceById(id: string): Promise<Invoice | undefined> {
+	return db.invoices.get(id);
+}
+
+/**
+ * 年度別請求書の取得
+ */
+export async function getInvoicesByYear(year: number): Promise<Invoice[]> {
+	const startDate = `${year}-01-01`;
+	const endDate = `${year}-12-31`;
+
+	return db.invoices.where('issueDate').between(startDate, endDate, true, true).reverse().toArray();
+}
+
+/**
+ * 取引先別請求書の取得
+ */
+export async function getInvoicesByVendor(vendorId: string): Promise<Invoice[]> {
+	return db.invoices.where('vendorId').equals(vendorId).reverse().toArray();
+}
+
+/**
+ * ステータス別請求書の取得
+ */
+export async function getInvoicesByStatus(status: InvoiceStatus): Promise<Invoice[]> {
+	return db.invoices.where('status').equals(status).reverse().toArray();
+}
+
+/**
+ * 請求書の追加
+ */
+export async function addInvoice(
+	invoice: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string> {
+	const id = crypto.randomUUID();
+	const now = new Date().toISOString();
+
+	await db.invoices.add({
+		...invoice,
+		id,
+		createdAt: now,
+		updatedAt: now
+	});
+
+	return id;
+}
+
+/**
+ * 請求書の更新
+ */
+export async function updateInvoice(
+	id: string,
+	updates: Partial<Omit<Invoice, 'id' | 'createdAt'>>
+): Promise<void> {
+	await db.invoices.update(id, {
+		...updates,
+		updatedAt: new Date().toISOString()
+	});
+}
+
+/**
+ * 請求書の削除
+ */
+export async function deleteInvoice(id: string): Promise<void> {
+	await db.invoices.delete(id);
+}
+
+/**
+ * 次の請求書番号を生成（参考用）
+ * 形式: INV-{YYYY}-{NNNN}
+ */
+export async function generateNextInvoiceNumber(year?: number): Promise<string> {
+	const targetYear = year ?? new Date().getFullYear();
+	const prefix = `INV-${targetYear}-`;
+
+	const invoices = await db.invoices.toArray();
+	const yearInvoices = invoices.filter((inv) => inv.invoiceNumber.startsWith(prefix));
+
+	let maxNumber = 0;
+	for (const inv of yearInvoices) {
+		const numPart = inv.invoiceNumber.replace(prefix, '');
+		const num = parseInt(numPart, 10);
+		if (!isNaN(num) && num > maxNumber) {
+			maxNumber = num;
+		}
+	}
+
+	return `${prefix}${String(maxNumber + 1).padStart(4, '0')}`;
+}
+
+// ==================== 取引先関連（拡張） ====================
+
+/**
+ * 取引先の取得（ID指定）
+ */
+export async function getVendorById(id: string): Promise<Vendor | undefined> {
+	return db.vendors.get(id);
+}
+
+/**
+ * 取引先の追加（詳細情報付き）
+ */
+export async function addVendorWithDetails(
+	vendor: Omit<Vendor, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string> {
+	const id = crypto.randomUUID();
+	const now = new Date().toISOString();
+
+	await db.vendors.add({
+		...vendor,
+		id,
+		createdAt: now,
+		updatedAt: now
+	});
+
+	return id;
+}
+
+/**
+ * 取引先の更新
+ */
+export async function updateVendor(
+	id: string,
+	updates: Partial<Omit<Vendor, 'id' | 'createdAt'>>
+): Promise<void> {
+	await db.vendors.update(id, {
+		...updates,
+		updatedAt: new Date().toISOString()
+	});
+}
+
+/**
+ * 取引先が請求書で使用されているかチェック
+ */
+export async function isVendorInUseByInvoice(vendorId: string): Promise<boolean> {
+	const invoice = await db.invoices.where('vendorId').equals(vendorId).first();
+	return !!invoice;
+}
+
+/**
+ * 取引先が仕訳で使用されているかチェック
+ */
+export async function isVendorInUseByJournal(vendorId: string): Promise<boolean> {
+	const vendor = await db.vendors.get(vendorId);
+	if (!vendor) return false;
+
+	const journal = await db.journals.filter((j) => j.vendor === vendor.name).first();
+	return !!journal;
+}
+
+/**
+ * 取引先の削除（使用中の場合はエラー）
+ */
+export async function deleteVendor(id: string): Promise<void> {
+	// 請求書で使用されているかチェック
+	const inUseByInvoice = await isVendorInUseByInvoice(id);
+	if (inUseByInvoice) {
+		throw new Error('この取引先は請求書で使用されているため削除できません');
+	}
+
+	// 仕訳で使用されているかチェック
+	const inUseByJournal = await isVendorInUseByJournal(id);
+	if (inUseByJournal) {
+		throw new Error('この取引先は仕訳で使用されているため削除できません');
+	}
+
+	await db.vendors.delete(id);
 }

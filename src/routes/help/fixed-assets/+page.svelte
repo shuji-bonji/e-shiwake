@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
 
-	const pageDescription =
-		'固定資産台帳の登録と減価償却費の自動計算方法。 - e-shiwake ヘルプ';
+	const pageDescription = '固定資産台帳の登録と減価償却費の自動計算方法。 - e-shiwake ヘルプ';
 </script>
 
 <svelte:head>

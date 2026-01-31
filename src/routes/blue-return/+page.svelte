@@ -6,13 +6,21 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Download, Settings2, Printer, AlertCircle, ExternalLink } from '@lucide/svelte';
-	import type { BlueReturnData, BusinessInfo, FixedAsset } from '$lib/types/blue-return-types';
+	import type {
+		BlueReturnData,
+		BusinessInfo,
+		FixedAsset,
+		AccountType
+	} from '$lib/types/blue-return-types';
+	import { AccountTypeLabels } from '$lib/types/blue-return-types';
 	import type { JournalEntry, Account, ProfitLossData, BalanceSheetData } from '$lib/types';
 	import {
 		initializeDatabase,
 		getJournalsByYear,
 		getAllAccounts,
-		getActiveFixedAssets
+		getActiveFixedAssets,
+		getSetting,
+		setSetting
 	} from '$lib/db';
 	import { useFiscalYear } from '$lib/stores/fiscalYear.svelte.js';
 	import { generateProfitLoss } from '$lib/utils/profit-loss';
@@ -58,6 +66,11 @@
 	// 初期化
 	onMount(async () => {
 		await initializeDatabase();
+		// 事業者情報を読み込み
+		const savedBusinessInfo = await getSetting('businessInfo');
+		if (savedBusinessInfo) {
+			businessInfo = savedBusinessInfo;
+		}
 		await loadData();
 	});
 
@@ -126,9 +139,17 @@
 		validationErrors = validateBlueReturnData(blueReturnData);
 	}
 
-	function handleSettingsSave() {
-		generateBlueReturn();
-		settingsDialogOpen = false;
+	// 設定を保存
+	async function handleSettingsSave() {
+		try {
+			const snapshot = $state.snapshot(businessInfo);
+			const plainBusinessInfo = JSON.parse(JSON.stringify(snapshot)) as BusinessInfo;
+			await setSetting('businessInfo', plainBusinessInfo);
+			generateBlueReturn();
+			settingsDialogOpen = false;
+		} catch (e) {
+			console.error('businessInfo保存エラー:', e);
+		}
 	}
 
 	// CSV出力
@@ -161,7 +182,7 @@
 
 <div class="space-y-6 print:space-y-4">
 	<!-- 印刷用ヘッダー -->
-	<div class="hidden print:block print:mb-4">
+	<div class="hidden print:mb-4 print:block">
 		<div class="border-b-2 border-black pb-2">
 			<h1 class="text-xl font-bold">青色申告決算書（一般用）</h1>
 			<p class="text-sm">
@@ -449,7 +470,9 @@
 			<div class="print-section space-y-6 {activeTab !== 'page4' ? 'hidden print:block' : ''}">
 				<h2 class="border-b pb-2 text-lg font-bold">貸借対照表</h2>
 
-				<div class="balance-sheet-container grid grid-cols-1 gap-8 md:grid-cols-2 print:grid-cols-2 print:gap-4">
+				<div
+					class="balance-sheet-container grid grid-cols-1 gap-8 md:grid-cols-2 print:grid-cols-2 print:gap-4"
+				>
 					<!-- 資産の部 -->
 					<section class="assets-section">
 						<table class="w-full text-sm">
@@ -557,7 +580,7 @@
 								</tr>
 								<!-- 青色申告特別控除前の所得金額（短縮表示） -->
 								<tr class="border-b border-muted">
-									<td class="px-2 py-0.5 whitespace-nowrap text-xs print:text-[8pt]"
+									<td class="px-2 py-0.5 text-xs whitespace-nowrap print:text-[8pt]"
 										>控除前所得金額</td
 									>
 									<td class="px-2 py-0.5 text-right font-mono text-muted-foreground"></td>
@@ -698,6 +721,84 @@
 							id="businessType"
 							bind:value={businessInfo.businessType}
 							placeholder="例: システム開発業"
+						/>
+					</div>
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-2">
+							<Label for="phoneNumber">電話番号（任意）</Label>
+							<Input
+								id="phoneNumber"
+								bind:value={businessInfo.phoneNumber}
+								placeholder="03-1234-5678"
+							/>
+						</div>
+						<div class="space-y-2">
+							<Label for="email">メールアドレス（任意）</Label>
+							<Input
+								id="email"
+								type="email"
+								bind:value={businessInfo.email}
+								placeholder="info@example.com"
+							/>
+						</div>
+					</div>
+					<div class="space-y-2">
+						<Label for="invoiceRegistrationNumber">インボイス登録番号（任意）</Label>
+						<Input
+							id="invoiceRegistrationNumber"
+							bind:value={businessInfo.invoiceRegistrationNumber}
+							placeholder="T1234567890123"
+						/>
+					</div>
+				</div>
+			</div>
+
+			<!-- 振込先情報（請求書用） -->
+			<div class="space-y-4">
+				<h3 class="font-medium">振込先情報（請求書用・任意）</h3>
+				<div class="grid gap-4 pl-2">
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-2">
+							<Label for="bankName">銀行名</Label>
+							<Input id="bankName" bind:value={businessInfo.bankName} placeholder="○○銀行" />
+						</div>
+						<div class="space-y-2">
+							<Label for="branchName">支店名</Label>
+							<Input id="branchName" bind:value={businessInfo.branchName} placeholder="○○支店" />
+						</div>
+					</div>
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-2">
+							<Label for="accountType">口座種別</Label>
+							<Select.Root
+								type="single"
+								value={businessInfo.accountType || 'ordinary'}
+								onValueChange={(v) => v && (businessInfo.accountType = v as AccountType)}
+							>
+								<Select.Trigger class="w-full">
+									{businessInfo.accountType ? AccountTypeLabels[businessInfo.accountType] : '普通'}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="ordinary">普通</Select.Item>
+									<Select.Item value="current">当座</Select.Item>
+								</Select.Content>
+							</Select.Root>
+						</div>
+						<div class="space-y-2">
+							<Label for="accountNumber">口座番号</Label>
+							<Input
+								id="accountNumber"
+								bind:value={businessInfo.accountNumber}
+								placeholder="1234567"
+							/>
+						</div>
+					</div>
+					<div class="space-y-2">
+						<Label for="accountHolder">口座名義</Label>
+						<Input
+							id="accountHolder"
+							bind:value={businessInfo.accountHolder}
+							placeholder="ヤマダ タロウ"
 						/>
 					</div>
 				</div>

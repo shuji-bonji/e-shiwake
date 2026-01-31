@@ -1,5 +1,8 @@
 export const prerender = true;
 
+// UTF-8 BOM（バイトオーダーマーク）- 静的ファイルサーバーでの文字化け対策
+const UTF8_BOM = '\uFEFF';
+
 const content = `# e-shiwake - 電子仕訳
 
 日本のフリーランス・個人事業主向けの無料会計PWAアプリケーション。
@@ -55,6 +58,7 @@ const content = `# e-shiwake - 電子仕訳
 - /help/accounts/llms.txt - 勘定科目管理
 - /help/fixed-assets/llms.txt - 固定資産台帳
 - /help/blue-return/llms.txt - 青色申告決算書
+- /help/invoice/llms.txt - 請求書
 - /help/data-management/llms.txt - 設定・データ管理
 - /help/pwa/llms.txt - PWA・オフライン
 - /help/shortcuts/llms.txt - ショートカット
@@ -112,7 +116,7 @@ https://github.com/shuji-bonji/e-shiwake
 `;
 
 export function GET() {
-	return new Response(content, {
+	return new Response(UTF8_BOM + content, {
 		headers: {
 			'Content-Type': 'text/plain; charset=utf-8'
 		}

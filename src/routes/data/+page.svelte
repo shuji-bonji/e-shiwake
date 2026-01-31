@@ -1,9 +1,13 @@
 <script lang="ts">
+	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as RadioGroup from '$lib/components/ui/radio-group/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import {
 		deleteYearData,
@@ -16,6 +20,7 @@
 		getFilesystemAttachmentCount,
 		getImportPreview,
 		getJournalsByYear,
+		getSetting,
 		getStorageMode,
 		getUnexportedAttachmentCount,
 		importData,
@@ -26,14 +31,16 @@
 		seedTestData2024,
 		setAutoPurgeBlobSetting,
 		setLastExportedAt,
+		setSetting,
 		setStorageMode,
 		validateExportData,
 		type ImportMode,
 		type ImportResult
 	} from '$lib/db';
-	import { useMigrationStore } from '$lib/stores/migration.svelte.js';
 	import { setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
-	import type { ExportData, StorageType } from '$lib/types';
+	import { useMigrationStore } from '$lib/stores/migration.svelte.js';
+	import type { ExportData, StorageType, StorageUsage } from '$lib/types';
+	import type { BusinessInfo } from '$lib/types/blue-return-types';
 	import {
 		clearDirectoryHandle,
 		getDirectoryDisplayName,
@@ -49,11 +56,10 @@
 		RECOMMENDED_QUOTA,
 		WARNING_THRESHOLD
 	} from '$lib/utils/storage';
-	import { exportToZip, downloadZip, type ZipExportProgress } from '$lib/utils/zip-export';
+	import { downloadZip, exportToZip, type ZipExportProgress } from '$lib/utils/zip-export';
 	import { importFromZip, isZipFile, type ZipImportProgress } from '$lib/utils/zip-import';
-	import type { StorageUsage } from '$lib/types';
-	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
-	import { Progress } from '$lib/components/ui/progress/index.js';
+	import { omit } from '$lib/utils';
+	import { createDebounce } from '$lib/utils/debounce';
 	import {
 		AlertTriangle,
 		Archive,
@@ -160,6 +166,22 @@
 	let isSeeding = $state(false);
 	let seedResult = $state<string | null>(null);
 
+	// === 事業者情報 ===
+	let businessInfo = $state<BusinessInfo>({
+		name: '',
+		tradeName: '',
+		address: '',
+		businessType: '',
+		phoneNumber: '',
+		email: '',
+		bankName: '',
+		branchName: '',
+		accountType: 'ordinary',
+		accountNumber: '',
+		accountHolder: '',
+		invoiceRegistrationNumber: ''
+	});
+
 	// 初期化
 	onMount(async () => {
 		await initializeDatabase();
@@ -190,8 +212,26 @@
 
 		// 年度リスト
 		availableYears = await getAvailableYears();
+
+		// 事業者情報を読み込み
+		const savedBusinessInfo = await getSetting('businessInfo');
+		if (savedBusinessInfo) {
+			businessInfo = savedBusinessInfo;
+		}
+
 		isLoading = false;
 	});
+
+	// 事業者情報を自動保存（デバウンス付き）
+	const saveBusinessInfoDebounced = createDebounce(async () => {
+		try {
+			const snapshot = $state.snapshot(businessInfo);
+			const plainBusinessInfo = JSON.parse(JSON.stringify(snapshot)) as BusinessInfo;
+			await setSetting('businessInfo', plainBusinessInfo);
+		} catch (e) {
+			console.error('businessInfo自動保存エラー:', e);
+		}
+	}, 500);
 
 	// === 保存モード関連 ===
 	async function handleStorageModeChange(mode: StorageType) {
@@ -485,11 +525,7 @@
 
 		const journalsWithoutBlob = journals.map((journal) => ({
 			...journal,
-			attachments: journal.attachments.map((att) => {
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				const { blob, ...rest } = att;
-				return rest;
-			})
+			attachments: journal.attachments.map((att) => omit(att, ['blob']))
 		}));
 
 		return {
@@ -645,11 +681,7 @@
 				fiscalYear: year,
 				journals: journals.map((journal) => ({
 					...journal,
-					attachments: journal.attachments.map((att) => {
-						// eslint-disable-next-line @typescript-eslint/no-unused-vars
-						const { blob, ...rest } = att;
-						return rest;
-					})
+					attachments: journal.attachments.map((att) => omit(att, ['blob']))
 				})),
 				accounts,
 				vendors,
@@ -866,6 +898,147 @@
 		</h1>
 		<p class="text-sm text-muted-foreground">証憑の保存設定とデータのエクスポート・インポート</p>
 	</div>
+
+	<!-- 事業者情報 -->
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>事業者情報</Card.Title>
+			<Card.Description>請求書に表示される事業者情報を設定します（自動保存）</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-6">
+			<!-- 基本情報 -->
+			<div class="space-y-4">
+				<h3 class="text-sm font-medium">基本情報</h3>
+				<div class="grid gap-4 sm:grid-cols-2">
+					<div class="space-y-2">
+						<Label for="business-name">氏名 *</Label>
+						<Input
+							id="business-name"
+							bind:value={businessInfo.name}
+							placeholder="山田 太郎"
+							oninput={saveBusinessInfoDebounced}
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="business-trade-name">屋号</Label>
+						<Input
+							id="business-trade-name"
+							bind:value={businessInfo.tradeName}
+							placeholder="○○事務所"
+							oninput={saveBusinessInfoDebounced}
+						/>
+					</div>
+					<div class="space-y-2 sm:col-span-2">
+						<Label for="business-address">住所 *</Label>
+						<Input
+							id="business-address"
+							bind:value={businessInfo.address}
+							placeholder="東京都○○区..."
+							oninput={saveBusinessInfoDebounced}
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="business-phone">電話番号</Label>
+						<Input
+							id="business-phone"
+							bind:value={businessInfo.phoneNumber}
+							placeholder="03-1234-5678"
+							oninput={saveBusinessInfoDebounced}
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="business-email">メールアドレス</Label>
+						<Input
+							id="business-email"
+							type="email"
+							bind:value={businessInfo.email}
+							placeholder="info@example.com"
+							oninput={saveBusinessInfoDebounced}
+						/>
+					</div>
+				</div>
+			</div>
+
+			<!-- インボイス登録番号 -->
+			<div class="space-y-4">
+				<h3 class="text-sm font-medium">インボイス制度</h3>
+				<div class="space-y-2">
+					<Label for="invoice-registration">適格請求書発行事業者登録番号</Label>
+					<Input
+						id="invoice-registration"
+						bind:value={businessInfo.invoiceRegistrationNumber}
+						placeholder="T1234567890123"
+						oninput={saveBusinessInfoDebounced}
+					/>
+					<p class="text-xs text-muted-foreground">
+						登録番号は「T」+ 13桁の数字です。未登録の場合は空欄のままにしてください。
+					</p>
+				</div>
+			</div>
+
+			<!-- 振込先情報 -->
+			<div class="space-y-4">
+				<h3 class="text-sm font-medium">振込先情報</h3>
+				<div class="grid gap-4 sm:grid-cols-2">
+					<div class="space-y-2">
+						<Label for="bank-name">銀行名</Label>
+						<Input
+							id="bank-name"
+							bind:value={businessInfo.bankName}
+							placeholder="○○銀行"
+							oninput={saveBusinessInfoDebounced}
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="branch-name">支店名</Label>
+						<Input
+							id="branch-name"
+							bind:value={businessInfo.branchName}
+							placeholder="○○支店"
+							oninput={saveBusinessInfoDebounced}
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label>口座種別</Label>
+						<Select.Root
+							type="single"
+							value={businessInfo.accountType || 'ordinary'}
+							onValueChange={(v) => {
+								businessInfo.accountType = v as 'ordinary' | 'current';
+								saveBusinessInfoDebounced();
+							}}
+						>
+							<Select.Trigger>
+								{businessInfo.accountType === 'current' ? '当座' : '普通'}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="ordinary">普通</Select.Item>
+								<Select.Item value="current">当座</Select.Item>
+							</Select.Content>
+						</Select.Root>
+					</div>
+					<div class="space-y-2">
+						<Label for="account-number">口座番号</Label>
+						<Input
+							id="account-number"
+							bind:value={businessInfo.accountNumber}
+							placeholder="1234567"
+							oninput={saveBusinessInfoDebounced}
+						/>
+					</div>
+					<div class="space-y-2 sm:col-span-2">
+						<Label for="account-holder">口座名義</Label>
+						<Input
+							id="account-holder"
+							bind:value={businessInfo.accountHolder}
+							placeholder="ヤマダ タロウ"
+							oninput={saveBusinessInfoDebounced}
+						/>
+					</div>
+				</div>
+			</div>
+		</Card.Content>
+	</Card.Root>
 
 	<!-- 証憑保存先設定 -->
 	<Card.Root>

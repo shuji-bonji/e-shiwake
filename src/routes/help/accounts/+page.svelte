@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
 
-	const pageDescription =
-		'勘定科目の追加・編集方法。家事按分の設定も解説。 - e-shiwake ヘルプ';
+	const pageDescription = '勘定科目の追加・編集方法。家事按分の設定も解説。 - e-shiwake ヘルプ';
 </script>
 
 <svelte:head>
