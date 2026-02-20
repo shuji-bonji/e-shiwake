@@ -322,46 +322,50 @@
 </script>
 
 <div class="space-y-4">
-	<!-- ヘッダー -->
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl font-bold">仕訳帳</h1>
-			<p class="text-sm text-muted-foreground">{fiscalYear.selectedYear}年度</p>
+	<!-- ヘッダー + 検索ボックス（固定） -->
+	<div
+		class="sticky top-14 z-10 -mx-4 space-y-3 border-b bg-background px-4 pt-4 pb-3 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12"
+	>
+		<div class="flex items-center justify-between">
+			<div>
+				<h1 class="text-2xl font-bold">仕訳帳</h1>
+				<p class="text-sm text-muted-foreground">{fiscalYear.selectedYear}年度</p>
+			</div>
+			<div class="flex items-center gap-2">
+				<Button variant="outline" onclick={exportCSV} disabled={filteredJournals.length === 0}>
+					<Download class="mr-2 size-4" />
+					CSV
+				</Button>
+				<Button onclick={handleAddJournal}>
+					<Plus class="mr-2 size-4" />
+					新規仕訳
+				</Button>
+			</div>
 		</div>
-		<div class="flex items-center gap-2">
-			<Button variant="outline" onclick={exportCSV} disabled={filteredJournals.length === 0}>
-				<Download class="mr-2 size-4" />
-				CSV
-			</Button>
-			<Button onclick={handleAddJournal}>
-				<Plus class="mr-2 size-4" />
-				新規仕訳
-			</Button>
-		</div>
-	</div>
 
-	<!-- 検索ボックス -->
-	<div class="flex items-center gap-2">
-		<div class="relative flex-1">
-			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-			<Input
-				type="text"
-				placeholder="検索（摘要、取引先、勘定科目、金額、日付...）"
-				bind:value={searchQuery}
-				class="pr-10 pl-10"
-			/>
-			{#if searchQuery}
-				<button
-					type="button"
-					onclick={clearSearch}
-					class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-					aria-label="検索をクリア"
-				>
-					<X class="size-4" />
-				</button>
-			{/if}
+		<!-- 検索ボックス -->
+		<div class="flex items-center gap-2">
+			<div class="relative flex-1">
+				<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+				<Input
+					type="text"
+					placeholder="検索（摘要、取引先、勘定科目、金額、日付...）"
+					bind:value={searchQuery}
+					class="pr-10 pl-10"
+				/>
+				{#if searchQuery}
+					<button
+						type="button"
+						onclick={clearSearch}
+						class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+						aria-label="検索をクリア"
+					>
+						<X class="size-4" />
+					</button>
+				{/if}
+			</div>
+			<SearchHelp />
 		</div>
-		<SearchHelp />
 	</div>
 
 	<!-- 仕訳リスト -->

@@ -192,7 +192,9 @@
 	</div>
 
 	<!-- 画面表示用ヘッダー -->
-	<div class="flex flex-wrap items-center justify-between gap-4 print:hidden">
+	<div
+		class="sticky top-14 z-10 -mx-4 flex flex-wrap items-center justify-between gap-4 border-b bg-background px-4 pt-4 pb-3 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12 print:hidden"
+	>
 		<div>
 			<h1 class="text-2xl font-bold">青色申告決算書</h1>
 			<p class="text-sm text-muted-foreground">

@@ -281,7 +281,9 @@
 
 <div class="space-y-6">
 	<!-- ヘッダー -->
-	<div class="flex items-center justify-between">
+	<div
+		class="sticky top-14 z-10 -mx-4 flex items-center justify-between border-b bg-background px-4 pt-4 pb-3 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12"
+	>
 		<div>
 			<h1 class="text-2xl font-bold">勘定科目</h1>
 			<p class="text-sm text-muted-foreground">勘定科目の追加・編集・削除を行います</p>

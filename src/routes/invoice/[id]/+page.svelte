@@ -262,7 +262,9 @@
 
 <div class="space-y-6 print:hidden">
 	<!-- ヘッダー（画面表示用） -->
-	<div class="flex flex-wrap items-center justify-between gap-4 print:hidden">
+	<div
+		class="sticky top-14 z-10 -mx-4 flex flex-wrap items-center justify-between gap-4 border-b bg-background px-4 pt-4 pb-3 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12 print:hidden"
+	>
 		<div class="flex items-center gap-4">
 			<Button variant="ghost" size="icon" onclick={goBack}>
 				<ArrowLeft class="size-5" />

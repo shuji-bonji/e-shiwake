@@ -1037,8 +1037,10 @@
 	}
 </script>
 
-<div class="container mx-auto max-w-3xl space-y-6 p-4">
-	<div class="flex items-center justify-between">
+<div class="container mx-auto max-w-3xl space-y-6 px-4 pb-4">
+	<div
+		class="sticky top-14 z-10 -mx-4 flex items-center justify-between border-b bg-background px-4 pt-4 pb-3 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12"
+	>
 		<h1 class="flex items-center gap-2 text-2xl font-bold">
 			<FileText class="size-6" />
 			帳簿出力

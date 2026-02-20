@@ -170,6 +170,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
 		display: none !important;
 	}
 
+	/* sticky要素を解除（印刷時にずれ防止） */
+	.sticky {
+		position: static !important;
+	}
+
 	/* メインコンテンツを全幅に */
 	[data-slot='sidebar-inset'],
 	main {

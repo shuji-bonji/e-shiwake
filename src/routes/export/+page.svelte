@@ -228,7 +228,9 @@
 </script>
 
 <div class="space-y-6">
-	<div>
+	<div
+		class="sticky top-14 z-10 -mx-4 border-b bg-background px-4 pt-4 pb-3 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12"
+	>
 		<h1 class="text-2xl font-bold">エクスポート</h1>
 		<p class="text-sm text-muted-foreground">年度別にデータをエクスポートします</p>
 	</div>

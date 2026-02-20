@@ -130,7 +130,9 @@
 </script>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
+	<div
+		class="sticky top-14 z-10 -mx-4 flex items-center justify-between border-b bg-background px-4 pt-4 pb-3 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12"
+	>
 		<h1 class="flex items-center gap-2 text-2xl font-bold">
 			<BookOpen class="size-6" />
 			総勘定元帳
