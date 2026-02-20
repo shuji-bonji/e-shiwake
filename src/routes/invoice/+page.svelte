@@ -107,7 +107,9 @@
 
 <div class="space-y-6">
 	<!-- ヘッダー -->
-	<div class="flex flex-wrap items-center justify-between gap-4">
+	<div
+		class="sticky top-14 z-10 -mx-4 flex flex-wrap items-center justify-between gap-4 border-b bg-background px-4 pt-4 pb-3 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12"
+	>
 		<div>
 			<h1 class="text-2xl font-bold">請求書一覧</h1>
 			<p class="text-sm text-muted-foreground">{fiscalYear.selectedYear}年度の請求書</p>
