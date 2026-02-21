@@ -39,6 +39,11 @@
 			</div>
 			<div class="flex items-center gap-2">
 				<span class="w-5 text-center text-muted-foreground">D</span>
+				<span class="flex-1">年</span>
+				<code class="rounded bg-muted px-1.5 py-0.5 text-xs">2025年</code>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="w-5 text-center text-muted-foreground">D</span>
 				<span class="flex-1">年月</span>
 				<code class="rounded bg-muted px-1.5 py-0.5 text-xs">2025-01</code>
 			</div>
@@ -64,6 +69,7 @@
 			<div class="mt-1 space-y-1">
 				<p><code class="rounded bg-muted px-1.5 py-0.5 text-xs">Amazon 12月</code></p>
 				<p><code class="rounded bg-muted px-1.5 py-0.5 text-xs">消耗品費 10000</code></p>
+				<p><code class="rounded bg-muted px-1.5 py-0.5 text-xs">2025年 通信費</code></p>
 			</div>
 		</div>
 	</div>
