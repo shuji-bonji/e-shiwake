@@ -22,6 +22,7 @@
 		getJournalsByYear,
 		getSetting,
 		getStorageMode,
+		getSuppressRenameConfirm,
 		getUnexportedAttachmentCount,
 		importData,
 		initializeDatabase,
@@ -33,6 +34,7 @@
 		setLastExportedAt,
 		setSetting,
 		setStorageMode,
+		setSuppressRenameConfirm,
 		validateExportData,
 		type ImportMode,
 		type ImportResult
@@ -65,6 +67,7 @@
 		Archive,
 		Check,
 		Download,
+		FileCheck,
 		FileJson,
 		FileSpreadsheet,
 		Folder,
@@ -103,6 +106,9 @@
 	let isFolderMigrating = $state(false);
 	let folderMigrationProgress = $state(0);
 	let folderMigrationError = $state<string | null>(null);
+
+	// === 証憑確認設定 ===
+	let suppressRenameConfirm = $state(false);
 
 	// === 容量管理設定 ===
 	let storageUsage = $state<StorageUsage>({ used: 0, quota: 0, percentage: 0 });
@@ -209,6 +215,9 @@
 		// 容量管理設定を取得
 		autoPurgeEnabled = await getAutoPurgeBlobSetting();
 		retentionDays = await getBlobRetentionDays();
+
+		// 証憑リネーム確認設定を取得
+		suppressRenameConfirm = await getSuppressRenameConfirm();
 
 		// 年度リスト
 		availableYears = await getAvailableYears();
@@ -476,6 +485,12 @@
 		directoryName = null;
 		storageMode = 'indexeddb';
 		await setStorageMode('indexeddb');
+	}
+
+	// === 証憑確認設定関連 ===
+	async function handleSuppressRenameConfirmChange(suppress: boolean) {
+		suppressRenameConfirm = suppress;
+		await setSuppressRenameConfirm(suppress);
 	}
 
 	// === 容量管理関連 ===
@@ -1154,6 +1169,34 @@
 					</div>
 				{/if}
 			{/if}
+		</Card.Content>
+	</Card.Root>
+
+	<!-- 証憑確認設定 -->
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="flex items-center gap-2">
+				<FileCheck class="size-5" />
+				証憑の確認設定
+			</Card.Title>
+			<Card.Description>証憑ファイルのリネーム確認に関する設定です</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-4">
+			<div class="flex items-center justify-between rounded-lg border p-4">
+				<div class="space-y-0.5">
+					<Label for="suppress-rename" class="font-medium">
+						仕訳変更時のリネーム確認を表示しない
+					</Label>
+					<p class="text-sm text-muted-foreground">
+						日付・摘要・金額・取引先の変更時に、証憑ファイル名の自動変更を確認せず即実行します
+					</p>
+				</div>
+				<Switch
+					id="suppress-rename"
+					checked={suppressRenameConfirm}
+					onCheckedChange={handleSuppressRenameConfirmChange}
+				/>
+			</div>
 		</Card.Content>
 	</Card.Root>
 

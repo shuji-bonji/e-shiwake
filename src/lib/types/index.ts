@@ -203,7 +203,8 @@ export type SettingsKey =
 	| 'lastExportedAt'
 	| 'autoPurgeBlobAfterExport'
 	| 'blobRetentionDays'
-	| 'businessInfo';
+	| 'businessInfo'
+	| 'suppressRenameConfirm';
 
 // BusinessInfoはblue-return-types.tsで定義（循環参照を避けるため、ここではanyを使用）
 // 実際の型は $lib/types/blue-return-types.ts の BusinessInfo を参照
@@ -213,6 +214,7 @@ export type SettingsValueMap = {
 	autoPurgeBlobAfterExport: boolean;
 	blobRetentionDays: number;
 	businessInfo: import('./blue-return-types').BusinessInfo;
+	suppressRenameConfirm: boolean;
 };
 
 export interface Settings {

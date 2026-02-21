@@ -117,6 +117,27 @@ export async function getYearDirectory(
 }
 
 /**
+ * 指定ディレクトリにファイルが存在するか確認
+ * @param rootHandle ルートディレクトリハンドル
+ * @param year 年度
+ * @param fileName ファイル名
+ * @returns ファイルが存在すればtrue
+ */
+export async function fileExistsInDirectory(
+	rootHandle: FileSystemDirectoryHandle,
+	year: number,
+	fileName: string
+): Promise<boolean> {
+	try {
+		const yearDir = await rootHandle.getDirectoryHandle(String(year));
+		await yearDir.getFileHandle(fileName);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
  * ファイルを保存
  * @param rootHandle ルートディレクトリハンドル
  * @param year 年度
