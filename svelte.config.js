@@ -48,6 +48,7 @@ const config = {
 				'/help/fixed-assets',
 				'/help/blue-return',
 				'/help/invoice',
+				'/help/webmcp',
 				// LLM用テキストエンドポイント
 				'/llms.txt',
 				'/help/getting-started/llms.txt',
@@ -63,7 +64,8 @@ const config = {
 				'/help/data-management/llms.txt',
 				'/help/pwa/llms.txt',
 				'/help/shortcuts/llms.txt',
-				'/help/glossary/llms.txt'
+				'/help/glossary/llms.txt',
+				'/help/webmcp/llms.txt'
 			]
 		}
 	}

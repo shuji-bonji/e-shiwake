@@ -106,6 +106,122 @@ const content = `# e-shiwake - 電子仕訳
 - out_of_scope: 不課税
 - na: 対象外（事業主勘定等）
 
+## AI連携（WebMCP）
+
+e-shiwake は WebMCP（Web Model Context Protocol）に対応しています。
+Chrome 146+ で WebMCP が有効な場合、AIエージェントは以下のツールを通じて
+e-shiwake のデータに直接アクセスできます。
+
+### 利用可能なツール
+
+#### 仕訳管理
+
+- search_journals: 仕訳を全年度横断で検索（キーワード、勘定科目、金額、日付で検索可能。スペース区切りでAND検索）
+  - 引数: query (string, 必須), fiscalYear (number, 任意)
+  - 例: search_journals({query: "Amazon 12月"})
+
+- get_journals_by_year: 指定した会計年度の全仕訳を取得
+  - 引数: year (number, 必須)
+
+- create_journal: 複合仕訳を作成（借方合計 = 貸方合計であること）
+  - 引数: date (string, 必須), description (string, 必須), vendor (string), debitLines (array, 必須), creditLines (array, 必須)
+  - debitLines/creditLines の各要素: {accountCode: "5005", amount: 1200, taxCategory?: "purchase_10"}
+
+- delete_journal: 仕訳を削除
+  - 引数: id (string, 必須)
+
+#### マスタ参照
+
+- list_accounts: 勘定科目マスタ一覧を取得
+  - 引数: type (string, 任意) - asset/liability/equity/revenue/expense でフィルタ
+
+- list_vendors: 取引先一覧を取得（検索可能）
+  - 引数: query (string, 任意)
+
+#### 帳簿生成
+
+- generate_ledger: 総勘定元帳を生成
+  - 引数: accountCode (string, 必須), fiscalYear (number, 必須)
+
+- generate_trial_balance: 試算表（合計残高試算表）を生成
+  - 引数: fiscalYear (number, 必須)
+
+- generate_profit_loss: 損益計算書を生成
+  - 引数: fiscalYear (number, 必須)
+
+- generate_balance_sheet: 貸借対照表を生成
+  - 引数: fiscalYear (number, 必須)
+
+#### 税務
+
+- calculate_consumption_tax: 消費税集計を計算（課税売上・課税仕入・納付税額）
+  - 引数: fiscalYear (number, 必須)
+
+#### ユーティリティ
+
+- get_available_years: データが存在する会計年度の一覧を取得（引数なし）
+
+### 勘定科目コード体系（4桁）
+
+1桁目: 1=資産, 2=負債, 3=純資産, 4=収益, 5=費用
+2桁目: 0=システム, 1=ユーザー追加
+3-4桁目: 連番（01-99）
+
+主な勘定科目:
+- 1001: 現金, 1002: 当座預金, 1003: 普通預金, 1004: 売掛金
+- 2001: 買掛金, 2002: 未払金
+- 3001: 元入金, 3002: 事業主貸, 3003: 事業主借
+- 4001: 売上高
+- 5001: 仕入高, 5002: 租税公課, 5003: 荷造運賃, 5004: 水道光熱費,
+  5005: 旅費交通費, 5006: 通信費, 5007: 広告宣伝費, 5008: 接待交際費,
+  5009: 損害保険料, 5010: 修繕費, 5011: 消耗品費, 5012: 減価償却費,
+  5013: 福利厚生費, 5014: 給料賃金, 5015: 外注工賃, 5016: 利子割引料,
+  5017: 地代家賃, 5018: 貸倒金, 5019: 雑費, 5020: 新聞図書費,
+  5021: 研修費, 5022: 支払手数料
+
+### 複式簿記のルール
+
+借方(debit)に来る科目:
+- 資産の増加（例: 現金が入った）
+- 費用の発生（例: 経費を使った）
+- 負債の減少（例: 借入を返した）
+
+貸方(credit)に来る科目:
+- 資産の減少（例: 現金を払った）
+- 収益の発生（例: 売上が立った）
+- 負債の増加（例: 借入をした）
+
+### 仕訳の例
+
+電車代1,200円を現金で支払い:
+create_journal({
+  date: "2026-02-22",
+  description: "電車代",
+  vendor: "",
+  debitLines: [{accountCode: "5005", amount: 1200, taxCategory: "na"}],
+  creditLines: [{accountCode: "1001", amount: 1200, taxCategory: "na"}]
+})
+
+家事按分（携帯電話代10,000円、事業80%）:
+create_journal({
+  date: "2026-02-20",
+  description: "携帯電話代",
+  vendor: "NTTドコモ",
+  debitLines: [
+    {accountCode: "5006", amount: 8000, taxCategory: "purchase_10"},
+    {accountCode: "3002", amount: 2000, taxCategory: "na"}
+  ],
+  creditLines: [{accountCode: "1003", amount: 10000, taxCategory: "na"}]
+})
+
+### WebMCPの有効化
+
+Chrome 146+ で chrome://flags → "WebMCP for testing" を Enabled にする。
+
+### 詳細ドキュメント
+
+- /help/webmcp/llms.txt - WebMCPツールの詳細な使い方
+
 ## URL
 
 https://shuji-bonji.github.io/e-shiwake/

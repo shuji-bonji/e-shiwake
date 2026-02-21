@@ -19,6 +19,7 @@
 	} from '$lib/utils/storage';
 	import { AlertTriangle } from '@lucide/svelte';
 	import { onMount } from 'svelte';
+	import { initWebMCP, destroyWebMCP } from '$lib/webmcp';
 	import { toast } from 'svelte-sonner';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import './layout.css';
@@ -42,6 +43,12 @@
 	onMount(() => {
 		// テーマを初期化
 		initializeTheme();
+
+		// WebMCP ツールを登録（Chrome 146+ Early Preview）
+		const webmcpToolCount = initWebMCP();
+		if (webmcpToolCount > 0) {
+			console.info(`[e-shiwake] WebMCP: ${webmcpToolCount} ツールをAIエージェントに公開しました`);
+		}
 
 		// オフライン/オンライン検知
 		function handleOnline() {
@@ -111,6 +118,7 @@
 		return () => {
 			window.removeEventListener('online', handleOnline);
 			window.removeEventListener('offline', handleOffline);
+			destroyWebMCP();
 		};
 	});
 
