@@ -7,6 +7,7 @@ export interface SearchCriteria {
 	text: string[]; // 摘要・取引先（部分一致）
 	accounts: string[]; // 勘定科目コード
 	amounts: number[]; // 金額（完全一致）
+	year?: number; // 年（YYYY）
 	yearMonth?: string; // YYYY-MM
 	month?: number; // 月のみ（1-12）
 	date?: string; // YYYY-MM-DD
@@ -58,6 +59,29 @@ export function parseSearchQuery(query: string, accounts: Account[]): SearchCrit
 			const m = slashDateMatch[2].padStart(2, '0');
 			const d = slashDateMatch[3].padStart(2, '0');
 			criteria.date = `${y}-${m}-${d}`;
+			continue;
+		}
+
+		// YYYY年（年指定）
+		const yearJaMatch = token.match(/^(\d{4})年$/);
+		if (yearJaMatch) {
+			criteria.year = parseInt(yearJaMatch[1], 10);
+			continue;
+		}
+
+		// YYYY-（ハイフン末尾で年指定）
+		const yearHyphenMatch = token.match(/^(\d{4})-$/);
+		if (yearHyphenMatch) {
+			criteria.year = parseInt(yearHyphenMatch[1], 10);
+			continue;
+		}
+
+		// YYYY/MM（スラッシュ区切り年月）
+		const slashYearMonthMatch = token.match(/^(\d{4})\/(\d{1,2})$/);
+		if (slashYearMonthMatch) {
+			const y = slashYearMonthMatch[1];
+			const m = slashYearMonthMatch[2].padStart(2, '0');
+			criteria.yearMonth = `${y}-${m}`;
 			continue;
 		}
 
@@ -144,6 +168,11 @@ export function filterJournals(journals: JournalEntry[], criteria: SearchCriteri
 			const journalAmounts = journal.lines.map((l) => l.amount);
 			const hasMatch = criteria.amounts.some((a) => journalAmounts.includes(a));
 			if (!hasMatch) return false;
+		}
+
+		// 年（YYYY）
+		if (criteria.year && !journal.date.startsWith(String(criteria.year))) {
+			return false;
 		}
 
 		// 日付（完全一致）
