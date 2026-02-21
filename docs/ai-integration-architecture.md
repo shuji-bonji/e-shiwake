@@ -1,7 +1,8 @@
 # e-shiwake AI連携 アーキテクチャ設計書
 
-> **ステータス**: Draft v1.0
+> **ステータス**: Draft v1.1
 > **作成日**: 2026-02-22
+> **更新日**: 2026-02-22
 > **関連**: [GitHub Discussion #19](https://github.com/shuji-bonji/e-shiwake/discussions/19)
 
 ---
@@ -104,13 +105,13 @@ utils/ → 26ファイルの純粋関数群
 ```mermaid
 graph LR
     User["ユーザー"]
-    Agent["AIエージェント<br/>（Claude Code等）"]
+    Agent["AIエージェント<br/>（Chrome AI等）"]
     Browser["ブラウザ<br/>（e-shiwake PWA）"]
     IDB["IndexedDB"]
     FS["ファイルシステム"]
 
     User -->|指示| Agent
-    Agent -->|操作| Browser
+    Agent -->|WebMCP| Browser
     Browser --> IDB
     Browser --> FS
     User -->|閲覧| Browser
@@ -118,7 +119,7 @@ graph LR
 
 ### 3.2 選択肢の比較
 
-#### A. WebMCP（W3C標準）
+#### A. WebMCP（W3C標準）✅ PoC実装済み
 
 ```mermaid
 sequenceDiagram
@@ -136,32 +137,38 @@ sequenceDiagram
     Chrome-->>Agent: 完了レスポンス
 ```
 
-**実装イメージ**:
+**実装状況（2026-02-22 PoC完了）**:
 
-```typescript
-// e-shiwake 側に追加（src/lib/webmcp/register-tools.ts）
-export function registerWebMCPTools() {
-	navigator.modelContext.registerTool({
-		name: 'search_journals',
-		description: '仕訳を全年度横断で検索',
-		inputSchema: {
-			type: 'object',
-			properties: {
-				keyword: { type: 'string', description: '検索キーワード' },
-				fiscalYear: { type: 'number', description: '会計年度（省略時は全年度）' }
-			},
-			required: ['keyword']
-		},
-		async execute(args) {
-			const journals = await getAllJournals();
-			const results = searchJournals(args.keyword, journals);
-			return {
-				content: [{ type: 'text', text: JSON.stringify(results) }]
-			};
-		}
-	});
-}
 ```
+src/lib/webmcp/
+├── types.ts    # navigator.modelContext の型定義
+├── tools.ts    # 12ツールの定義と実装
+└── index.ts    # init/destroy モジュール（graceful degradation）
+```
+
+**登録済みツール（12個）**:
+
+| カテゴリ       | ツール名                  | 概要             |
+| -------------- | ------------------------- | ---------------- |
+| 仕訳管理       | search_journals           | 全年度横断検索   |
+|                | get_journals_by_year      | 年度指定取得     |
+|                | create_journal            | 仕訳作成         |
+|                | delete_journal            | 仕訳削除         |
+| マスタ参照     | list_accounts             | 勘定科目一覧     |
+|                | list_vendors              | 取引先一覧       |
+| 帳簿生成       | generate_ledger           | 総勘定元帳       |
+|                | generate_trial_balance    | 試算表           |
+|                | generate_profit_loss      | 損益計算書       |
+|                | generate_balance_sheet    | 貸借対照表       |
+| 税務           | calculate_consumption_tax | 消費税集計       |
+| ユーティリティ | get_available_years       | 利用可能年度一覧 |
+
+**動作確認結果**:
+
+| 環境                             | 動作                                                   |
+| -------------------------------- | ------------------------------------------------------ |
+| Chrome Canary 146+（flags有効）  | 12ツール登録、AIエージェントに公開                     |
+| 通常の Chrome / Safari / Firefox | 情報メッセージのみ、エラーなし（graceful degradation） |
 
 | 項目           | 評価                                                        |
 | -------------- | ----------------------------------------------------------- |
@@ -170,34 +177,9 @@ export function registerWebMCPTools() {
 | **実装コスト** | 低（既存のdb/utils関数をそのまま呼び出し）                  |
 | **成熟度**     | ⚠️ 極めて初期段階（2026年2月時点で Canary のみ）            |
 
-#### B. Playwright MCP
+#### B. e-shiwake Skill（Claude Code / Cowork）
 
-```mermaid
-sequenceDiagram
-    participant Agent as AIエージェント
-    participant PW as Playwright MCP Server
-    participant Browser as ブラウザ（e-shiwake）
-
-    Agent->>PW: navigate("https://e-shiwake/")
-    PW->>Browser: ページ遷移
-    Agent->>PW: click("新規仕訳ボタン")
-    PW->>Browser: DOM操作
-    Agent->>PW: fill("日付フィールド", "2026-02-22")
-    PW->>Browser: 入力
-    Agent->>PW: snapshot()
-    PW-->>Agent: アクセシビリティツリー
-```
-
-| 項目           | 評価                                                      |
-| -------------- | --------------------------------------------------------- |
-| **メリット**   | 既存UIをそのまま利用、幅広いブラウザ対応                  |
-| **デメリット** | DOM構造に依存（UI変更で壊れる）、トークンコスト高         |
-| **実装コスト** | 低（追加コード不要、Playwright MCP Serverを設定するだけ） |
-| **成熟度**     | ✅ 安定（Playwright自体は成熟技術）                       |
-
-#### C. e-shiwake Skill（Claude Code / Cowork）
-
-Skillはコードを書くのではなく、既存のUI操作手順をマークダウンで記述する。
+Skillはコードを書くのではなく、既存のUI操作手順をマークダウンで記述する。AIエージェント（Claude Code / Cowork）がこの手順を参照してユーザーの指示を実行する。
 
 ```markdown
 # e-shiwake 操作スキル（SKILL.md）
@@ -212,28 +194,62 @@ Skillはコードを書くのではなく、既存のUI操作手順をマーク�
 6. 確定ボタンをクリック
 ```
 
-| 項目           | 評価                                   |
-| -------------- | -------------------------------------- |
-| **メリット**   | 実装コスト最小、すぐに使える           |
-| **デメリット** | Playwright等のブラウザ操作ツールが前提 |
-| **実装コスト** | 極低（SKILL.mdを書くだけ）             |
-| **成熟度**     | ✅ Claude Code/Coworkで利用可能        |
+| 項目           | 評価                                              |
+| -------------- | ------------------------------------------------- |
+| **メリット**   | 実装コスト最小、すぐに使える、llms.txt と補完関係 |
+| **デメリット** | ブラウザ操作ツール（Claude in Chrome等）が前提    |
+| **実装コスト** | 極低（SKILL.mdを書くだけ）                        |
+| **成熟度**     | ✅ Claude Code / Cowork で利用可能                |
 
-### 3.3 構想1の推奨アプローチ
+### 3.3 Playwright の位置づけ（E2Eテスト専用）
+
+> **決定事項**: Playwright は**フォールバック手段から除外**。開発用E2Eテストとしてのみ使用する。
+
+**除外理由**:
+
+- ユーザーにNode.js + Playwright（Chromiumバイナリ含む数百MB）のインストール負担がかかる
+- DOM構造に依存し、UI変更のたびにセレクタの更新が必要
+- 実行のたびにブラウザが起動し、体感が重い
+- WebMCPが使えない場合、Concept 2（MCP Server で直接DB操作）の方が速くて確実
+
+**E2Eテストとしての活用**:
+
+- WebMCPツール12個の動作をE2Eテストで検証（開発時）
+- 仕訳CRUD、帳簿生成、検索機能の統合テスト
+- CI/CDパイプラインでのリグレッションテスト
+
+### 3.4 構想1のフォールバック戦略
 
 ```
-Phase 1（即座）: Skill + Playwright MCP
-  → SKILL.md で操作手順を定義
-  → Playwright MCP Server で実際のブラウザ操作
-
-Phase 2（2026年後半）: WebMCP Early Adoption
-  → Chrome 146+ 安定版リリース後に navigator.modelContext 実装
-  → 読み取り系ツールから段階的に導入
-
-Phase 3（2027年〜）: WebMCP Full Integration
-  → 書き込み系ツール実装
-  → Playwright をフォールバックとして維持
+WebMCP（メイン、Chrome 146+）
+  ↓ 非対応環境
+MCP Server（構想2 = UIレス、Node.js環境）
+  ↓ 導入できない場合
+Skill（SKILL.md = 手順書 + ブラウザ操作ツール）
 ```
+
+WebMCPが利用できない環境では、Playwright でUIを叩くのではなく、構想2のMCP Serverで直接データ操作するか、Skillでブラウザ操作ツール（Claude in Chrome等）を活用する。
+
+### 3.5 llms.txt による自己記述
+
+e-shiwakeは `/llms.txt` エンドポイントでアプリ自身の情報をAIエージェントに公開している。
+
+**実装済みエンドポイント**:
+
+| URL                     | 内容                                     |
+| ----------------------- | ---------------------------------------- |
+| `/llms.txt`             | サービス概要 + WebMCPツール全12個の仕様  |
+| `/help/webmcp/llms.txt` | WebMCPツールの詳細な使い方・仕訳例       |
+| `/help/*/llms.txt`      | 各機能のヘルプ（仕訳、帳簿、証憑管理等） |
+
+**llms.txt と Skill の補完関係**:
+
+| 観点     | llms.txt                        | Skill（SKILL.md）                            |
+| -------- | ------------------------------- | -------------------------------------------- |
+| 提供元   | アプリ側（e-shiwake自身が配信） | エージェント側（Claude Code / Coworkに配置） |
+| 内容     | アプリの仕様・APIリファレンス   | 操作手順・ワークフロー・会計ルール           |
+| 対象     | すべてのAIエージェント          | Claude Code / Cowork 専用                    |
+| 取得方法 | HTTP GET                        | ローカルファイル読み込み                     |
 
 ---
 
@@ -456,9 +472,9 @@ Claude> e-shiwakeの2025年度データをインポートして
 ```mermaid
 graph TB
     subgraph Plan1["構想1: UI付き操作"]
-        P1A["WebMCP"]
-        P1B["Playwright"]
-        P1C["Skill"]
+        P1A["WebMCP ✅"]
+        P1B["Skill"]
+        P1C["llms.txt ✅"]
     end
 
     subgraph Plan2["構想2: UIレス"]
@@ -480,7 +496,7 @@ graph TB
 | 観点                 | 構想1（UI付き操作）              | 構想2（UIレス）                     |
 | -------------------- | -------------------------------- | ----------------------------------- |
 | **ユーザー体験**     | ブラウザUIを見ながらAIが操作     | AIとの対話のみで完結                |
-| **実装コスト**       | 低〜中（Playwright即使用可）     | 中〜高（MCP Server構築が必要）      |
+| **実装コスト**       | 低（WebMCP PoC実装済み）         | 中〜高（MCP Server構築が必要）      |
 | **データ整合性**     | ✅ 単一データソース（IndexedDB） | ⚠️ 同期が必要（IndexedDB ↔ SQLite） |
 | **オフライン対応**   | ✅ PWAとして完全対応             | ⚠️ MCP Serverが動作している必要     |
 | **iPad対応**         | ⚠️ WebMCPは非対応                | ⚠️ ローカルサーバー起動が困難       |
@@ -493,9 +509,43 @@ graph TB
 
 ## 6. 推奨ロードマップ
 
-### Phase 0: 共通基盤（1-2週間）
+### Phase 0: WebMCP PoC ✅ 完了
 
-コアロジックのパッケージ化。構想1・2両方の土台。
+```
+目標: WebMCP でのツール登録・動作確認
+
+完了タスク:
+- [x] src/lib/webmcp/ ディレクトリ構成
+- [x] navigator.modelContext 型定義
+- [x] 12ツールの実装（仕訳CRUD、帳簿生成、税務、マスタ参照）
+- [x] +layout.svelte でのinit/destroy統合
+- [x] graceful degradation（非対応環境でエラーなし）
+- [x] /llms.txt にWebMCPツール仕様を追加
+- [x] /help/webmcp/ ヘルプページ + llms.txt エンドポイント
+- [x] npm run preview での動作確認
+```
+
+### Phase 1: Skill + E2Eテスト（現在）
+
+```
+目標: SKILL.md でAIエージェント連携を実用化 + WebMCPツールをE2Eテストで検証
+
+タスク:
+- [ ] e-shiwake Skill（SKILL.md）作成
+  - 仕訳入力手順
+  - 帳簿確認手順
+  - エクスポート手順
+  - 会計ルール（複式簿記、消費税区分）
+- [ ] Playwright E2Eテストでの WebMCP ツール検証
+  - 仕訳 CRUD テスト
+  - 帳簿生成テスト
+  - 検索機能テスト
+- [ ] 動作検証（Claude Code / Cowork から e-shiwake を操作）
+```
+
+### Phase 2: 共通基盤パッケージ化（1-2週間）
+
+コアロジックのパッケージ化。構想2の土台。
 
 ```
 目標: @e-shiwake/core パッケージの切り出し
@@ -508,21 +558,7 @@ graph TB
 - [ ] 既存テストの移行・動作確認
 ```
 
-### Phase 1: 構想1 クイックスタート（1週間）
-
-```
-目標: Playwright + Skill で最小限のAI連携を実現
-
-タスク:
-- [ ] e-shiwake Skill（SKILL.md）作成
-  - 仕訳入力手順
-  - 帳簿確認手順
-  - エクスポート手順
-- [ ] Playwright MCP Server 設定ガイド作成
-- [ ] 動作検証（Claude Code から e-shiwake を操作）
-```
-
-### Phase 2: 構想2 MCP Server MVP（2-4週間）
+### Phase 3: 構想2 MCP Server MVP（2-4週間）
 
 ```
 目標: 基本的な仕訳CRUD + 帳簿生成をMCPツールとして提供
@@ -540,7 +576,7 @@ graph TB
 - [ ] Claude Desktop / Claude Code への登録・動作検証
 ```
 
-### Phase 3: Skill統合 + プロンプト（1-2週間）
+### Phase 4: Skill統合 + プロンプト（1-2週間）
 
 ```
 目標: MCP Serverと連携するSkillの作成
@@ -557,19 +593,18 @@ graph TB
 - [ ] Cowork プラグイン化の検討
 ```
 
-### Phase 4: WebMCP 統合（2026年後半〜）
+### Phase 5: WebMCP 安定版統合（2026年後半〜）
 
 ```
-目標: Chrome 安定版でのWebMCP対応
+目標: Chrome 安定版でのWebMCP正式対応
 
 タスク:
-- [ ] navigator.modelContext ツール登録
-- [ ] 読み取り系ツール（検索、帳簿表示）
-- [ ] 書き込み系ツール（仕訳作成・編集）
-- [ ] Playwright → WebMCP の段階的移行
+- [ ] Chrome 安定版リリースに合わせたAPI更新
+- [ ] WebMCP ← → MCP Server の連携（ハイブリッド運用）
+- [ ] ユーザー向けWebMCP機能の案内ページ
 ```
 
-### Phase 5: 高度な統合（2027年〜）
+### Phase 6: 高度な統合（2027年〜）
 
 ```
 - [ ] ブラウザ ↔ MCP Server リアルタイム同期
@@ -592,11 +627,11 @@ graph TB
 
 ### 7.2 WebMCP の制約（構想1）
 
-| 課題               | 影響                 | 対策                                  |
-| ------------------ | -------------------- | ------------------------------------- |
-| Chrome 146+ のみ   | iPad / Safari 非対応 | Playwright をフォールバック           |
-| Early Preview 段階 | API変更のリスク      | 抽象化層を設けて変更に対応            |
-| Blob の直列化不可  | PDF添付が困難        | Base64 エンコード or ファイルパス参照 |
+| 課題               | 影響                 | 対策                                          |
+| ------------------ | -------------------- | --------------------------------------------- |
+| Chrome 146+ のみ   | iPad / Safari 非対応 | 構想2（MCP Server）をフォールバックとして活用 |
+| Early Preview 段階 | API変更のリスク      | 抽象化層を設けて変更に対応                    |
+| Blob の直列化不可  | PDF添付が困難        | Base64 エンコード or ファイルパス参照         |
 
 ### 7.3 MCP Server の運用（構想2）
 
@@ -612,14 +647,15 @@ graph TB
 
 ### 8.1 どちらを先に進めるべきか
 
-**推奨: 構想1（Skill + Playwright）→ 構想2（MCP Server）の順**
+**推奨: 構想1（WebMCP + Skill）→ 構想2（MCP Server）の順**
 
 理由：
 
-1. **構想1は即座に始められる** — SKILL.md を書くだけで最低限の連携が可能
-2. **構想2は構想1の学びを活かせる** — AIエージェントが実際に何を操作したいかの知見が得られる
-3. **共通基盤（@e-shiwake/core）は両方に必要** — Phase 0 で切り出しておけば無駄がない
-4. **構想2はe-shiwakeの価値を最大化する** — 最終的にはMCP Serverが本命
+1. **構想1はWebMCP PoC実装済み** — 12ツールが動作確認済み
+2. **Skillは即座に始められる** — SKILL.md を書くだけで最低限の連携が可能
+3. **構想2は構想1の学びを活かせる** — AIエージェントが実際に何を操作したいかの知見が得られる
+4. **共通基盤（@e-shiwake/core）は両方に必要** — パッケージ化で無駄がない
+5. **構想2はe-shiwakeの価値を最大化する** — 最終的にはMCP Serverが本命
 
 ### 8.2 ゴールイメージ
 
