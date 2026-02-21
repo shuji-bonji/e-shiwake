@@ -399,7 +399,7 @@
 		const defaultTaxCategory = getAccountDefaultTaxCategory(accountCode);
 		const newLines = journal.lines.map((line) =>
 			line.id === lineId
-				? { ...line, accountCode, taxCategory: line.taxCategory ?? defaultTaxCategory }
+				? { ...line, accountCode, taxCategory: defaultTaxCategory ?? line.taxCategory }
 				: line
 		);
 		onupdate({ ...journal, lines: newLines });
