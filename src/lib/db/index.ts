@@ -838,6 +838,27 @@ export async function setAutoPurgeBlobSetting(enabled: boolean): Promise<void> {
 }
 
 /**
+ * 証憑リネーム確認の非表示設定を取得
+ */
+export async function getSuppressRenameConfirm(): Promise<boolean> {
+	const value = await getSetting('suppressRenameConfirm');
+	if (value !== undefined && typeof value !== 'boolean') {
+		console.warn(
+			`[settings] 不正なsuppressRenameConfirm値: ${typeof value}、デフォルト値を使用します`
+		);
+		return false;
+	}
+	return value ?? false; // デフォルト: false（確認を表示する）
+}
+
+/**
+ * 証憑リネーム確認の非表示設定を保存
+ */
+export async function setSuppressRenameConfirm(suppress: boolean): Promise<void> {
+	await setSetting('suppressRenameConfirm', suppress);
+}
+
+/**
  * Blob保持日数を取得
  */
 export async function getBlobRetentionDays(): Promise<number> {
@@ -1119,6 +1140,7 @@ export interface AttachmentUpdateParams {
 	description?: string;
 	amount?: number;
 	vendor?: string;
+	generatedName?: string; // 手動編集されたファイル名（指定時は自動生成を上書き）
 }
 
 export async function updateAttachment(
@@ -1146,14 +1168,10 @@ export async function updateAttachment(
 	const newAmount = updates.amount ?? attachment.amount;
 	const newVendor = updates.vendor ?? attachment.vendor;
 
-	// 新しいファイル名を生成
-	const newGeneratedName = generateAttachmentName(
-		newDocumentDate,
-		newDocumentType,
-		newDescription,
-		newAmount,
-		newVendor
-	);
+	// 新しいファイル名を生成（手動指定がある場合はそちらを優先）
+	const newGeneratedName =
+		updates.generatedName ||
+		generateAttachmentName(newDocumentDate, newDocumentType, newDescription, newAmount, newVendor);
 
 	// ファイルシステム保存の場合、実ファイルをリネーム
 	let newFilePath = attachment.filePath;

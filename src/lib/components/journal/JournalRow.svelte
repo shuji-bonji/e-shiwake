@@ -4,7 +4,13 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import { suggestDocumentType, validateJournal } from '$lib/db';
+	import {
+		generateAttachmentName,
+		getSuppressRenameConfirm,
+		setSuppressRenameConfirm,
+		suggestDocumentType,
+		validateJournal
+	} from '$lib/db';
 	import type {
 		Account,
 		AccountType,
@@ -26,6 +32,7 @@
 		updateJournalAttachment
 	} from '$lib/usecases/journal-attachments';
 	import { cn } from '$lib/utils.js';
+	import { fileExistsInDirectory } from '$lib/utils/filesystem';
 	import {
 		applyBusinessRatio,
 		getAppliedBusinessRatio,
@@ -104,6 +111,23 @@
 	// 証跡ステータス変更確認ダイアログの状態
 	let evidenceChangeDialogOpen = $state(false);
 	let pendingEvidenceStatus = $state<EvidenceStatus | null>(null);
+
+	// 証憑削除確認ダイアログの状態
+	let removeAttachmentDialogOpen = $state(false);
+	let pendingRemoveAttachmentId = $state<string | null>(null);
+
+	// 証憑リネーム確認ダイアログの状態
+	let renameConfirmDialogOpen = $state(false);
+	let renameConfirmSuppressCheck = $state(false);
+	let pendingRenameInfo = $state<{
+		oldNames: string[];
+		newNames: string[];
+		syncArgs: {
+			journal: JournalEntry;
+			mainDebitAmount: number;
+			directoryHandle?: FileSystemDirectoryHandle | null;
+		};
+	} | null>(null);
 
 	// タブ順序制御用の参照
 	let vendorInputRef: { focus: () => void } | undefined = $state();
@@ -264,6 +288,58 @@
 		const mainDebitAmount =
 			journal.lines.find((l) => l.type === 'debit' && l.accountCode)?.amount ?? 0;
 
+		// ファイル名が変わるかプレチェック
+		const newNames = journal.attachments.map((att) =>
+			generateAttachmentName(
+				journal.date,
+				att.documentType,
+				journal.description,
+				mainDebitAmount || att.amount,
+				journal.vendor
+			)
+		);
+		const oldNames = journal.attachments.map((att) => att.generatedName);
+		const hasNameChanges = oldNames.some((name, i) => name !== newNames[i]);
+
+		if (!hasNameChanges) return;
+
+		// 設定を確認
+		const suppress = await getSuppressRenameConfirm();
+
+		if (!suppress) {
+			// 確認ダイアログを表示
+			pendingRenameInfo = {
+				oldNames,
+				newNames,
+				syncArgs: { journal, mainDebitAmount, directoryHandle }
+			};
+			renameConfirmSuppressCheck = false;
+			renameConfirmDialogOpen = true;
+			return;
+		}
+
+		// 確認不要の場合は即実行
+		await executeSyncAttachments(mainDebitAmount);
+	}
+
+	// リネーム確認OKの処理
+	async function handleConfirmRename() {
+		if (!pendingRenameInfo) return;
+
+		// 「次回から表示しない」チェック
+		if (renameConfirmSuppressCheck) {
+			await setSuppressRenameConfirm(true);
+		}
+
+		const { mainDebitAmount } = pendingRenameInfo.syncArgs;
+		renameConfirmDialogOpen = false;
+		pendingRenameInfo = null;
+
+		await executeSyncAttachments(mainDebitAmount);
+	}
+
+	// リネーム実行
+	async function executeSyncAttachments(mainDebitAmount: number) {
 		try {
 			const syncedAttachments = await syncAttachmentsOnBlurUseCase({
 				journal,
@@ -416,7 +492,7 @@
 		attachmentDialogOpen = true;
 	}
 
-	// ダイアログで確定 → 実際に添付
+	// ダイアログで確定 → 同名チェック → 実際に添付
 	async function handleAttachmentConfirm(
 		documentDate: string,
 		documentType: DocumentType,
@@ -426,8 +502,42 @@
 		if (!pendingFile) return;
 
 		try {
+			// 同名ファイルの存在チェック
+			let fileExists = false;
+
+			if (directoryHandle) {
+				// ファイルシステム保存の場合
+				const year = new Date(documentDate).getFullYear();
+				fileExists = await fileExistsInDirectory(directoryHandle, year, generatedName);
+			} else {
+				// IndexedDB保存の場合：既存添付ファイル名と照合
+				fileExists = journal.attachments.some((a) => a.generatedName === generatedName);
+			}
+
+			if (fileExists) {
+				const confirmed = confirm(
+					`同名のファイルが既に存在します。\n\n${generatedName}\n\n上書きしますか？`
+				);
+				if (!confirmed) return;
+			}
+
+			// 上書き対象：同名の既存証憑があれば先に削除
+			let targetJournal = journal;
+			if (fileExists) {
+				const existingAttachment = journal.attachments.find(
+					(a) => a.generatedName === generatedName
+				);
+				if (existingAttachment) {
+					targetJournal = await removeJournalAttachment({
+						journal,
+						attachmentId: existingAttachment.id,
+						directoryHandle
+					});
+				}
+			}
+
 			const updatedJournal = await addJournalAttachment({
-				journal,
+				journal: targetJournal,
 				file: pendingFile,
 				documentDate,
 				documentType,
@@ -450,17 +560,27 @@
 		pendingFile = null;
 	}
 
-	// 添付ファイルの削除
-	async function handleRemoveAttachment(attachmentId: string) {
+	// 添付ファイルの削除確認
+	function handleRemoveAttachment(attachmentId: string) {
+		pendingRemoveAttachmentId = attachmentId;
+		removeAttachmentDialogOpen = true;
+	}
+
+	// 添付ファイルの削除実行
+	async function handleConfirmRemoveAttachment() {
+		if (!pendingRemoveAttachmentId) return;
 		try {
 			const updatedJournal = await removeJournalAttachment({
 				journal,
-				attachmentId,
+				attachmentId: pendingRemoveAttachmentId,
 				directoryHandle
 			});
 			onupdate(updatedJournal);
 		} catch (error) {
 			console.error('添付ファイルの削除に失敗しました:', error);
+		} finally {
+			removeAttachmentDialogOpen = false;
+			pendingRemoveAttachmentId = null;
 		}
 	}
 
@@ -482,10 +602,32 @@
 		description: string;
 		amount: number;
 		vendor: string;
+		generatedName?: string;
 	}) {
 		if (!editingAttachment) return;
 
 		try {
+			// ファイル名が変わる場合に同名チェック
+			const newName =
+				updates.generatedName ||
+				generateAttachmentName(
+					updates.documentDate,
+					updates.documentType,
+					updates.description,
+					updates.amount,
+					updates.vendor
+				);
+			if (newName !== editingAttachment.generatedName && directoryHandle) {
+				const year = new Date(updates.documentDate).getFullYear();
+				const exists = await fileExistsInDirectory(directoryHandle, year, newName);
+				if (exists) {
+					const confirmed = confirm(
+						`同名のファイルが既に存在します。\n\n${newName}\n\n上書きしますか？`
+					);
+					if (!confirmed) return;
+				}
+			}
+
 			const updatedJournal = await updateJournalAttachment({
 				journal,
 				attachmentId: editingAttachment.id,
@@ -994,6 +1136,89 @@
 			>
 				削除して変更
 			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<!-- 証憑削除確認ダイアログ -->
+<AlertDialog.Root bind:open={removeAttachmentDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>証憑を削除しますか？</AlertDialog.Title>
+			<AlertDialog.Description>
+				{#if pendingRemoveAttachmentId}
+					{@const att = journal.attachments.find((a) => a.id === pendingRemoveAttachmentId)}
+					{#if att}
+						<span class="font-mono text-sm">{att.generatedName}</span> を削除します。
+						{#if att.storageType === 'filesystem'}
+							保存先フォルダのファイルも削除されます。
+						{/if}
+						この操作は取り消せません。
+					{/if}
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel
+				onclick={() => {
+					removeAttachmentDialogOpen = false;
+					pendingRemoveAttachmentId = null;
+				}}>キャンセル</AlertDialog.Cancel
+			>
+			<AlertDialog.Action
+				class="bg-destructive/80 text-white hover:bg-destructive/70"
+				onclick={handleConfirmRemoveAttachment}
+			>
+				削除
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<!-- 証憑リネーム確認ダイアログ -->
+<AlertDialog.Root bind:open={renameConfirmDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>証憑のファイル名が変更されます</AlertDialog.Title>
+			<AlertDialog.Description>
+				仕訳の変更に伴い、紐付けられた証憑のファイル名が更新されます。
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+
+		{#if pendingRenameInfo}
+			<div class="max-h-48 space-y-2 overflow-y-auto py-2">
+				{#each pendingRenameInfo.oldNames as oldName, i (i)}
+					{#if oldName !== pendingRenameInfo.newNames[i]}
+						<div class="rounded-md border p-2 text-xs">
+							<p class="text-muted-foreground line-through">{oldName}</p>
+							<p class="font-medium">{pendingRenameInfo.newNames[i]}</p>
+						</div>
+					{/if}
+				{/each}
+			</div>
+		{/if}
+
+		<div class="flex items-center gap-2 py-2">
+			<input
+				type="checkbox"
+				id="suppress-rename-check"
+				checked={renameConfirmSuppressCheck}
+				onchange={(e) => (renameConfirmSuppressCheck = e.currentTarget.checked)}
+				class="size-4 rounded border-gray-300"
+			/>
+			<label for="suppress-rename-check" class="text-sm text-muted-foreground">
+				次回から表示しない
+			</label>
+		</div>
+
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel
+				onclick={() => {
+					renameConfirmDialogOpen = false;
+					pendingRenameInfo = null;
+				}}>キャンセル</AlertDialog.Cancel
+			>
+			<AlertDialog.Action onclick={handleConfirmRename}>変更する</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
