@@ -72,10 +72,14 @@ export default defineConfig({
 							// prerendered/pages/ と client/ プレフィックスを除去
 							url = url.replace(/^prerendered\/pages\//, '');
 							url = url.replace(/^client\//, '');
-							// index.html を / に変換
+							// index.html を除去（ルートは "/" に変換）
 							url = url.replace(/index\.html$/, '');
-							// HTMLページ（拡張子なし・空以外）にトレイリングスラッシュを追加
-							if (!url.includes('.') && url !== '' && !url.endsWith('/')) {
+							// 空文字（ルート）は "/" に変換
+							if (url === '') {
+								url = '/';
+							}
+							// HTMLページ（拡張子なし）にトレイリングスラッシュを追加
+							if (!url.includes('.') && !url.endsWith('/')) {
 								url = `${url}/`;
 							}
 							entry.url = url;
