@@ -173,7 +173,11 @@
 {/if}
 
 <!-- Safari向け説明ダイアログ -->
-<SafariStorageDialog bind:open={safariDialogOpen} onconfirm={() => {}} />
+<SafariStorageDialog
+	open={safariDialogOpen}
+	onclose={() => (safariDialogOpen = false)}
+	onconfirm={() => (safariDialogOpen = false)}
+/>
 
 <!-- 証憑パージ確認ダイアログ -->
 <AlertDialog.Root bind:open={purgeDialogOpen}>

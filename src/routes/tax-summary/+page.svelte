@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Receipt, Download, Info, ExternalLink } from '@lucide/svelte';
-	import { initializeDatabase, getJournalsByYear } from '$lib/db';
 	import {
 		generateConsumptionTax,
 		formatTaxAmount,
@@ -13,30 +11,15 @@
 		isExemptBusiness,
 		canUseSimplifiedTax
 	} from '$lib/utils/consumption-tax';
-	import { useFiscalYear, setSelectedYear } from '$lib/stores/fiscalYear.svelte';
-	import type { JournalEntry, ConsumptionTaxData } from '$lib/types';
+	import { useJournalPage } from '$lib/hooks/use-journal-page.svelte';
+	import type { ConsumptionTaxData } from '$lib/types';
 
-	let isLoading = $state(true);
-	let journals = $state<JournalEntry[]>([]);
-	let taxData = $state<ConsumptionTaxData | null>(null);
+	const page = useJournalPage({ loadAccounts: false });
 
-	const fiscalYear = useFiscalYear();
-
-	onMount(async () => {
-		await initializeDatabase();
-		await loadData();
-		isLoading = false;
+	const taxData = $derived.by<ConsumptionTaxData | null>(() => {
+		if (page.journals.length === 0) return null;
+		return generateConsumptionTax(page.journals, page.fiscalYear.selectedYear);
 	});
-
-	async function loadData() {
-		journals = await getJournalsByYear(fiscalYear.selectedYear);
-		taxData = generateConsumptionTax(journals, fiscalYear.selectedYear);
-	}
-
-	async function handleYearChange(year: number) {
-		setSelectedYear(year);
-		await loadData();
-	}
 
 	function exportCSV() {
 		if (!taxData) return;
@@ -46,7 +29,7 @@
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `消費税集計_${fiscalYear.selectedYear}.csv`;
+		a.download = `消費税集計_${page.fiscalYear.selectedYear}.csv`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -73,14 +56,14 @@
 		<div class="flex items-center gap-2">
 			<Select.Root
 				type="single"
-				value={fiscalYear.selectedYear.toString()}
-				onValueChange={(v) => v && handleYearChange(parseInt(v))}
+				value={page.fiscalYear.selectedYear.toString()}
+				onValueChange={(v) => v && page.handleYearChange(parseInt(v))}
 			>
 				<Select.Trigger class="w-32">
-					{fiscalYear.selectedYear}年度
+					{page.fiscalYear.selectedYear}年度
 				</Select.Trigger>
 				<Select.Content>
-					{#each fiscalYear.availableYears as year (year)}
+					{#each page.fiscalYear.availableYears as year (year)}
 						<Select.Item value={year.toString()}>{year}年度</Select.Item>
 					{/each}
 				</Select.Content>
@@ -93,7 +76,7 @@
 		</div>
 	</div>
 
-	{#if isLoading}
+	{#if page.isLoading}
 		<div class="flex h-64 items-center justify-center">
 			<p class="text-muted-foreground">読み込み中...</p>
 		</div>
@@ -101,7 +84,7 @@
 		<Card.Root>
 			<Card.Content class="flex h-64 items-center justify-center">
 				<p class="text-muted-foreground">
-					{fiscalYear.selectedYear}年度の仕訳がありません
+					{page.fiscalYear.selectedYear}年度の仕訳がありません
 				</p>
 			</Card.Content>
 		</Card.Root>

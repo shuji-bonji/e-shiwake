@@ -7,10 +7,11 @@
 
 	interface Props {
 		open: boolean;
+		onclose?: () => void;
 		onconfirm: () => void;
 	}
 
-	let { open = $bindable(), onconfirm }: Props = $props();
+	let { open, onclose, onconfirm }: Props = $props();
 
 	let dontShowAgain = $state(false);
 
@@ -19,11 +20,14 @@
 			localStorage.setItem('shownStorageWarning', 'true');
 		}
 		onconfirm();
-		open = false;
+	}
+
+	function handleOpenChange(isOpen: boolean) {
+		if (!isOpen) onclose?.();
 	}
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root {open} onOpenChange={handleOpenChange}>
 	<Dialog.Content class="max-w-md">
 		<Dialog.Header>
 			<Dialog.Title class="flex items-center gap-2">

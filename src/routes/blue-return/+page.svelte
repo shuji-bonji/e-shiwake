@@ -335,12 +335,12 @@
 		}
 
 		/* テーブルヘッダーをページごとに繰り返す */
-		thead {
+		:global(thead) {
 			display: table-header-group;
 		}
 
 		/* 行を途中で分割しない */
-		tr {
+		:global(tr) {
 			page-break-inside: avoid;
 		}
 

@@ -29,7 +29,7 @@
 	}
 
 	let {
-		open = $bindable(),
+		open,
 		file,
 		journalDate,
 		vendor,
@@ -71,16 +71,18 @@
 
 	function handleConfirm() {
 		onconfirm(documentDate, documentType, generatedName, editableVendor);
-		open = false;
 	}
 
 	function handleCancel() {
 		oncancel();
-		open = false;
+	}
+
+	function handleOpenChange(isOpen: boolean) {
+		if (!isOpen) oncancel();
 	}
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root {open} onOpenChange={handleOpenChange}>
 	<Dialog.Content class="max-w-[calc(100vw-2rem)] overflow-hidden sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title>証憑を添付</Dialog.Title>

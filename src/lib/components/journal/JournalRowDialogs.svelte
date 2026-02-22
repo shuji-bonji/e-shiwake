@@ -1,31 +1,21 @@
 <script lang="ts">
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import type { Attachment, DocumentType, JournalEntry, Vendor } from '$lib/types';
+	import type { DocumentType, JournalEntry, Vendor } from '$lib/types';
+	import type { DialogState } from './dialog-state';
 	import AttachmentDialog from './AttachmentDialog.svelte';
 	import AttachmentEditDialog from './AttachmentEditDialog.svelte';
-
-	interface RenameInfo {
-		oldNames: string[];
-		newNames: string[];
-		syncArgs: {
-			journal: JournalEntry;
-			mainDebitAmount: number;
-			directoryHandle?: FileSystemDirectoryHandle | null;
-		};
-	}
 
 	interface Props {
 		journal: JournalEntry;
 		vendors: Vendor[];
-		// Safari警告
-		safariDialogOpen: boolean;
-		onsafaridialogconfirm: () => void;
-		// 添付ダイアログ
-		attachmentDialogOpen: boolean;
-		pendingFile: File | null;
+		dialog: DialogState;
 		mainAmount: number;
 		suggestedDocType: DocumentType;
+		ondialogclose: () => void;
+		// Safari警告
+		onsafaridialogconfirm: () => void;
+		// 添付ダイアログ
 		onattachmentconfirm: (
 			documentDate: string,
 			documentType: DocumentType,
@@ -34,8 +24,6 @@
 		) => void;
 		onattachmentcancel: () => void;
 		// 添付編集
-		editDialogOpen: boolean;
-		editingAttachment: Attachment | null;
 		oneditconfirm: (updates: {
 			documentDate: string;
 			documentType: DocumentType;
@@ -46,25 +34,16 @@
 		}) => void;
 		oneditcancel: () => void;
 		// 証跡ステータス変更
-		evidenceChangeDialogOpen: boolean;
-		attachmentCount: number;
 		onconfirmstatuschange: () => void;
 		oncancelstatuschange: () => void;
 		// 添付削除
-		removeAttachmentDialogOpen: boolean;
-		pendingRemoveAttachmentId: string | null;
 		onconfirmremoveattachment: () => void;
 		oncancelremoveattachment: () => void;
 		// リネーム確認
-		renameConfirmDialogOpen: boolean;
-		renameConfirmSuppressCheck: boolean;
-		pendingRenameInfo: RenameInfo | null;
 		onconfirmrename: () => void;
 		oncancelrename: () => void;
 		onsuppresschange: (checked: boolean) => void;
 		// ファイル上書き確認
-		overwriteDialogOpen: boolean;
-		overwriteFileName: string;
 		onconfirmoverwrite: () => void;
 		oncanceloverwrite: () => void;
 	}
@@ -72,45 +51,58 @@
 	let {
 		journal,
 		vendors,
-		safariDialogOpen = $bindable(),
-		onsafaridialogconfirm,
-		attachmentDialogOpen = $bindable(),
-		pendingFile,
+		dialog,
 		mainAmount,
 		suggestedDocType,
+		ondialogclose,
+		onsafaridialogconfirm,
 		onattachmentconfirm,
 		onattachmentcancel,
-		editDialogOpen = $bindable(),
-		editingAttachment,
 		oneditconfirm,
 		oneditcancel,
-		evidenceChangeDialogOpen = $bindable(),
-		attachmentCount,
 		onconfirmstatuschange,
 		oncancelstatuschange,
-		removeAttachmentDialogOpen = $bindable(),
-		pendingRemoveAttachmentId,
 		onconfirmremoveattachment,
 		oncancelremoveattachment,
-		renameConfirmDialogOpen = $bindable(),
-		renameConfirmSuppressCheck,
-		pendingRenameInfo,
 		onconfirmrename,
 		oncancelrename,
 		onsuppresschange,
-		overwriteDialogOpen = $bindable(),
-		overwriteFileName,
 		onconfirmoverwrite,
 		oncanceloverwrite
 	}: Props = $props();
+
+	// DialogState から各ダイアログの open 状態を導出
+	const safariDialogOpen = $derived(dialog.type === 'safari');
+	const attachmentDialogOpen = $derived(dialog.type === 'attachment');
+	const editDialogOpen = $derived(dialog.type === 'edit');
+	const evidenceChangeDialogOpen = $derived(dialog.type === 'evidenceChange');
+	const removeAttachmentDialogOpen = $derived(dialog.type === 'removeAttachment');
+	const renameConfirmDialogOpen = $derived(dialog.type === 'rename');
+	const overwriteDialogOpen = $derived(dialog.type === 'overwrite');
+
+	// 各ダイアログ固有のデータを安全に取得
+	const pendingFile = $derived(dialog.type === 'attachment' ? dialog.file : null);
+	const editingAttachment = $derived(dialog.type === 'edit' ? dialog.attachment : null);
+	const pendingRemoveAttachmentId = $derived(
+		dialog.type === 'removeAttachment' ? dialog.attachmentId : null
+	);
+	const renameConfirmSuppressCheck = $derived(
+		dialog.type === 'rename' ? dialog.suppressCheck : false
+	);
+	const pendingRenameInfo = $derived(dialog.type === 'rename' ? dialog.info : null);
+	const overwriteFileName = $derived(dialog.type === 'overwrite' ? dialog.fileName : '');
 </script>
 
 <!-- Safari向け警告ダイアログ -->
-<SafariStorageDialog bind:open={safariDialogOpen} onconfirm={onsafaridialogconfirm} />
+<SafariStorageDialog
+	open={safariDialogOpen}
+	onclose={ondialogclose}
+	onconfirm={onsafaridialogconfirm}
+/>
 
 <!-- 添付ダイアログ -->
 <AttachmentDialog
-	bind:open={attachmentDialogOpen}
+	open={attachmentDialogOpen}
 	file={pendingFile}
 	journalDate={journal.date}
 	vendor={journal.vendor}
@@ -124,7 +116,7 @@
 
 <!-- 証憑編集ダイアログ -->
 <AttachmentEditDialog
-	bind:open={editDialogOpen}
+	open={editDialogOpen}
 	attachment={editingAttachment}
 	{vendors}
 	onconfirm={oneditconfirm}
@@ -132,12 +124,18 @@
 />
 
 <!-- 証跡ステータス変更確認ダイアログ -->
-<AlertDialog.Root bind:open={evidenceChangeDialogOpen}>
+<AlertDialog.Root
+	open={evidenceChangeDialogOpen}
+	onOpenChange={(open) => {
+		if (!open) oncancelstatuschange();
+	}}
+>
 	<AlertDialog.Content>
 		<AlertDialog.Header>
 			<AlertDialog.Title>添付ファイルを削除しますか？</AlertDialog.Title>
 			<AlertDialog.Description>
-				電子証憑から他のステータスに変更すると、紐付けられている添付ファイル（{attachmentCount}件）が削除されます。この操作は取り消せません。
+				電子証憑から他のステータスに変更すると、紐付けられている添付ファイル（{journal.attachments
+					.length}件）が削除されます。この操作は取り消せません。
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
@@ -153,7 +151,12 @@
 </AlertDialog.Root>
 
 <!-- 証憑削除確認ダイアログ -->
-<AlertDialog.Root bind:open={removeAttachmentDialogOpen}>
+<AlertDialog.Root
+	open={removeAttachmentDialogOpen}
+	onOpenChange={(open) => {
+		if (!open) oncancelremoveattachment();
+	}}
+>
 	<AlertDialog.Content>
 		<AlertDialog.Header>
 			<AlertDialog.Title>証憑を削除しますか？</AlertDialog.Title>
@@ -183,7 +186,12 @@
 </AlertDialog.Root>
 
 <!-- 証憑リネーム確認ダイアログ -->
-<AlertDialog.Root bind:open={renameConfirmDialogOpen}>
+<AlertDialog.Root
+	open={renameConfirmDialogOpen}
+	onOpenChange={(open) => {
+		if (!open) oncancelrename();
+	}}
+>
 	<AlertDialog.Content>
 		<AlertDialog.Header>
 			<AlertDialog.Title>証憑のファイル名が変更されます</AlertDialog.Title>
@@ -226,7 +234,12 @@
 </AlertDialog.Root>
 
 <!-- ファイル上書き確認ダイアログ -->
-<AlertDialog.Root bind:open={overwriteDialogOpen}>
+<AlertDialog.Root
+	open={overwriteDialogOpen}
+	onOpenChange={(open) => {
+		if (!open) oncanceloverwrite();
+	}}
+>
 	<AlertDialog.Content>
 		<AlertDialog.Header>
 			<AlertDialog.Title>ファイルを上書きしますか？</AlertDialog.Title>

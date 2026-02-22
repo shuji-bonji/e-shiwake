@@ -1,51 +1,34 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Landmark, Download, Check, AlertTriangle } from '@lucide/svelte';
-	import { initializeDatabase, getJournalsByYear, getAllAccounts } from '$lib/db';
 	import {
 		generateBalanceSheet,
 		formatBSAmount,
 		balanceSheetToCsv
 	} from '$lib/utils/balance-sheet';
 	import { generateProfitLoss } from '$lib/utils/profit-loss';
-	import { useFiscalYear, setSelectedYear } from '$lib/stores/fiscalYear.svelte';
-	import type { Account, JournalEntry, BalanceSheetData, BalanceSheetRow } from '$lib/types';
+	import { useJournalPage } from '$lib/hooks/use-journal-page.svelte';
+	import type { BalanceSheetData, BalanceSheetRow } from '$lib/types';
 
-	let isLoading = $state(true);
-	let accounts = $state<Account[]>([]);
-	let journals = $state<JournalEntry[]>([]);
-	let balanceSheet = $state<BalanceSheetData | null>(null);
+	const page = useJournalPage();
 
-	const fiscalYear = useFiscalYear();
-
-	onMount(async () => {
-		await initializeDatabase();
-		accounts = await getAllAccounts();
-		await loadData();
-		isLoading = false;
-	});
-
-	async function loadData() {
-		journals = await getJournalsByYear(fiscalYear.selectedYear);
-		// まず損益計算書から当期純利益を計算
-		const profitLoss = generateProfitLoss(journals, accounts, fiscalYear.selectedYear);
-		// 当期純利益を貸借対照表に渡す
-		balanceSheet = generateBalanceSheet(
-			journals,
-			accounts,
-			fiscalYear.selectedYear,
+	const balanceSheet = $derived.by<BalanceSheetData | null>(() => {
+		if (page.journals.length === 0 || page.accounts.length === 0) return null;
+		const profitLoss = generateProfitLoss(
+			page.journals,
+			page.accounts,
+			page.fiscalYear.selectedYear
+		);
+		return generateBalanceSheet(
+			page.journals,
+			page.accounts,
+			page.fiscalYear.selectedYear,
 			profitLoss.netIncome
 		);
-	}
-
-	async function handleYearChange(year: number) {
-		setSelectedYear(year);
-		await loadData();
-	}
+	});
 
 	function exportCSV() {
 		if (!balanceSheet) return;
@@ -55,7 +38,7 @@
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `貸借対照表_${fiscalYear.selectedYear}.csv`;
+		a.download = `貸借対照表_${page.fiscalYear.selectedYear}.csv`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -78,14 +61,14 @@
 		<div class="flex items-center gap-2">
 			<Select.Root
 				type="single"
-				value={fiscalYear.selectedYear.toString()}
-				onValueChange={(v) => v && handleYearChange(parseInt(v))}
+				value={page.fiscalYear.selectedYear.toString()}
+				onValueChange={(v) => v && page.handleYearChange(parseInt(v))}
 			>
 				<Select.Trigger class="w-32">
-					{fiscalYear.selectedYear}年度
+					{page.fiscalYear.selectedYear}年度
 				</Select.Trigger>
 				<Select.Content>
-					{#each fiscalYear.availableYears as year (year)}
+					{#each page.fiscalYear.availableYears as year (year)}
 						<Select.Item value={year.toString()}>{year}年度</Select.Item>
 					{/each}
 				</Select.Content>
@@ -98,7 +81,7 @@
 		</div>
 	</div>
 
-	{#if isLoading}
+	{#if page.isLoading}
 		<div class="flex h-64 items-center justify-center">
 			<p class="text-muted-foreground">読み込み中...</p>
 		</div>
@@ -106,7 +89,7 @@
 		<Card.Root>
 			<Card.Content class="flex h-64 items-center justify-center">
 				<p class="text-muted-foreground">
-					{fiscalYear.selectedYear}年度の仕訳がありません
+					{page.fiscalYear.selectedYear}年度の仕訳がありません
 				</p>
 			</Card.Content>
 		</Card.Root>

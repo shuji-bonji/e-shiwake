@@ -38,6 +38,7 @@
 		removeBusinessRatio
 	} from '$lib/utils/business-ratio';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
+	import { DIALOG_NONE, type DialogState } from './dialog-state';
 	import JournalLineGroup from './JournalLineGroup.svelte';
 	import JournalRowDialogs from './JournalRowDialogs.svelte';
 	import JournalRowHeader from './JournalRowHeader.svelte';
@@ -79,42 +80,9 @@
 	const isBusinessRatioApplied = $derived(hasBusinessRatioApplied(journal.lines));
 	const appliedBusinessRatio = $derived(getAppliedBusinessRatio(journal.lines));
 
-	// 添付ダイアログの状態
-	let attachmentDialogOpen = $state(false);
-	let pendingFile = $state<File | null>(null);
-
-	// Safari向け警告ダイアログの状態
-	let safariDialogOpen = $state(false);
-
-	// 証憑編集ダイアログの状態
-	let editDialogOpen = $state(false);
-	let editingAttachment = $state<Attachment | null>(null);
-
-	// 証跡ステータス変更確認ダイアログの状態
-	let evidenceChangeDialogOpen = $state(false);
-	let pendingEvidenceStatus = $state<EvidenceStatus | null>(null);
-
-	// 証憑削除確認ダイアログの状態
-	let removeAttachmentDialogOpen = $state(false);
-	let pendingRemoveAttachmentId = $state<string | null>(null);
-
-	// ファイル上書き確認ダイアログの状態
-	let overwriteDialogOpen = $state(false);
-	let overwriteFileName = $state('');
-	let overwriteCallback: (() => Promise<void>) | null = $state(null);
-
-	// 証憑リネーム確認ダイアログの状態
-	let renameConfirmDialogOpen = $state(false);
-	let renameConfirmSuppressCheck = $state(false);
-	let pendingRenameInfo = $state<{
-		oldNames: string[];
-		newNames: string[];
-		syncArgs: {
-			journal: JournalEntry;
-			mainDebitAmount: number;
-			directoryHandle?: FileSystemDirectoryHandle | null;
-		};
-	} | null>(null);
+	// ダイアログ状態（Discriminated Union で一元管理）
+	// 同時に2つのダイアログが開く不正状態を型レベルで防止
+	let dialog = $state<DialogState>(DIALOG_NONE);
 
 	// タブ順序制御用の参照
 	let vendorInputRef: { focus: () => void } | undefined = $state();
@@ -123,7 +91,7 @@
 
 	// 日付のローカル状態（blurタイミングでのみ親に伝播）
 	// propsから同期しつつローカル編集も可能にするため、$state + $effect を使用
-	let localDate = $state(journal.date);
+	let localDate = $state('');
 	$effect(() => {
 		localDate = journal.date;
 	});
@@ -200,8 +168,7 @@
 		const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
 
 		if (journal.evidenceStatus === 'digital' && journal.attachments.length > 0) {
-			pendingEvidenceStatus = nextStatus;
-			evidenceChangeDialogOpen = true;
+			dialog = { type: 'evidenceChange', nextStatus };
 			return;
 		}
 
@@ -210,26 +177,26 @@
 
 	// 証跡ステータス変更を確定（添付ファイルを削除）
 	async function confirmEvidenceStatusChange() {
-		if (pendingEvidenceStatus === null) return;
+		if (dialog.type !== 'evidenceChange') return;
+		const { nextStatus } = dialog;
 
 		try {
 			const updatedJournal = await confirmEvidenceStatusChangeUseCase({
 				journal,
-				nextStatus: pendingEvidenceStatus,
+				nextStatus,
 				directoryHandle
 			});
 			onupdate(updatedJournal);
 		} catch (error) {
 			console.error('添付ファイルの削除に失敗しました:', error);
 		} finally {
-			pendingEvidenceStatus = null;
-			evidenceChangeDialogOpen = false;
+			dialog = DIALOG_NONE;
 		}
 	}
 
 	// 証跡ステータス変更をキャンセル
 	function cancelEvidenceStatusChange() {
-		pendingEvidenceStatus = null;
+		dialog = DIALOG_NONE;
 	}
 
 	// フィールド更新（即時、証憑同期なし）
@@ -280,13 +247,15 @@
 		const suppress = await getSuppressRenameConfirm();
 
 		if (!suppress) {
-			pendingRenameInfo = {
-				oldNames,
-				newNames,
-				syncArgs: { journal, mainDebitAmount, directoryHandle }
+			dialog = {
+				type: 'rename',
+				info: {
+					oldNames,
+					newNames,
+					syncArgs: { journal, mainDebitAmount, directoryHandle }
+				},
+				suppressCheck: false
 			};
-			renameConfirmSuppressCheck = false;
-			renameConfirmDialogOpen = true;
 			return;
 		}
 
@@ -295,23 +264,21 @@
 
 	// リネーム確認OKの処理
 	async function handleConfirmRename() {
-		if (!pendingRenameInfo) return;
+		if (dialog.type !== 'rename') return;
 
-		if (renameConfirmSuppressCheck) {
+		if (dialog.suppressCheck) {
 			await setSuppressRenameConfirm(true);
 		}
 
-		const { mainDebitAmount } = pendingRenameInfo.syncArgs;
-		renameConfirmDialogOpen = false;
-		pendingRenameInfo = null;
+		const { mainDebitAmount } = dialog.info.syncArgs;
+		dialog = DIALOG_NONE;
 
 		await executeSyncAttachments(mainDebitAmount);
 	}
 
 	// リネームキャンセル
 	function handleCancelRename() {
-		renameConfirmDialogOpen = false;
-		pendingRenameInfo = null;
+		dialog = DIALOG_NONE;
 	}
 
 	// リネーム実行
@@ -441,17 +408,17 @@
 
 	// 添付ファイルのドロップ → ダイアログを開く
 	function handleFileDrop(file: File) {
-		pendingFile = file;
 		if (shouldShowSafariWarning()) {
-			safariDialogOpen = true;
+			dialog = { type: 'safari', file };
 		} else {
-			attachmentDialogOpen = true;
+			dialog = { type: 'attachment', file };
 		}
 	}
 
 	// Safari警告ダイアログでOKした後、添付ダイアログを開く
 	function handleSafariDialogConfirm() {
-		attachmentDialogOpen = true;
+		if (dialog.type !== 'safari') return;
+		dialog = { type: 'attachment', file: dialog.file };
 	}
 
 	// ダイアログで確定 → 同名チェック → 実際に添付
@@ -461,7 +428,8 @@
 		generatedName: string,
 		updatedVendor: string
 	) {
-		if (!pendingFile) return;
+		const file = dialog.type === 'attachment' ? dialog.file : null;
+		if (!file) return;
 
 		try {
 			// 全仕訳横断でファイル名の重複をチェック
@@ -484,7 +452,7 @@
 
 				const updatedJournal = await addJournalAttachment({
 					journal: targetJournal,
-					file: pendingFile!,
+					file,
 					documentDate,
 					documentType,
 					generatedName,
@@ -493,58 +461,52 @@
 					directoryHandle
 				});
 				onupdate(updatedJournal);
-				pendingFile = null;
 			};
 
 			if (fileExists) {
-				overwriteFileName = generatedName;
-				overwriteCallback = doAdd;
-				overwriteDialogOpen = true;
+				dialog = { type: 'overwrite', fileName: generatedName, callback: doAdd };
 				return;
 			}
 
+			dialog = DIALOG_NONE;
 			await doAdd();
 		} catch (error) {
 			console.error('添付ファイルの追加に失敗しました:', error);
 			toast.error('添付ファイルの追加に失敗しました');
-		} finally {
-			pendingFile = null;
 		}
 	}
 
 	// ダイアログでキャンセル
 	function handleAttachmentCancel() {
-		pendingFile = null;
+		dialog = DIALOG_NONE;
 	}
 
 	// 添付ファイルの削除確認
 	function handleRemoveAttachment(attachmentId: string) {
-		pendingRemoveAttachmentId = attachmentId;
-		removeAttachmentDialogOpen = true;
+		dialog = { type: 'removeAttachment', attachmentId };
 	}
 
 	// 添付ファイルの削除実行
 	async function handleConfirmRemoveAttachment() {
-		if (!pendingRemoveAttachmentId) return;
+		if (dialog.type !== 'removeAttachment') return;
+		const { attachmentId } = dialog;
 		try {
 			const updatedJournal = await removeJournalAttachment({
 				journal,
-				attachmentId: pendingRemoveAttachmentId,
+				attachmentId,
 				directoryHandle
 			});
 			onupdate(updatedJournal);
 		} catch (error) {
 			console.error('添付ファイルの削除に失敗しました:', error);
 		} finally {
-			removeAttachmentDialogOpen = false;
-			pendingRemoveAttachmentId = null;
+			dialog = DIALOG_NONE;
 		}
 	}
 
 	// 添付ファイルの削除キャンセル
 	function handleCancelRemoveAttachment() {
-		removeAttachmentDialogOpen = false;
-		pendingRemoveAttachmentId = null;
+		dialog = DIALOG_NONE;
 	}
 
 	// 添付ファイルのプレビュー
@@ -554,8 +516,7 @@
 
 	// 添付ファイルの編集ダイアログを開く
 	function handleEditAttachment(attachment: Attachment) {
-		editingAttachment = attachment;
-		editDialogOpen = true;
+		dialog = { type: 'edit', attachment };
 	}
 
 	// 添付ファイルの編集を確定
@@ -567,7 +528,8 @@
 		vendor: string;
 		generatedName?: string;
 	}) {
-		if (!editingAttachment) return;
+		if (dialog.type !== 'edit') return;
+		const { attachment: editingAttachment } = dialog;
 
 		try {
 			const newName =
@@ -584,24 +546,25 @@
 			if (newName !== editingAttachment.generatedName) {
 				const usedNames = await getUsedFileNames(editingAttachment.id);
 				if (usedNames.has(newName)) {
-					overwriteFileName = newName;
-					overwriteCallback = async () => {
-						try {
-							const updatedJournal = await updateJournalAttachment({
-								journal,
-								attachmentId: editingAttachment!.id,
-								updates,
-								directoryHandle
-							});
-							onupdate(updatedJournal);
-						} catch (error) {
-							console.error('添付ファイルの更新に失敗しました:', error);
-							toast.error('添付ファイルの更新に失敗しました');
-						} finally {
-							editingAttachment = null;
+					const attachmentId = editingAttachment.id;
+					dialog = {
+						type: 'overwrite',
+						fileName: newName,
+						callback: async () => {
+							try {
+								const updatedJournal = await updateJournalAttachment({
+									journal,
+									attachmentId,
+									updates,
+									directoryHandle
+								});
+								onupdate(updatedJournal);
+							} catch (error) {
+								console.error('添付ファイルの更新に失敗しました:', error);
+								toast.error('添付ファイルの更新に失敗しました');
+							}
 						}
 					};
-					overwriteDialogOpen = true;
 					return;
 				}
 			}
@@ -617,28 +580,25 @@
 			console.error('添付ファイルの更新に失敗しました:', error);
 			toast.error('添付ファイルの更新に失敗しました');
 		} finally {
-			editingAttachment = null;
+			dialog = DIALOG_NONE;
 		}
 	}
 
 	// ファイル上書き確認ダイアログのハンドラー
 	async function handleOverwriteConfirm() {
-		overwriteDialogOpen = false;
-		if (overwriteCallback) {
-			await overwriteCallback();
-			overwriteCallback = null;
-		}
+		if (dialog.type !== 'overwrite') return;
+		const { callback } = dialog;
+		dialog = DIALOG_NONE;
+		await callback();
 	}
 
 	function handleOverwriteCancel() {
-		overwriteDialogOpen = false;
-		overwriteCallback = null;
-		pendingFile = null;
+		dialog = DIALOG_NONE;
 	}
 
 	// 添付ファイルの編集をキャンセル
 	function handleEditCancel() {
-		editingAttachment = null;
+		dialog = DIALOG_NONE;
 	}
 
 	// 家事按分を適用
@@ -769,34 +729,26 @@
 <JournalRowDialogs
 	{journal}
 	{vendors}
-	bind:safariDialogOpen
-	onsafaridialogconfirm={handleSafariDialogConfirm}
-	bind:attachmentDialogOpen
-	{pendingFile}
+	{dialog}
 	{mainAmount}
 	{suggestedDocType}
+	ondialogclose={() => (dialog = DIALOG_NONE)}
+	onsafaridialogconfirm={handleSafariDialogConfirm}
 	onattachmentconfirm={handleAttachmentConfirm}
 	onattachmentcancel={handleAttachmentCancel}
-	bind:editDialogOpen
-	{editingAttachment}
 	oneditconfirm={handleEditConfirm}
 	oneditcancel={handleEditCancel}
-	bind:evidenceChangeDialogOpen
-	attachmentCount={journal.attachments.length}
 	onconfirmstatuschange={confirmEvidenceStatusChange}
 	oncancelstatuschange={cancelEvidenceStatusChange}
-	bind:removeAttachmentDialogOpen
-	{pendingRemoveAttachmentId}
 	onconfirmremoveattachment={handleConfirmRemoveAttachment}
 	oncancelremoveattachment={handleCancelRemoveAttachment}
-	bind:renameConfirmDialogOpen
-	{renameConfirmSuppressCheck}
-	{pendingRenameInfo}
 	onconfirmrename={handleConfirmRename}
 	oncancelrename={handleCancelRename}
-	onsuppresschange={(checked) => (renameConfirmSuppressCheck = checked)}
-	bind:overwriteDialogOpen
-	{overwriteFileName}
+	onsuppresschange={(checked) => {
+		if (dialog.type === 'rename') {
+			dialog = { ...dialog, suppressCheck: checked };
+		}
+	}}
 	onconfirmoverwrite={handleOverwriteConfirm}
 	oncanceloverwrite={handleOverwriteCancel}
 />

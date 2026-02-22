@@ -25,7 +25,7 @@
 		oncancel: () => void;
 	}
 
-	let { open = $bindable(), attachment, vendors, onconfirm, oncancel }: Props = $props();
+	let { open, attachment, vendors, onconfirm, oncancel }: Props = $props();
 
 	// 編集用の状態
 	let documentDate = $state('');
@@ -87,16 +87,18 @@
 			vendor,
 			generatedName: isManualEdit ? manualFileName : undefined
 		});
-		open = false;
 	}
 
 	function handleCancel() {
 		oncancel();
-		open = false;
+	}
+
+	function handleOpenChange(isOpen: boolean) {
+		if (!isOpen) oncancel();
 	}
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root {open} onOpenChange={handleOpenChange}>
 	<Dialog.Content class="max-w-[calc(100vw-2rem)] overflow-hidden sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title class="flex items-center gap-2">

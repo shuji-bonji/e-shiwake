@@ -1,25 +1,25 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { BookOpen, Download, Receipt, Wallet, TrendingUp, CreditCard, Gem } from '@lucide/svelte';
-	import { initializeDatabase, getJournalsByYear, getAllAccounts } from '$lib/db';
 	import { generateLedger, getUsedAccounts, type LedgerData } from '$lib/utils/ledger';
 	import { formatAmount } from '$lib/utils/trial-balance';
-	import { useFiscalYear, setSelectedYear } from '$lib/stores/fiscalYear.svelte';
-	import type { Account, AccountType, JournalEntry } from '$lib/types';
+	import { useJournalPage } from '$lib/hooks/use-journal-page.svelte';
+	import type { Account, AccountType } from '$lib/types';
 	import { AccountTypeLabels } from '$lib/types';
 
-	let isLoading = $state(true);
-	let accounts = $state<Account[]>([]);
-	let usedAccounts = $state<Account[]>([]);
-	let journals = $state<JournalEntry[]>([]);
-	let selectedAccountCode = $state<string>('');
-	let ledgerData = $state<LedgerData | null>(null);
+	const page = useJournalPage();
 
-	const fiscalYear = useFiscalYear();
+	let selectedAccountCode = $state<string>('');
+
+	// 使用済み科目を仕訳・科目マスタから導出
+	const usedAccounts = $derived(
+		page.journals.length > 0 && page.accounts.length > 0
+			? getUsedAccounts(page.journals, page.accounts)
+			: []
+	);
 
 	// カテゴリ順序（試算表と同じ順）
 	const typeOrder: AccountType[] = ['asset', 'liability', 'equity', 'revenue', 'expense'];
@@ -51,36 +51,23 @@
 	});
 
 	// 勘定科目が変更されたら元帳を再生成
-	$effect(() => {
-		if (selectedAccountCode && journals.length > 0 && accounts.length > 0) {
-			ledgerData = generateLedger(journals, selectedAccountCode, accounts, 0);
-		} else {
-			ledgerData = null;
+	const ledgerData = $derived.by<LedgerData | null>(() => {
+		if (selectedAccountCode && page.journals.length > 0 && page.accounts.length > 0) {
+			return generateLedger(page.journals, selectedAccountCode, page.accounts, 0);
 		}
+		return null;
 	});
 
-	onMount(async () => {
-		await initializeDatabase();
-		accounts = await getAllAccounts();
-		await loadData();
-		isLoading = false;
-	});
-
-	async function loadData() {
-		journals = await getJournalsByYear(fiscalYear.selectedYear);
-		usedAccounts = getUsedAccounts(journals, accounts);
-
-		// 最初の科目を自動選択
+	// 使用済み科目があり、まだ科目が選択されていなければ最初の科目を自動選択
+	$effect(() => {
 		if (usedAccounts.length > 0 && !selectedAccountCode) {
 			selectedAccountCode = usedAccounts[0].code;
 		}
-	}
+	});
 
-	async function handleYearChange(year: number) {
-		setSelectedYear(year);
+	function handleYearChange(year: number) {
 		selectedAccountCode = '';
-		ledgerData = null;
-		await loadData();
+		page.handleYearChange(year);
 	}
 
 	function selectAccount(code: string) {
@@ -123,7 +110,7 @@
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `総勘定元帳_${ledgerData.accountName}_${fiscalYear.selectedYear}.csv`;
+		a.download = `総勘定元帳_${ledgerData.accountName}_${page.fiscalYear.selectedYear}.csv`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -141,14 +128,14 @@
 		<div class="flex items-center gap-2">
 			<Select.Root
 				type="single"
-				value={fiscalYear.selectedYear.toString()}
+				value={page.fiscalYear.selectedYear.toString()}
 				onValueChange={(v) => v && handleYearChange(parseInt(v))}
 			>
 				<Select.Trigger class="w-32">
-					{fiscalYear.selectedYear}年度
+					{page.fiscalYear.selectedYear}年度
 				</Select.Trigger>
 				<Select.Content>
-					{#each fiscalYear.availableYears as year (year)}
+					{#each page.fiscalYear.availableYears as year (year)}
 						<Select.Item value={year.toString()}>{year}年度</Select.Item>
 					{/each}
 				</Select.Content>
@@ -161,7 +148,7 @@
 		</div>
 	</div>
 
-	{#if isLoading}
+	{#if page.isLoading}
 		<div class="flex h-64 items-center justify-center">
 			<p class="text-muted-foreground">読み込み中...</p>
 		</div>
@@ -169,7 +156,7 @@
 		<Card.Root>
 			<Card.Content class="flex h-64 items-center justify-center">
 				<p class="text-muted-foreground">
-					{fiscalYear.selectedYear}年度の仕訳がありません
+					{page.fiscalYear.selectedYear}年度の仕訳がありません
 				</p>
 			</Card.Content>
 		</Card.Root>
