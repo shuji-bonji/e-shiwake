@@ -1,28 +1,5 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import {
-		Calendar,
-		BookOpen,
-		BookText,
-		Scale,
-		Settings,
-		List,
-		AlertTriangle,
-		CircleHelp,
-		TrendingUp,
-		Landmark,
-		Receipt,
-		FileText,
-		FileOutput,
-		Package,
-		ClipboardList,
-		Calculator,
-		FileCheck,
-		BookMarked,
-		ExternalLink,
-		FileSpreadsheet,
-		Users
-	} from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
@@ -39,6 +16,10 @@
 	} from '$lib/db';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { onMount } from 'svelte';
+	import { navGroups } from './sidebar-nav';
+	import SidebarNavGroup from './SidebarNavGroup.svelte';
+	import SidebarYearSelector from './SidebarYearSelector.svelte';
+	import SidebarFooterComponent from './SidebarFooter.svelte';
 
 	// 年度ストア
 	const fiscalYear = useFiscalYear();
@@ -73,7 +54,6 @@
 	// 年度を選択して仕訳帳に遷移
 	function handleYearSelect(year: number) {
 		setSelectedYear(year);
-		// 仕訳帳ページ以外にいる場合は遷移
 		if (pathname !== '/') {
 			goto(`${base}/`);
 		}
@@ -97,300 +77,24 @@
 
 	<Sidebar.Content>
 		<!-- 年度セクション -->
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>
-				<Calendar class="size-4" />
-				年度
-			</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					{#each fiscalYear.availableYears as year (year)}
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton
-								isActive={fiscalYear.selectedYear === year}
-								onclick={() => handleYearSelect(year)}
-							>
-								<span>{year}</span>
-								{#if fiscalYear.selectedYear === year}
-									<span class="ml-auto text-xs text-muted-foreground">選択中</span>
-								{/if}
-							</Sidebar.MenuButton>
-						</Sidebar.MenuItem>
-					{/each}
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
+		<SidebarYearSelector
+			availableYears={fiscalYear.availableYears}
+			selectedYear={fiscalYear.selectedYear}
+			onselect={handleYearSelect}
+		/>
 
-		<Sidebar.Separator />
-
-		<!-- 帳簿セクション -->
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>
-				<BookOpen class="size-4" />
-				帳簿
-			</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/'}>
-							{#snippet child({ props })}
-								<a href="{base}/" {...props}>
-									<BookText class="size-4" />
-									<span>仕訳帳</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/ledger'}>
-							{#snippet child({ props })}
-								<a href="{base}/ledger" {...props}>
-									<BookOpen class="size-4" />
-									<span>総勘定元帳</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/trial-balance'}>
-							{#snippet child({ props })}
-								<a href="{base}/trial-balance" {...props}>
-									<Scale class="size-4" />
-									<span>試算表</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
-
-		<Sidebar.Separator />
-
-		<!-- 決算書類セクション -->
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>
-				<Calculator class="size-4" />
-				決算書類
-			</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/profit-loss'}>
-							{#snippet child({ props })}
-								<a href="{base}/profit-loss" {...props}>
-									<TrendingUp class="size-4" />
-									<span>損益計算書</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/balance-sheet'}>
-							{#snippet child({ props })}
-								<a href="{base}/balance-sheet" {...props}>
-									<Landmark class="size-4" />
-									<span>貸借対照表</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/tax-summary'}>
-							{#snippet child({ props })}
-								<a href="{base}/tax-summary" {...props}>
-									<Receipt class="size-4" />
-									<span>消費税集計</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/fixed-assets'}>
-							{#snippet child({ props })}
-								<a href="{base}/fixed-assets" {...props}>
-									<Package class="size-4" />
-									<span>固定資産台帳</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
-
-		<Sidebar.Separator />
-
-		<!-- 確定申告セクション -->
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>
-				<FileCheck class="size-4" />
-				確定申告
-			</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/blue-return'}>
-							{#snippet child({ props })}
-								<a href="{base}/blue-return" {...props}>
-									<ClipboardList class="size-4" />
-									<span>青色申告決算書</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
-
-		<Sidebar.Separator />
-
-		<!-- 出力セクション -->
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>
-				<FileOutput class="size-4" />
-				出力
-			</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/reports'}>
-							{#snippet child({ props })}
-								<a href="{base}/reports" {...props}>
-									<FileText class="size-4" />
-									<span>帳簿出力</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
-
-		<Sidebar.Separator />
-
-		<!-- 請求書セクション -->
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>
-				<FileSpreadsheet class="size-4" />
-				請求書
-			</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/invoice'}>
-							{#snippet child({ props })}
-								<a href="{base}/invoice" {...props}>
-									<FileSpreadsheet class="size-4" />
-									<span>請求書一覧</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/vendors'}>
-							{#snippet child({ props })}
-								<a href="{base}/vendors" {...props}>
-									<Users class="size-4" />
-									<span>取引先管理</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
-
-		<Sidebar.Separator />
-
-		<!-- 設定セクション -->
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>
-				<Settings class="size-4" />
-				設定
-			</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/accounts'}>
-							{#snippet child({ props })}
-								<a href="{base}/accounts" {...props}>
-									<List class="size-4" />
-									<span>勘定科目</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={pathname === '/data'}>
-							{#snippet child({ props })}
-								<a href="{base}/data" {...props}>
-									<Settings class="size-4" />
-									<span>設定・データ管理</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
+		{#each navGroups as group (group.label)}
+			<Sidebar.Separator />
+			<SidebarNavGroup {group} {pathname} />
+		{/each}
 	</Sidebar.Content>
 
-	<Sidebar.Footer class="border-t border-sidebar-border">
-		<Sidebar.Menu>
-			<!-- ヘルプ -->
-			<Sidebar.MenuItem>
-				<Sidebar.MenuButton isActive={pathname.startsWith('/help')}>
-					{#snippet child({ props })}
-						<a href="{base}/help" {...props}>
-							<CircleHelp class="size-4" />
-							<span>ヘルプ</span>
-						</a>
-					{/snippet}
-				</Sidebar.MenuButton>
-			</Sidebar.MenuItem>
-			<!-- 簿記ガイド（外部リンク） -->
-			<Sidebar.MenuItem>
-				<Sidebar.MenuButton>
-					{#snippet child({ props })}
-						<a
-							href="https://github.com/shuji-bonji/Note-on-bookkeeping"
-							target="_blank"
-							rel="noopener noreferrer"
-							class="flex items-center gap-2"
-							{...props}
-						>
-							<BookMarked class="size-4" />
-							<span>簿記ガイド</span>
-							<ExternalLink class="ml-auto size-3 opacity-50" />
-						</a>
-					{/snippet}
-				</Sidebar.MenuButton>
-			</Sidebar.MenuItem>
-			<!-- 未エクスポートリマインダー -->
-			{#if showReminder}
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={pathname === '/data'}>
-						{#snippet child({ props })}
-							<a
-								href="{base}/data"
-								{...props}
-								class="flex items-center gap-2 text-amber-600 dark:text-amber-400"
-							>
-								<AlertTriangle class="size-4" />
-								<span class="text-xs">未エクスポート: {unexportedCount}件</span>
-							</a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-			{/if}
-			<Sidebar.MenuItem>
-				<div class="p-2 text-xs text-muted-foreground">
-					<span>選択中: {fiscalYear.selectedYear}年度</span>
-				</div>
-			</Sidebar.MenuItem>
-		</Sidebar.Menu>
-	</Sidebar.Footer>
+	<SidebarFooterComponent
+		{pathname}
+		selectedYear={fiscalYear.selectedYear}
+		{showReminder}
+		{unexportedCount}
+	/>
 
 	<Sidebar.Rail />
 </Sidebar.Root>

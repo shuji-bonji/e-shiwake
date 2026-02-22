@@ -16,27 +16,19 @@ export async function getSetting<K extends SettingsKey>(
 
 /**
  * 設定値を保存
- * 注意: Svelte 5のproxyオブジェクトを完全に除去するため、JSON round-tripを行う
+ * 注意: Svelte 5のproxyオブジェクトを完全に除去するため、structuredCloneを使用
  */
 export async function setSetting<K extends SettingsKey>(
 	key: K,
 	value: SettingsValueMap[K]
 ): Promise<void> {
-	// JSON round-tripでproxyを完全に除去
-	const plainValue = JSON.parse(JSON.stringify(value)) as SettingsValueMap[K];
-	const record = {
+	// structuredCloneでproxyを完全に除去（JSON round-tripより効率的で型安全）
+	const plainValue = structuredClone(value);
+	await db.settings.put({
 		key,
 		value: plainValue,
 		updatedAt: new Date().toISOString()
-	};
-	// デバッグ用: 構造化クローン可能かテスト
-	try {
-		structuredClone(record);
-	} catch (e) {
-		console.error('setSetting: structuredClone failed for record:', record);
-		throw e;
-	}
-	await db.settings.put(record);
+	});
 }
 
 /**
