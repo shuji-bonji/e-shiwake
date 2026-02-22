@@ -1,9 +1,4 @@
 <script lang="ts">
-	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import {
 		generateAttachmentName,
 		getSuppressRenameConfirm,
@@ -42,25 +37,10 @@
 		removeBusinessRatio
 	} from '$lib/utils/business-ratio';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
-	import {
-		ArrowDown,
-		ArrowUp,
-		Check,
-		Circle,
-		Copy,
-		FileText,
-		Paperclip,
-		Percent,
-		Plus,
-		Trash2,
-		X
-	} from '@lucide/svelte';
-	import AccountSelect from './AccountSelect.svelte';
-	import AttachmentDialog from './AttachmentDialog.svelte';
-	import AttachmentEditDialog from './AttachmentEditDialog.svelte';
+	import JournalLineGroup from './JournalLineGroup.svelte';
+	import JournalRowDialogs from './JournalRowDialogs.svelte';
+	import JournalRowHeader from './JournalRowHeader.svelte';
 	import PdfDropZone from './PdfDropZone.svelte';
-	import TaxCategorySelect from './TaxCategorySelect.svelte';
-	import VendorInput from './VendorInput.svelte';
 
 	interface Props {
 		journal: JournalEntry;
@@ -170,14 +150,6 @@
 
 	/**
 	 * 借方/貸方と勘定科目タイプから増減アイコン情報を取得
-	 *
-	 * | 種別   | 増加 | 減少 |
-	 * |--------|------|------|
-	 * | 資産   | 借方 | 貸方 |
-	 * | 負債   | 貸方 | 借方 |
-	 * | 純資産 | 貸方 | 借方 |
-	 * | 収益   | 貸方 | ―   |
-	 * | 費用   | 借方 | ―   |
 	 */
 	function getLineIndicator(
 		side: 'debit' | 'credit',
@@ -187,7 +159,6 @@
 			return { icon: null, label: '', color: '' };
 		}
 
-		// 借方側のルール
 		if (side === 'debit') {
 			switch (accountType) {
 				case 'asset':
@@ -199,12 +170,10 @@
 				case 'equity':
 					return { icon: 'down', label: '純資産', color: 'text-purple-500' };
 				case 'revenue':
-					// 収益が借方に来るのは取消・戻しの場合（稀）
 					return { icon: 'down', label: '収益', color: 'text-green-500' };
 			}
 		}
 
-		// 貸方側のルール
 		if (side === 'credit') {
 			switch (accountType) {
 				case 'asset':
@@ -216,7 +185,6 @@
 				case 'revenue':
 					return { icon: 'up', label: '収益', color: 'text-green-500' };
 				case 'expense':
-					// 費用が貸方に来るのは取消・戻しの場合（稀）
 					return { icon: 'down', label: '費用', color: 'text-red-500' };
 			}
 		}
@@ -230,7 +198,6 @@
 		const currentIndex = statusOrder.indexOf(journal.evidenceStatus);
 		const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
 
-		// 電子証憑から他に切り替える場合、添付ファイルがあれば確認ダイアログを表示
 		if (journal.evidenceStatus === 'digital' && journal.attachments.length > 0) {
 			pendingEvidenceStatus = nextStatus;
 			evidenceChangeDialogOpen = true;
@@ -269,20 +236,22 @@
 		onupdate({ ...journal, [field]: value });
 	}
 
+	// 日付変更ハンドラ（ローカル状態のみ更新）
+	function handleDateChange(value: string) {
+		localDate = value;
+	}
+
 	// 日付のblurハンドラ（日付が変更された場合のみ親に伝播）
 	async function handleDateBlur() {
 		if (localDate !== journal.date) {
 			updateField('date', localDate);
 		}
-		// 証憑同期
 		await syncAttachmentsOnBlur();
 	}
 
 	// 取引先保存と証憑同期（blurタイミング）
 	async function handleVendorBlur() {
-		// 取引先を保存（入力完了時のみ）
 		await saveVendorIfNeeded(journal.vendor);
-		// 証憑同期
 		await syncAttachmentsOnBlur();
 	}
 
@@ -290,11 +259,9 @@
 	async function syncAttachmentsOnBlur() {
 		if (journal.attachments.length === 0) return;
 
-		// メイン借方行の金額を取得
 		const mainDebitAmount =
 			journal.lines.find((l) => l.type === 'debit' && l.accountCode)?.amount ?? 0;
 
-		// ファイル名が変わるかプレチェック
 		const newNames = journal.attachments.map((att) =>
 			generateAttachmentName(
 				journal.date,
@@ -309,11 +276,9 @@
 
 		if (!hasNameChanges) return;
 
-		// 設定を確認
 		const suppress = await getSuppressRenameConfirm();
 
 		if (!suppress) {
-			// 確認ダイアログを表示
 			pendingRenameInfo = {
 				oldNames,
 				newNames,
@@ -324,7 +289,6 @@
 			return;
 		}
 
-		// 確認不要の場合は即実行
 		await executeSyncAttachments(mainDebitAmount);
 	}
 
@@ -332,7 +296,6 @@
 	async function handleConfirmRename() {
 		if (!pendingRenameInfo) return;
 
-		// 「次回から表示しない」チェック
 		if (renameConfirmSuppressCheck) {
 			await setSuppressRenameConfirm(true);
 		}
@@ -342,6 +305,12 @@
 		pendingRenameInfo = null;
 
 		await executeSyncAttachments(mainDebitAmount);
+	}
+
+	// リネームキャンセル
+	function handleCancelRename() {
+		renameConfirmDialogOpen = false;
+		pendingRenameInfo = null;
 	}
 
 	// リネーム実行
@@ -361,11 +330,7 @@
 	}
 
 	// 仕訳行の更新（即時、証憑同期はblurで実行）
-	function updateLine(
-		lineId: string,
-		field: keyof JournalLine,
-		value: string | number | TaxCategory | undefined
-	) {
+	function updateLine(lineId: string, field: string, value: unknown) {
 		const targetLine = journal.lines.find((l) => l.id === lineId);
 
 		// 按分適用済みの行の金額変更 → 自動再計算
@@ -381,10 +346,8 @@
 
 			const newLines = journal.lines.map((line) => {
 				if (line.id === lineId) {
-					// 事業分を更新
 					return { ...line, amount: businessAmount, _originalAmount: newTotal };
 				} else if (line._businessRatioGenerated) {
-					// 家事分（事業主貸）を更新
 					return { ...line, amount: personalAmount };
 				}
 				return line;
@@ -414,7 +377,6 @@
 	// 貸方金額でTabキー押下時、最後の行なら取引先にフォーカス移動
 	function handleCreditAmountKeydown(e: KeyboardEvent, lineId: string) {
 		if (e.key === 'Tab' && !e.shiftKey) {
-			// 最後の貸方行かチェック
 			const lastCreditLine = creditLines[creditLines.length - 1];
 			if (lastCreditLine?.id === lineId) {
 				e.preventDefault();
@@ -452,7 +414,7 @@
 
 	// 仕訳行の削除
 	function removeLine(lineId: string) {
-		if (journal.lines.length <= 2) return; // 最低2行は維持
+		if (journal.lines.length <= 2) return;
 		onupdate({ ...journal, lines: journal.lines.filter((l) => l.id !== lineId) });
 	}
 
@@ -460,18 +422,13 @@
 	function isSafari(): boolean {
 		if (typeof navigator === 'undefined') return false;
 		const ua = navigator.userAgent;
-		// Safari判定: Safariを含み、ChromeやEdgeを含まない
 		return /Safari/.test(ua) && !/Chrome|CriOS|Edg/.test(ua);
 	}
 
 	// Safari向け警告が必要かチェック
 	function shouldShowSafariWarning(): boolean {
-		// File System Access API非対応、またはSafariの場合は警告対象
 		const needsWarning = !supportsFileSystemAccess() || isSafari();
-		if (!needsWarning) {
-			return false;
-		}
-		// 既に表示済みなら警告不要
+		if (!needsWarning) return false;
 		if (
 			typeof localStorage !== 'undefined' &&
 			localStorage.getItem('shownStorageWarning') === 'true'
@@ -484,8 +441,6 @@
 	// 添付ファイルのドロップ → ダイアログを開く
 	function handleFileDrop(file: File) {
 		pendingFile = file;
-
-		// Safari向け：初回のみ警告ダイアログを表示
 		if (shouldShowSafariWarning()) {
 			safariDialogOpen = true;
 		} else {
@@ -508,19 +463,15 @@
 		if (!pendingFile) return;
 
 		try {
-			// 同名ファイルの存在チェック
 			let fileExists = false;
 
 			if (directoryHandle) {
-				// ファイルシステム保存の場合
 				const year = new Date(documentDate).getFullYear();
 				fileExists = await fileExistsInDirectory(directoryHandle, year, generatedName);
 			} else {
-				// IndexedDB保存の場合：既存添付ファイル名と照合
 				fileExists = journal.attachments.some((a) => a.generatedName === generatedName);
 			}
 
-			// 上書き処理の共通ロジック
 			const doAdd = async () => {
 				let targetJournal = journal;
 				if (fileExists) {
@@ -595,6 +546,12 @@
 		}
 	}
 
+	// 添付ファイルの削除キャンセル
+	function handleCancelRemoveAttachment() {
+		removeAttachmentDialogOpen = false;
+		pendingRemoveAttachmentId = null;
+	}
+
 	// 添付ファイルのプレビュー
 	async function handlePreviewAttachment(attachment: Attachment) {
 		await previewJournalAttachment({ journal, attachment, directoryHandle });
@@ -618,7 +575,6 @@
 		if (!editingAttachment) return;
 
 		try {
-			// ファイル名が変わる場合に同名チェック
 			const newName =
 				updates.generatedName ||
 				generateAttachmentName(
@@ -718,388 +674,68 @@
 >
 	<!-- メインコンテンツ -->
 	<div class="min-w-0 flex-1">
-		<!-- ヘッダー行: モバイル2段、デスクトップ1行 -->
-		<div class="mb-3 flex flex-col gap-2 journal:flex-row journal:items-center journal:gap-3">
-			<!-- 証跡ステータス + 日付 + 摘要 -->
-			<div class="flex min-w-0 flex-1 items-center gap-2">
-				<!-- 証跡ステータス -->
-				<Tooltip.Provider>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							<button type="button" class="p-1" onclick={cycleEvidenceStatus} tabindex={-1}>
-								{#if journal.evidenceStatus === 'none'}
-									<Circle class="size-5 text-muted-foreground" />
-								{:else if journal.evidenceStatus === 'paper'}
-									<FileText class="size-5 text-amber-500" />
-								{:else}
-									<Paperclip class="size-5 text-green-500" />
-								{/if}
-							</button>
-						</Tooltip.Trigger>
-						<Tooltip.Content>
-							{#if journal.evidenceStatus === 'none'}
-								証跡なし（クリックで変更）
-							{:else if journal.evidenceStatus === 'paper'}
-								紙で保管（クリックで変更）
-							{:else}
-								電子データ紐付け済み（クリックで変更）
-							{/if}
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
-
-				<!-- 日付（blurタイミングでのみ保存、入力中の自動ソートを防止） -->
-				<Input
-					bind:ref={dateInputRef}
-					type="date"
-					value={localDate}
-					oninput={(e) => (localDate = e.currentTarget.value)}
-					onblur={handleDateBlur}
-					class="w-32 shrink-0"
-				/>
-
-				<!-- 摘要 -->
-				<Input
-					type="text"
-					value={journal.description}
-					oninput={(e) => updateField('description', e.currentTarget.value)}
-					onblur={syncAttachmentsOnBlur}
-					placeholder="摘要"
-					class="min-w-0 flex-1"
-				/>
-			</div>
-
-			<!-- 取引先 + ボタン類 -->
-			<div class="flex items-center gap-2 pl-8 journal:pl-0">
-				<!-- 取引先 -->
-				<VendorInput
-					bind:this={vendorInputRef}
-					{vendors}
-					value={journal.vendor}
-					onchange={(name) => updateField('vendor', name)}
-					onblur={handleVendorBlur}
-					onkeydown={handleVendorKeydown}
-					placeholder="取引先"
-					class="w-40 shrink-0"
-					tabindex={-1}
-				/>
-
-				<!-- 確定ボタン（編集中のみ表示） -->
-				{#if isEditing && onconfirm}
-					<Tooltip.Provider>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<Button
-										{...props}
-										variant="default"
-										size="sm"
-										class="shrink-0 gap-1"
-										disabled={!validation.isValid}
-										onclick={() => onconfirm(journal.id)}
-										tabindex={-1}
-									>
-										<Check class="size-4" />
-										確定
-									</Button>
-								{/snippet}
-							</Tooltip.Trigger>
-							{#if !validation.isValid}
-								<Tooltip.Content>
-									{#if validation.hasEmptyAccounts}
-										勘定科目を選択してください
-									{:else if validation.debitTotal === 0 && validation.creditTotal === 0}
-										金額を入力してください
-									{:else}
-										借方・貸方の合計が一致しません
-									{/if}
-								</Tooltip.Content>
-							{/if}
-						</Tooltip.Root>
-					</Tooltip.Provider>
-				{/if}
-
-				<!-- コピーボタン（編集中でない場合のみ表示） -->
-				{#if !isEditing && oncopy}
-					<Tooltip.Provider>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<Button
-										{...props}
-										variant="ghost"
-										size="icon"
-										class="shrink-0"
-										onclick={() => oncopy(journal)}
-										tabindex={-1}
-									>
-										<Copy class="size-4" />
-									</Button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content>この仕訳をコピーして新規作成</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
-				{/if}
-
-				<!-- 削除ボタン -->
-				<Button
-					variant="ghost"
-					size="icon"
-					class="shrink-0 text-destructive"
-					onclick={() => ondelete(journal.id)}
-					tabindex={-1}
-				>
-					<Trash2 class="size-4" />
-				</Button>
-			</div>
-		</div>
+		<!-- ヘッダー行 -->
+		<JournalRowHeader
+			{journal}
+			{vendors}
+			{localDate}
+			{validation}
+			{isEditing}
+			onupdatefield={updateField}
+			ondatechange={handleDateChange}
+			ondateblur={handleDateBlur}
+			onvendorblur={handleVendorBlur}
+			onsyncblur={syncAttachmentsOnBlur}
+			oncyclestatus={cycleEvidenceStatus}
+			{onconfirm}
+			{oncopy}
+			{ondelete}
+			onvendorkeydown={handleVendorKeydown}
+			bind:dateInputRef
+			bind:vendorInputRef
+		/>
 
 		<!-- 仕訳行 -->
 		<div class="grid grid-cols-2 gap-4">
 			<!-- 借方 -->
-			<div class="space-y-3">
-				<div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-					借方
-
-					<!-- 家事按分ボタン（インライン） -->
-					{#if isBusinessRatioApplied}
-						<button
-							type="button"
-							class="flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
-							onclick={handleRemoveBusinessRatio}
-							tabindex={-1}
-						>
-							<Percent class="size-3" />
-							{appliedBusinessRatio}%
-							<X class="size-3" />
-						</button>
-					{:else if businessRatioTarget}
-						<button
-							type="button"
-							class="flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
-							onclick={() =>
-								handleApplyBusinessRatio(
-									businessRatioTarget.index,
-									businessRatioTarget.account.defaultBusinessRatio ?? 50
-								)}
-							tabindex={-1}
-						>
-							<Percent class="size-3" />
-							按分適用
-						</button>
-					{/if}
-
-					<span class="ml-auto font-mono">{validation.debitTotal.toLocaleString('ja-JP')}円</span>
-					<Tooltip.Provider>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-6 text-foreground"
-									onclick={() => addLine('debit')}
-									tabindex={-1}
-								>
-									<Plus class="size-4" strokeWidth={3} />
-								</Button>
-							</Tooltip.Trigger>
-							<Tooltip.Content>
-								<div class="text-xs">
-									<div class="mb-1 font-medium">借方に来る科目：</div>
-									<div class="flex items-center gap-1">
-										<ArrowUp class="size-3 text-blue-500" />資産の増加
-									</div>
-									<div class="flex items-center gap-1">
-										<ArrowUp class="size-3 text-red-500" />費用の発生
-									</div>
-									<div class="flex items-center gap-1">
-										<ArrowDown class="size-3 text-purple-500" />負債の減少
-									</div>
-								</div>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
-				</div>
-				{#each debitLines as line (line.id)}
-					{@const accountType = getAccountType(line.accountCode)}
-					{@const indicator = getLineIndicator('debit', accountType)}
-					<!-- モバイル: 2段、デスクトップ: 1行 -->
-					<div class="flex flex-col gap-1 journal:flex-row journal:items-center journal:gap-2">
-						<!-- 種別アイコン + 勘定科目 -->
-						<div class="flex min-w-0 flex-1 items-center gap-2">
-							<Tooltip.Provider>
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										<div
-											class={cn('flex size-7 items-center justify-center rounded', indicator.color)}
-										>
-											{#if indicator.icon === 'up'}
-												<ArrowUp class="size-4" />
-											{:else if indicator.icon === 'down'}
-												<ArrowDown class="size-4" />
-											{:else}
-												<span class="size-4"></span>
-											{/if}
-										</div>
-									</Tooltip.Trigger>
-									{#if indicator.label}
-										<Tooltip.Content>
-											{indicator.icon === 'up' ? '増加' : '減少'}：{indicator.label}
-										</Tooltip.Content>
-									{/if}
-								</Tooltip.Root>
-							</Tooltip.Provider>
-							<AccountSelect
-								{accounts}
-								value={line.accountCode}
-								onchange={(code) => handleAccountChange(line.id, code)}
-								class="min-w-0 flex-1"
-							/>
-						</div>
-						<!-- 税区分 + 金額 + 削除ボタン -->
-						<div class="flex items-center gap-1 pl-9 journal:pl-0">
-							<TaxCategorySelect
-								value={line.taxCategory}
-								onchange={(cat) => updateLine(line.id, 'taxCategory', cat)}
-								tabindex={-1}
-							/>
-							<Input
-								type="number"
-								value={line.amount}
-								onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
-								onblur={syncAttachmentsOnBlur}
-								onfocus={(e) => e.currentTarget.select()}
-								placeholder="金額"
-								class={cn(
-									'w-full text-right font-mono journal:w-24',
-									!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
-								)}
-								min="0"
-							/>
-							{#if debitLines.length > 1}
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-7 shrink-0"
-									onclick={() => removeLine(line.id)}
-									tabindex={-1}
-								>
-									<Trash2 class="size-3" />
-								</Button>
-							{/if}
-						</div>
-					</div>
-				{/each}
-			</div>
+			<JournalLineGroup
+				side="debit"
+				lines={debitLines}
+				{accounts}
+				total={validation.debitTotal}
+				{isEditing}
+				isValid={validation.isValid}
+				{businessRatioTarget}
+				{isBusinessRatioApplied}
+				{appliedBusinessRatio}
+				getlineIndicator={getLineIndicator}
+				getaccounttype={getAccountType}
+				onaccountchange={handleAccountChange}
+				onupdateline={updateLine}
+				onremoveline={removeLine}
+				onaddline={addLine}
+				onsyncblur={syncAttachmentsOnBlur}
+				onapplyratio={handleApplyBusinessRatio}
+				onremoveratio={handleRemoveBusinessRatio}
+			/>
 
 			<!-- 貸方 -->
-			<div class="space-y-3">
-				<div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-					貸方
-					<span class="ml-auto font-mono">{validation.creditTotal.toLocaleString('ja-JP')}円</span>
-					<Tooltip.Provider>
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-6 text-foreground"
-									onclick={() => addLine('credit')}
-									tabindex={-1}
-								>
-									<Plus class="size-4" strokeWidth={3} />
-								</Button>
-							</Tooltip.Trigger>
-							<Tooltip.Content>
-								<div class="text-xs">
-									<div class="mb-1 font-medium">貸方に来る科目：</div>
-									<div class="flex items-center gap-1">
-										<ArrowDown class="size-3 text-blue-500" />資産の減少
-									</div>
-									<div class="flex items-center gap-1">
-										<ArrowUp class="size-3 text-purple-500" />負債の増加
-									</div>
-									<div class="flex items-center gap-1">
-										<ArrowUp class="size-3 text-green-500" />収益の発生
-									</div>
-								</div>
-							</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
-				</div>
-				{#each creditLines as line (line.id)}
-					{@const accountType = getAccountType(line.accountCode)}
-					{@const indicator = getLineIndicator('credit', accountType)}
-					<!-- モバイル: 2段、デスクトップ: 1行 -->
-					<div class="flex flex-col gap-1 journal:flex-row journal:items-center journal:gap-2">
-						<!-- 種別アイコン + 勘定科目 -->
-						<div class="flex min-w-0 flex-1 items-center gap-2">
-							<Tooltip.Provider>
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										<div
-											class={cn('flex size-7 items-center justify-center rounded', indicator.color)}
-										>
-											{#if indicator.icon === 'up'}
-												<ArrowUp class="size-4" />
-											{:else if indicator.icon === 'down'}
-												<ArrowDown class="size-4" />
-											{:else}
-												<span class="size-4"></span>
-											{/if}
-										</div>
-									</Tooltip.Trigger>
-									{#if indicator.label}
-										<Tooltip.Content>
-											{indicator.icon === 'up' ? '増加' : '減少'}：{indicator.label}
-										</Tooltip.Content>
-									{/if}
-								</Tooltip.Root>
-							</Tooltip.Provider>
-							<AccountSelect
-								{accounts}
-								value={line.accountCode}
-								onchange={(code) => handleAccountChange(line.id, code)}
-								class="min-w-0 flex-1"
-							/>
-						</div>
-						<!-- 税区分 + 金額 + 削除ボタン -->
-						<div class="flex items-center gap-1 pl-9 journal:pl-0">
-							<TaxCategorySelect
-								value={line.taxCategory}
-								onchange={(cat) => updateLine(line.id, 'taxCategory', cat)}
-								tabindex={-1}
-							/>
-							<Input
-								type="number"
-								value={line.amount}
-								onchange={(e) => updateLine(line.id, 'amount', Number(e.currentTarget.value))}
-								onblur={syncAttachmentsOnBlur}
-								onfocus={(e) => e.currentTarget.select()}
-								onkeydown={(e) => handleCreditAmountKeydown(e, line.id)}
-								placeholder="金額"
-								class={cn(
-									'w-full text-right font-mono journal:w-24',
-									!isEditing && line.amount === 0 && !validation.isValid && 'border-destructive'
-								)}
-								min="0"
-							/>
-							{#if creditLines.length > 1}
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-7 shrink-0"
-									onclick={() => removeLine(line.id)}
-									tabindex={-1}
-								>
-									<Trash2 class="size-3" />
-								</Button>
-							{/if}
-						</div>
-					</div>
-				{/each}
-			</div>
+			<JournalLineGroup
+				side="credit"
+				lines={creditLines}
+				{accounts}
+				total={validation.creditTotal}
+				{isEditing}
+				isValid={validation.isValid}
+				getlineIndicator={getLineIndicator}
+				getaccounttype={getAccountType}
+				onaccountchange={handleAccountChange}
+				onupdateline={updateLine}
+				onremoveline={removeLine}
+				onaddline={addLine}
+				onsyncblur={syncAttachmentsOnBlur}
+				onkeydown={handleCreditAmountKeydown}
+			/>
 		</div>
 
 		<!-- バリデーションエラー表示 -->
@@ -1133,151 +769,38 @@
 	</div>
 </div>
 
-<!-- Safari向け警告ダイアログ -->
-<SafariStorageDialog bind:open={safariDialogOpen} onconfirm={handleSafariDialogConfirm} />
-
-<!-- 添付ダイアログ -->
-<AttachmentDialog
-	bind:open={attachmentDialogOpen}
-	file={pendingFile}
-	journalDate={journal.date}
-	vendor={journal.vendor}
+<!-- ダイアログ群 -->
+<JournalRowDialogs
+	{journal}
 	{vendors}
-	description={journal.description}
-	amount={mainAmount}
-	suggestedDocumentType={suggestedDocType}
-	onconfirm={handleAttachmentConfirm}
-	oncancel={handleAttachmentCancel}
+	bind:safariDialogOpen
+	onsafaridialogconfirm={handleSafariDialogConfirm}
+	bind:attachmentDialogOpen
+	{pendingFile}
+	{mainAmount}
+	{suggestedDocType}
+	onattachmentconfirm={handleAttachmentConfirm}
+	onattachmentcancel={handleAttachmentCancel}
+	bind:editDialogOpen
+	{editingAttachment}
+	oneditconfirm={handleEditConfirm}
+	oneditcancel={handleEditCancel}
+	bind:evidenceChangeDialogOpen
+	attachmentCount={journal.attachments.length}
+	onconfirmstatuschange={confirmEvidenceStatusChange}
+	oncancelstatuschange={cancelEvidenceStatusChange}
+	bind:removeAttachmentDialogOpen
+	{pendingRemoveAttachmentId}
+	onconfirmremoveattachment={handleConfirmRemoveAttachment}
+	oncancelremoveattachment={handleCancelRemoveAttachment}
+	bind:renameConfirmDialogOpen
+	{renameConfirmSuppressCheck}
+	{pendingRenameInfo}
+	onconfirmrename={handleConfirmRename}
+	oncancelrename={handleCancelRename}
+	onsuppresschange={(checked) => (renameConfirmSuppressCheck = checked)}
+	bind:overwriteDialogOpen
+	{overwriteFileName}
+	onconfirmoverwrite={handleOverwriteConfirm}
+	oncanceloverwrite={handleOverwriteCancel}
 />
-
-<!-- 証憑編集ダイアログ -->
-<AttachmentEditDialog
-	bind:open={editDialogOpen}
-	attachment={editingAttachment}
-	{vendors}
-	onconfirm={handleEditConfirm}
-	oncancel={handleEditCancel}
-/>
-
-<!-- 証跡ステータス変更確認ダイアログ -->
-<AlertDialog.Root bind:open={evidenceChangeDialogOpen}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>添付ファイルを削除しますか？</AlertDialog.Title>
-			<AlertDialog.Description>
-				電子証憑から他のステータスに変更すると、紐付けられている添付ファイル（{journal.attachments
-					.length}件）が削除されます。この操作は取り消せません。
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel onclick={cancelEvidenceStatusChange}>キャンセル</AlertDialog.Cancel>
-			<AlertDialog.Action
-				class="bg-destructive/80 text-white hover:bg-destructive/70"
-				onclick={confirmEvidenceStatusChange}
-			>
-				削除して変更
-			</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
-
-<!-- 証憑削除確認ダイアログ -->
-<AlertDialog.Root bind:open={removeAttachmentDialogOpen}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>証憑を削除しますか？</AlertDialog.Title>
-			<AlertDialog.Description>
-				{#if pendingRemoveAttachmentId}
-					{@const att = journal.attachments.find((a) => a.id === pendingRemoveAttachmentId)}
-					{#if att}
-						<span class="font-mono text-sm">{att.generatedName}</span> を削除します。
-						{#if att.storageType === 'filesystem'}
-							保存先フォルダのファイルも削除されます。
-						{/if}
-						この操作は取り消せません。
-					{/if}
-				{/if}
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel
-				onclick={() => {
-					removeAttachmentDialogOpen = false;
-					pendingRemoveAttachmentId = null;
-				}}>キャンセル</AlertDialog.Cancel
-			>
-			<AlertDialog.Action
-				class="bg-destructive/80 text-white hover:bg-destructive/70"
-				onclick={handleConfirmRemoveAttachment}
-			>
-				削除
-			</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
-
-<!-- 証憑リネーム確認ダイアログ -->
-<AlertDialog.Root bind:open={renameConfirmDialogOpen}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>証憑のファイル名が変更されます</AlertDialog.Title>
-			<AlertDialog.Description>
-				仕訳の変更に伴い、紐付けられた証憑のファイル名が更新されます。
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-
-		{#if pendingRenameInfo}
-			<div class="max-h-48 space-y-2 overflow-y-auto py-2">
-				{#each pendingRenameInfo.oldNames as oldName, i (i)}
-					{#if oldName !== pendingRenameInfo.newNames[i]}
-						<div class="rounded-md border p-2 text-xs">
-							<p class="text-muted-foreground line-through">{oldName}</p>
-							<p class="font-medium">{pendingRenameInfo.newNames[i]}</p>
-						</div>
-					{/if}
-				{/each}
-			</div>
-		{/if}
-
-		<div class="flex items-center gap-2 py-2">
-			<input
-				type="checkbox"
-				id="suppress-rename-check"
-				checked={renameConfirmSuppressCheck}
-				onchange={(e) => (renameConfirmSuppressCheck = e.currentTarget.checked)}
-				class="size-4 rounded border-gray-300"
-			/>
-			<label for="suppress-rename-check" class="text-sm text-muted-foreground">
-				次回から表示しない
-			</label>
-		</div>
-
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel
-				onclick={() => {
-					renameConfirmDialogOpen = false;
-					pendingRenameInfo = null;
-				}}>キャンセル</AlertDialog.Cancel
-			>
-			<AlertDialog.Action onclick={handleConfirmRename}>変更する</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
-
-<!-- ファイル上書き確認ダイアログ -->
-<AlertDialog.Root bind:open={overwriteDialogOpen}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>ファイルを上書きしますか？</AlertDialog.Title>
-			<AlertDialog.Description>
-				同名のファイルが既に存在します。
-				<span class="mt-2 block font-mono text-sm">{overwriteFileName}</span>
-				<span class="mt-2 block">上書きしますか？</span>
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel onclick={handleOverwriteCancel}>キャンセル</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={handleOverwriteConfirm}>上書き</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
