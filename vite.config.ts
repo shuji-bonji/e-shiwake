@@ -74,13 +74,18 @@ export default defineConfig({
 							url = url.replace(/^client\//, '');
 							// index.html を除去（ルートは "/" に変換）
 							url = url.replace(/index\.html$/, '');
-							// 空文字（ルート）は "/" に変換
+							// 空文字（ルート）は base パスに変換
 							if (url === '') {
-								url = '/';
-							}
-							// HTMLページ（拡張子なし）にトレイリングスラッシュを追加
-							if (!url.includes('.') && !url.endsWith('/')) {
-								url = `${url}/`;
+								url = pwaBase;
+							} else {
+								// HTMLページ（拡張子なし）にトレイリングスラッシュを追加
+								if (!url.includes('.') && !url.endsWith('/')) {
+									url = `${url}/`;
+								}
+								// base パスがある場合はプレフィックスとして付与
+								if (base && !url.startsWith(base)) {
+									url = `${base}/${url}`;
+								}
 							}
 							entry.url = url;
 							return entry;

@@ -61,7 +61,9 @@ export {
 	removeAttachmentFromJournal,
 	getAttachmentBlob,
 	updateAttachment,
-	syncAttachmentsWithJournal
+	syncAttachmentsWithJournal,
+	getUsedFileNames,
+	makeFileNameUnique
 } from './attachment-repository';
 export type { AttachmentParams, AttachmentUpdateParams } from './attachment-repository';
 

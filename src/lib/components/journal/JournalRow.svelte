@@ -4,7 +4,8 @@
 		getSuppressRenameConfirm,
 		setSuppressRenameConfirm,
 		suggestDocumentType,
-		validateJournal
+		validateJournal,
+		getUsedFileNames
 	} from '$lib/db';
 	import type {
 		Account,
@@ -28,7 +29,7 @@
 	} from '$lib/usecases/journal-attachments';
 	import { cn } from '$lib/utils.js';
 	import { toast } from 'svelte-sonner';
-	import { fileExistsInDirectory } from '$lib/utils/filesystem';
+
 	import {
 		applyBusinessRatio,
 		getAppliedBusinessRatio,
@@ -463,28 +464,22 @@
 		if (!pendingFile) return;
 
 		try {
-			let fileExists = false;
-
-			if (directoryHandle) {
-				const year = new Date(documentDate).getFullYear();
-				fileExists = await fileExistsInDirectory(directoryHandle, year, generatedName);
-			} else {
-				fileExists = journal.attachments.some((a) => a.generatedName === generatedName);
-			}
+			// 全仕訳横断でファイル名の重複をチェック
+			const usedNames = await getUsedFileNames();
+			const fileExists = usedNames.has(generatedName);
 
 			const doAdd = async () => {
+				// 同名の添付が現在の仕訳にあれば先に削除（1つのみに保つ）
 				let targetJournal = journal;
-				if (fileExists) {
-					const existingAttachment = journal.attachments.find(
-						(a) => a.generatedName === generatedName
-					);
-					if (existingAttachment) {
-						targetJournal = await removeJournalAttachment({
-							journal,
-							attachmentId: existingAttachment.id,
-							directoryHandle
-						});
-					}
+				const existingAttachment = targetJournal.attachments.find(
+					(a) => a.generatedName === generatedName
+				);
+				if (existingAttachment) {
+					targetJournal = await removeJournalAttachment({
+						journal: targetJournal,
+						attachmentId: existingAttachment.id,
+						directoryHandle
+					});
 				}
 
 				const updatedJournal = await addJournalAttachment({
@@ -584,10 +579,11 @@
 					updates.amount,
 					updates.vendor
 				);
-			if (newName !== editingAttachment.generatedName && directoryHandle) {
-				const year = new Date(updates.documentDate).getFullYear();
-				const exists = await fileExistsInDirectory(directoryHandle, year, newName);
-				if (exists) {
+
+			// ファイル名が変わる場合のみ重複チェック
+			if (newName !== editingAttachment.generatedName) {
+				const usedNames = await getUsedFileNames(editingAttachment.id);
+				if (usedNames.has(newName)) {
 					overwriteFileName = newName;
 					overwriteCallback = async () => {
 						try {

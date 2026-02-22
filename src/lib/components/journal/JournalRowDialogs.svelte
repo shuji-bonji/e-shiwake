@@ -62,7 +62,7 @@
 		onconfirmrename: () => void;
 		oncancelrename: () => void;
 		onsuppresschange: (checked: boolean) => void;
-		// 上書き確認
+		// ファイル上書き確認
 		overwriteDialogOpen: boolean;
 		overwriteFileName: string;
 		onconfirmoverwrite: () => void;
@@ -231,14 +231,18 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>ファイルを上書きしますか？</AlertDialog.Title>
 			<AlertDialog.Description>
-				同名のファイルが既に存在します。
+				同じファイル名の証憑が既に存在します。上書きすると既存のPDFファイルが置き換えられます。
 				<span class="mt-2 block font-mono text-sm">{overwriteFileName}</span>
-				<span class="mt-2 block">上書きしますか？</span>
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel onclick={oncanceloverwrite}>キャンセル</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={onconfirmoverwrite}>上書き</AlertDialog.Action>
+			<AlertDialog.Action
+				class="bg-destructive/80 text-white hover:bg-destructive/70"
+				onclick={onconfirmoverwrite}
+			>
+				上書きする
+			</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

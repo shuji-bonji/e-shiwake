@@ -72,6 +72,52 @@ export function suggestDocumentType(
 }
 
 /**
+ * 全仕訳から使用中の添付ファイル名を収集
+ * @param excludeAttachmentId 除外する添付ファイルID（自分自身のリネーム時）
+ * @returns 使用中のファイル名のSet
+ */
+export async function getUsedFileNames(excludeAttachmentId?: string): Promise<Set<string>> {
+	const journals = await db.journals.toArray();
+	const usedNames = new Set<string>();
+
+	for (const journal of journals) {
+		for (const attachment of journal.attachments) {
+			if (excludeAttachmentId && attachment.id === excludeAttachmentId) continue;
+			if (attachment.generatedName) {
+				usedNames.add(attachment.generatedName);
+			}
+		}
+	}
+
+	return usedNames;
+}
+
+/**
+ * ファイル名の重複を回避するためにサフィックスを付与
+ * 例: "2025-01-15_領収書_USBケーブル_3,980円_Amazon.pdf"
+ *   → "2025-01-15_領収書_USBケーブル_3,980円_Amazon_2.pdf"
+ *   → "2025-01-15_領収書_USBケーブル_3,980円_Amazon_3.pdf"
+ */
+export function makeFileNameUnique(baseName: string, usedNames: Set<string>): string {
+	if (!usedNames.has(baseName)) {
+		return baseName;
+	}
+
+	const ext = baseName.lastIndexOf('.') >= 0 ? baseName.slice(baseName.lastIndexOf('.')) : '';
+	const nameWithoutExt =
+		baseName.lastIndexOf('.') >= 0 ? baseName.slice(0, baseName.lastIndexOf('.')) : baseName;
+
+	let counter = 2;
+	let candidate = `${nameWithoutExt}_${counter}${ext}`;
+	while (usedNames.has(candidate)) {
+		counter++;
+		candidate = `${nameWithoutExt}_${counter}${ext}`;
+	}
+
+	return candidate;
+}
+
+/**
  * 添付ファイルのBlobが削除済みかチェック
  */
 export function isAttachmentBlobPurged(attachment: Attachment): boolean {
@@ -263,10 +309,23 @@ export async function updateAttachment(
 	const newAmount = updates.amount ?? attachment.amount;
 	const newVendor = updates.vendor ?? attachment.vendor;
 
-	// 新しいファイル名を生成（手動指定がある場合はそちらを優先）
-	const newGeneratedName =
-		updates.generatedName ||
-		generateAttachmentName(newDocumentDate, newDocumentType, newDescription, newAmount, newVendor);
+	// 新しいファイル名を生成
+	// 手動指定がある場合はそのまま使用（UI側で上書き確認済み）
+	// 自動生成の場合のみ重複回避を適用
+	let newGeneratedName: string;
+	if (updates.generatedName) {
+		newGeneratedName = updates.generatedName;
+	} else {
+		const baseName = generateAttachmentName(
+			newDocumentDate,
+			newDocumentType,
+			newDescription,
+			newAmount,
+			newVendor
+		);
+		const usedNames = await getUsedFileNames(attachmentId);
+		newGeneratedName = makeFileNameUnique(baseName, usedNames);
+	}
 
 	// ファイルシステム保存の場合、実ファイルをリネーム
 	let newFilePath = attachment.filePath;
@@ -309,6 +368,7 @@ export async function updateAttachment(
 /**
  * 仕訳のメタデータ変更に連動して証憑を更新
  * 仕訳の日付・摘要・金額・取引先が変わった場合にファイル名も更新
+ * ファイル名の重複を自動回避する
  * 注意: DB保存は行わない（呼び出し元で onupdate を通じて保存）
  */
 export async function syncAttachmentsWithJournal(
@@ -323,6 +383,12 @@ export async function syncAttachmentsWithJournal(
 ): Promise<Attachment[]> {
 	if (currentAttachments.length === 0) {
 		return [];
+	}
+
+	// 全仕訳から使用中のファイル名を取得（現在の添付ファイル自身は除外）
+	const usedNames = await getUsedFileNames();
+	for (const att of currentAttachments) {
+		usedNames.delete(att.generatedName);
 	}
 
 	const updatedAttachments: Attachment[] = [];
@@ -342,17 +408,22 @@ export async function syncAttachmentsWithJournal(
 			newVendor === attachment.vendor
 		) {
 			updatedAttachments.push(attachment);
+			// 使用中名として登録（同じ仕訳内の他の添付との重複回避用）
+			usedNames.add(attachment.generatedName);
 			continue;
 		}
 
-		// 新しいファイル名を生成
-		const newGeneratedName = generateAttachmentName(
+		// 新しいファイル名を生成（重複回避）
+		const baseName = generateAttachmentName(
 			newDocumentDate,
 			attachment.documentType,
 			newDescription,
 			newAmount,
 			newVendor
 		);
+		const newGeneratedName = makeFileNameUnique(baseName, usedNames);
+		// 使用中名として登録（同じ仕訳内の他の添付との重複回避用）
+		usedNames.add(newGeneratedName);
 
 		// ファイルシステム保存の場合、実ファイルをリネーム
 		let newFilePath = attachment.filePath;
