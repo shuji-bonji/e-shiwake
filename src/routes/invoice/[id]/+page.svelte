@@ -9,20 +9,10 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import {
-		ArrowLeft,
-		Plus,
-		Trash2,
-		Printer,
-		BookOpen,
-		CheckCircle,
-		Banknote
-	} from '@lucide/svelte';
+	import { ArrowLeft, Printer, BookOpen, CheckCircle, Banknote } from '@lucide/svelte';
 	import type { Invoice, InvoiceStatus } from '$lib/types/invoice';
 	import { InvoiceStatusLabels } from '$lib/types/invoice';
 	import type { Vendor } from '$lib/types';
-	import { toast } from 'svelte-sonner';
 	import {
 		initializeDatabase,
 		getInvoiceById,
@@ -30,22 +20,20 @@
 		updateInvoice,
 		getAllVendors,
 		generateNextInvoiceNumber,
-		addJournal
+		getSetting
 	} from '$lib/db';
 	import {
-		calculateItemAmount,
 		calculateInvoiceAmounts,
 		createEmptyInvoice,
-		createEmptyInvoiceItem,
 		formatCurrency,
 		getNextMonthEndDate
 	} from '$lib/utils/invoice';
-	import { generateSalesJournal, generateDepositJournal } from '$lib/utils/invoice-journal';
-	import InvoicePrint from '$lib/components/invoice/InvoicePrint.svelte';
-	import type { BusinessInfo } from '$lib/types/blue-return-types';
-	import { getSetting } from '$lib/db';
 	import { omit } from '$lib/utils';
 	import { createDebounce } from '$lib/utils/debounce';
+	import type { BusinessInfo } from '$lib/types/blue-return-types';
+	import InvoicePrint from '$lib/components/invoice/InvoicePrint.svelte';
+	import InvoiceItemsTable from '$lib/components/invoice/InvoiceItemsTable.svelte';
+	import InvoiceJournalDialog from '$lib/components/invoice/InvoiceJournalDialog.svelte';
 
 	// ページパラメータ
 	const invoiceId = $derived(page.params.id);
@@ -62,7 +50,6 @@
 	// 仕訳生成ダイアログ
 	let journalDialogOpen = $state(false);
 	let journalType = $state<'sales' | 'deposit'>('sales');
-	let depositDate = $state(new Date().toISOString().slice(0, 10));
 
 	// 事業者情報（印刷用）
 	let businessInfo = $state<BusinessInfo | null>(null);
@@ -73,7 +60,7 @@
 	// 選択中の取引先
 	const selectedVendor = $derived(vendorMap.get(invoice.vendorId));
 
-	// 印刷用請求書（保存済み or 現在の編集内容）
+	// 印刷用請求書
 	const printableInvoice = $derived<Invoice>(
 		originalInvoice ?? {
 			...invoice,
@@ -86,7 +73,6 @@
 	// 初期化フラグ
 	let initialized = $state(false);
 
-	// 請求書を読み込む関数
 	async function loadInvoice(id: string) {
 		isLoading = true;
 		const existing = await getInvoiceById(id);
@@ -106,47 +92,23 @@
 		initialized = true;
 
 		if (isNew) {
-			// 新規作成: 即座にDBに保存してリダイレクト
 			const suggestedNumber = await generateNextInvoiceNumber();
 			const newInvoice = {
 				...createEmptyInvoice(),
 				invoiceNumber: suggestedNumber
 			};
 			const id = await addInvoice(newInvoice);
-			// リダイレクト（replace: trueでヒストリーを置き換え）
 			goto(`${base}/invoice/${id}`, { replaceState: true });
 		} else {
-			// 編集: 既存データを読み込み
 			await loadInvoice(invoiceId!);
 		}
 	});
 
-	// URLパラメータが変更された場合にデータを再読み込み
 	$effect(() => {
 		if (initialized && !isNew && invoiceId) {
 			loadInvoice(invoiceId);
 		}
 	});
-
-	// 明細行を追加
-	function addItem() {
-		invoice.items = [...invoice.items, createEmptyInvoiceItem()];
-		autoSave();
-	}
-
-	// 明細行を削除
-	function removeItem(index: number) {
-		invoice.items = invoice.items.filter((_, i) => i !== index);
-		recalculate();
-	}
-
-	// 明細行の金額を再計算
-	function updateItemAmount(index: number) {
-		const item = invoice.items[index];
-		item.amount = calculateItemAmount(item.quantity, item.unitPrice);
-		invoice.items = [...invoice.items];
-		recalculate();
-	}
 
 	// 合計金額を再計算
 	function recalculate() {
@@ -163,7 +125,6 @@
 		invoice.vendorId = vendorId;
 		const vendor = vendorMap.get(vendorId);
 		if (vendor?.paymentTerms) {
-			// 支払条件があれば翌月末をデフォルトに
 			invoice.dueDate = getNextMonthEndDate(invoice.issueDate);
 		}
 		autoSave();
@@ -171,18 +132,16 @@
 
 	// 自動保存（デバウンス付き）
 	const autoSave = createDebounce(async () => {
-		// 新規の場合はonMountで既にDBに保存されているはず
 		if (isNew) return;
 
 		isSaving = true;
 		try {
 			await updateInvoice(invoiceId!, $state.snapshot(invoice));
-			// 更新後にリロード
 			const updated = await getInvoiceById(invoiceId!);
 			if (updated) {
 				originalInvoice = updated;
 			}
-			error = ''; // 成功時はエラーをクリア
+			error = '';
 		} catch (e) {
 			error = e instanceof Error ? e.message : '自動保存に失敗しました';
 		} finally {
@@ -212,46 +171,21 @@
 		}
 	}
 
-	// 仕訳生成ダイアログを開く
 	function openJournalDialog(type: 'sales' | 'deposit') {
 		journalType = type;
-		depositDate = new Date().toISOString().slice(0, 10);
 		journalDialogOpen = true;
 	}
 
-	// 仕訳を生成
-	async function createJournal() {
-		if (!originalInvoice || !selectedVendor) return;
-
-		try {
-			let journalData;
-			if (journalType === 'sales') {
-				journalData = generateSalesJournal(originalInvoice, selectedVendor);
-			} else {
-				journalData = generateDepositJournal(originalInvoice, selectedVendor, depositDate);
-			}
-
-			const journalId = await addJournal(journalData);
-
-			// 請求書に仕訳IDを紐付け
-			if (journalType === 'sales') {
-				await updateInvoice(invoiceId!, { journalId });
-				invoice.journalId = journalId;
-			}
-
-			journalDialogOpen = false;
-			toast.success('仕訳を作成しました');
-		} catch (e) {
-			error = e instanceof Error ? e.message : '仕訳の作成に失敗しました';
+	function handleJournalSave(journalId?: string) {
+		if (journalId) {
+			invoice.journalId = journalId;
 		}
 	}
 
-	// 印刷
 	function handlePrint() {
 		window.print();
 	}
 
-	// 戻る
 	function goBack() {
 		goto(`${base}/invoice`);
 	}
@@ -262,7 +196,7 @@
 </svelte:head>
 
 <div class="space-y-6 print:hidden">
-	<!-- ヘッダー（画面表示用） -->
+	<!-- ヘッダー -->
 	<div
 		class="sticky top-14 z-10 -mx-4 flex flex-wrap items-center justify-between gap-4 border-b bg-background px-4 pt-4 pb-3 group-has-data-[collapsible=icon]/sidebar-wrapper:top-12 print:hidden"
 	>
@@ -363,109 +297,7 @@
 			</div>
 
 			<!-- 明細行 -->
-			<div class="space-y-4">
-				<div class="flex items-center justify-between">
-					<Label>明細</Label>
-					<Button variant="outline" size="sm" onclick={addItem}>
-						<Plus class="mr-2 size-4" />
-						行を追加
-					</Button>
-				</div>
-
-				{#if invoice.items.length === 0}
-					<div class="rounded-md border border-dashed p-8 text-center text-muted-foreground">
-						<p>明細行がありません</p>
-						<Button variant="outline" size="sm" class="mt-2" onclick={addItem}>
-							<Plus class="mr-2 size-4" />
-							行を追加
-						</Button>
-					</div>
-				{:else}
-					<div class="overflow-x-auto">
-						<table class="w-full text-sm">
-							<thead>
-								<tr class="border-b text-left text-muted-foreground">
-									<th class="w-24 pr-2 pb-2">日付</th>
-									<th class="min-w-50 pr-2 pb-2">品名・サービス名</th>
-									<th class="w-28 pr-2 pb-2 text-right">単価</th>
-									<th class="w-16 pr-2 pb-2 text-right">数量</th>
-									<th class="w-20 pr-2 pb-2 text-center">税率</th>
-									<th class="min-w-25 pr-2 pb-2 text-right">金額</th>
-									<th class="w-10 pb-2"></th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each invoice.items as item, index (item.id)}
-									<tr class="border-b">
-										<td class="py-2 pr-2">
-											<Input
-												bind:value={item.date}
-												placeholder="1月分"
-												class="w-24"
-												oninput={autoSave}
-											/>
-										</td>
-										<td class="py-2 pr-2">
-											<Input
-												bind:value={item.description}
-												placeholder="サービス名"
-												class="min-w-50"
-												oninput={autoSave}
-											/>
-										</td>
-										<td class="py-2 pr-2">
-											<Input
-												type="number"
-												bind:value={item.unitPrice}
-												min="0"
-												class="w-28 text-right"
-												onchange={() => updateItemAmount(index)}
-											/>
-										</td>
-										<td class="py-2 pr-2">
-											<Input
-												type="number"
-												bind:value={item.quantity}
-												min="0"
-												step="0.01"
-												class="w-16 text-right"
-												onchange={() => updateItemAmount(index)}
-											/>
-										</td>
-										<td class="py-2 pr-2">
-											<Select.Root
-												type="single"
-												value={String(item.taxRate)}
-												onValueChange={(v) => {
-													item.taxRate = Number(v) as 10 | 8;
-													invoice.items = [...invoice.items];
-													recalculate();
-												}}
-											>
-												<Select.Trigger class="w-20">
-													{item.taxRate}%
-												</Select.Trigger>
-												<Select.Content>
-													<Select.Item value="10">10%</Select.Item>
-													<Select.Item value="8">8%</Select.Item>
-												</Select.Content>
-											</Select.Root>
-										</td>
-										<td class="min-w-25 py-2 pr-2 text-right font-medium">
-											¥{formatCurrency(item.amount)}
-										</td>
-										<td class="py-2">
-											<Button variant="ghost" size="icon" onclick={() => removeItem(index)}>
-												<Trash2 class="size-4" />
-											</Button>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				{/if}
-			</div>
+			<InvoiceItemsTable bind:items={invoice.items} onchange={recalculate} />
 
 			<!-- 金額サマリー -->
 			<div class="flex justify-end">
@@ -517,34 +349,16 @@
 </div>
 
 <!-- 仕訳生成ダイアログ -->
-<Dialog.Root bind:open={journalDialogOpen}>
-	<Dialog.Content class="sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title>
-				{journalType === 'sales' ? '売掛金仕訳を作成' : '入金仕訳を作成'}
-			</Dialog.Title>
-			<Dialog.Description>
-				{#if journalType === 'sales'}
-					請求書発行に対応する売掛金仕訳を作成します。
-				{:else}
-					入金日を指定して入金仕訳を作成します。
-				{/if}
-			</Dialog.Description>
-		</Dialog.Header>
-		{#if journalType === 'deposit'}
-			<div class="space-y-2 py-4">
-				<Label for="depositDate">入金日</Label>
-				<Input id="depositDate" type="date" bind:value={depositDate} />
-			</div>
-		{/if}
-		<Dialog.Footer>
-			<Button variant="outline" onclick={() => (journalDialogOpen = false)}>キャンセル</Button>
-			<Button onclick={createJournal}>作成</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+<InvoiceJournalDialog
+	bind:open={journalDialogOpen}
+	{journalType}
+	invoice={originalInvoice}
+	invoiceId={invoiceId!}
+	vendor={selectedVendor ?? null}
+	onsave={handleJournalSave}
+/>
 
-<!-- 印刷用コンポーネント（画面では非表示、印刷時のみ表示） -->
+<!-- 印刷用コンポーネント -->
 <div class="hidden print:block">
 	<InvoicePrint invoice={printableInvoice} vendor={selectedVendor ?? null} {businessInfo} />
 </div>
