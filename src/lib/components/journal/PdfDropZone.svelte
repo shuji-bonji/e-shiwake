@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { cn } from '$lib/utils.js';
+	import { toast } from 'svelte-sonner';
 	import type { Attachment } from '$lib/types';
 
 	interface Props {
@@ -75,7 +76,7 @@
 	function processFile(file: File) {
 		// PDFのみ許可
 		if (file.type !== 'application/pdf') {
-			alert('PDFファイルのみ添付できます');
+			toast.error('PDFファイルのみ添付できます');
 			return;
 		}
 		onattach(file);

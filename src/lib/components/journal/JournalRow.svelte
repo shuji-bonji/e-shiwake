@@ -32,6 +32,7 @@
 		updateJournalAttachment
 	} from '$lib/usecases/journal-attachments';
 	import { cn } from '$lib/utils.js';
+	import { toast } from 'svelte-sonner';
 	import { fileExistsInDirectory } from '$lib/utils/filesystem';
 	import {
 		applyBusinessRatio,
@@ -115,6 +116,11 @@
 	// 証憑削除確認ダイアログの状態
 	let removeAttachmentDialogOpen = $state(false);
 	let pendingRemoveAttachmentId = $state<string | null>(null);
+
+	// ファイル上書き確認ダイアログの状態
+	let overwriteDialogOpen = $state(false);
+	let overwriteFileName = $state('');
+	let overwriteCallback: (() => Promise<void>) | null = $state(null);
 
 	// 証憑リネーム確認ダイアログの状態
 	let renameConfirmDialogOpen = $state(false);
@@ -514,42 +520,47 @@
 				fileExists = journal.attachments.some((a) => a.generatedName === generatedName);
 			}
 
-			if (fileExists) {
-				const confirmed = confirm(
-					`同名のファイルが既に存在します。\n\n${generatedName}\n\n上書きしますか？`
-				);
-				if (!confirmed) return;
-			}
-
-			// 上書き対象：同名の既存証憑があれば先に削除
-			let targetJournal = journal;
-			if (fileExists) {
-				const existingAttachment = journal.attachments.find(
-					(a) => a.generatedName === generatedName
-				);
-				if (existingAttachment) {
-					targetJournal = await removeJournalAttachment({
-						journal,
-						attachmentId: existingAttachment.id,
-						directoryHandle
-					});
+			// 上書き処理の共通ロジック
+			const doAdd = async () => {
+				let targetJournal = journal;
+				if (fileExists) {
+					const existingAttachment = journal.attachments.find(
+						(a) => a.generatedName === generatedName
+					);
+					if (existingAttachment) {
+						targetJournal = await removeJournalAttachment({
+							journal,
+							attachmentId: existingAttachment.id,
+							directoryHandle
+						});
+					}
 				}
+
+				const updatedJournal = await addJournalAttachment({
+					journal: targetJournal,
+					file: pendingFile!,
+					documentDate,
+					documentType,
+					generatedName,
+					updatedVendor,
+					mainAmount,
+					directoryHandle
+				});
+				onupdate(updatedJournal);
+				pendingFile = null;
+			};
+
+			if (fileExists) {
+				overwriteFileName = generatedName;
+				overwriteCallback = doAdd;
+				overwriteDialogOpen = true;
+				return;
 			}
 
-			const updatedJournal = await addJournalAttachment({
-				journal: targetJournal,
-				file: pendingFile,
-				documentDate,
-				documentType,
-				generatedName,
-				updatedVendor,
-				mainAmount,
-				directoryHandle
-			});
-			onupdate(updatedJournal);
+			await doAdd();
 		} catch (error) {
 			console.error('添付ファイルの追加に失敗しました:', error);
-			alert('添付ファイルの追加に失敗しました');
+			toast.error('添付ファイルの追加に失敗しました');
 		} finally {
 			pendingFile = null;
 		}
@@ -621,10 +632,25 @@
 				const year = new Date(updates.documentDate).getFullYear();
 				const exists = await fileExistsInDirectory(directoryHandle, year, newName);
 				if (exists) {
-					const confirmed = confirm(
-						`同名のファイルが既に存在します。\n\n${newName}\n\n上書きしますか？`
-					);
-					if (!confirmed) return;
+					overwriteFileName = newName;
+					overwriteCallback = async () => {
+						try {
+							const updatedJournal = await updateJournalAttachment({
+								journal,
+								attachmentId: editingAttachment!.id,
+								updates,
+								directoryHandle
+							});
+							onupdate(updatedJournal);
+						} catch (error) {
+							console.error('添付ファイルの更新に失敗しました:', error);
+							toast.error('添付ファイルの更新に失敗しました');
+						} finally {
+							editingAttachment = null;
+						}
+					};
+					overwriteDialogOpen = true;
+					return;
 				}
 			}
 
@@ -637,10 +663,25 @@
 			onupdate(updatedJournal);
 		} catch (error) {
 			console.error('添付ファイルの更新に失敗しました:', error);
-			alert('添付ファイルの更新に失敗しました');
+			toast.error('添付ファイルの更新に失敗しました');
 		} finally {
 			editingAttachment = null;
 		}
+	}
+
+	// ファイル上書き確認ダイアログのハンドラー
+	async function handleOverwriteConfirm() {
+		overwriteDialogOpen = false;
+		if (overwriteCallback) {
+			await overwriteCallback();
+			overwriteCallback = null;
+		}
+	}
+
+	function handleOverwriteCancel() {
+		overwriteDialogOpen = false;
+		overwriteCallback = null;
+		pendingFile = null;
 	}
 
 	// 添付ファイルの編集をキャンセル
@@ -1219,6 +1260,24 @@
 				}}>キャンセル</AlertDialog.Cancel
 			>
 			<AlertDialog.Action onclick={handleConfirmRename}>変更する</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<!-- ファイル上書き確認ダイアログ -->
+<AlertDialog.Root bind:open={overwriteDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>ファイルを上書きしますか？</AlertDialog.Title>
+			<AlertDialog.Description>
+				同名のファイルが既に存在します。
+				<span class="mt-2 block font-mono text-sm">{overwriteFileName}</span>
+				<span class="mt-2 block">上書きしますか？</span>
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={handleOverwriteCancel}>キャンセル</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={handleOverwriteConfirm}>上書き</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

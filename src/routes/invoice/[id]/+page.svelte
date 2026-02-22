@@ -22,6 +22,7 @@
 	import type { Invoice, InvoiceStatus } from '$lib/types/invoice';
 	import { InvoiceStatusLabels } from '$lib/types/invoice';
 	import type { Vendor } from '$lib/types';
+	import { toast } from 'svelte-sonner';
 	import {
 		initializeDatabase,
 		getInvoiceById,
@@ -239,7 +240,7 @@
 			}
 
 			journalDialogOpen = false;
-			alert('仕訳を作成しました');
+			toast.success('仕訳を作成しました');
 		} catch (e) {
 			error = e instanceof Error ? e.message : '仕訳の作成に失敗しました';
 		}

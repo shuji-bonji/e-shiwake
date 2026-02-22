@@ -32,7 +32,6 @@ const config = {
 				'/reports',
 				'/invoice',
 				'/vendors',
-				'/export',
 				'/help',
 				'/help/getting-started',
 				'/help/journal',

@@ -6,6 +6,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Label } from '$lib/components/ui/label';
 	import { Separator } from '$lib/components/ui/separator';
+	import { toast } from 'svelte-sonner';
 	import { FileText, Printer, FileArchive, Loader2 } from '@lucide/svelte';
 	import {
 		initializeDatabase,
@@ -737,7 +738,7 @@
 
 			const printWindow = window.open('', '_blank');
 			if (!printWindow) {
-				alert('ポップアップがブロックされました。ポップアップを許可してください。');
+				toast.error('ポップアップがブロックされました。ポップアップを許可してください。');
 				return;
 			}
 

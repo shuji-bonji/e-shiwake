@@ -25,6 +25,13 @@ import { generateBalanceSheet } from '$lib/utils/balance-sheet';
 import { generateConsumptionTax } from '$lib/utils/consumption-tax';
 import { filterJournals, parseSearchQuery } from '$lib/utils/journal-search';
 import type { WebMCPToolDefinition, ToolExecutionResult } from './types';
+import {
+	requireString,
+	optionalString,
+	requireNumber,
+	optionalNumber,
+	requireArray
+} from './validate';
 import type { JournalEntry, JournalLine } from '$lib/types';
 
 // =============================================================================
@@ -70,8 +77,8 @@ const searchJournalsTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const query = input.query as string;
-			const fiscalYear = input.fiscalYear as number | undefined;
+			const query = requireString(input, 'query');
+			const fiscalYear = optionalNumber(input, 'fiscalYear');
 
 			let journals: JournalEntry[];
 			if (fiscalYear) {
@@ -124,7 +131,7 @@ const getJournalsByYearTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const year = input.year as number;
+			const year = requireNumber(input, 'year');
 			const journals = await getJournalsByYear(year);
 			const accounts = await getAllAccounts();
 
@@ -191,21 +198,21 @@ const createJournalTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const date = input.date as string;
-			const description = input.description as string;
-			const vendor = (input.vendor as string) ?? '';
-			const debitLines = input.debitLines as Array<{
+			const date = requireString(input, 'date');
+			const description = requireString(input, 'description');
+			const vendor = optionalString(input, 'vendor') ?? '';
+			const debitLines = requireArray<{
 				accountCode: string;
 				amount: number;
 				taxCategory?: string;
 				memo?: string;
-			}>;
-			const creditLines = input.creditLines as Array<{
+			}>(input, 'debitLines');
+			const creditLines = requireArray<{
 				accountCode: string;
 				amount: number;
 				taxCategory?: string;
 				memo?: string;
-			}>;
+			}>(input, 'creditLines');
 
 			// 仕訳明細行を構築
 			const lines: JournalLine[] = [
@@ -278,7 +285,7 @@ const deleteJournalTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const id = input.id as string;
+			const id = requireString(input, 'id');
 			await deleteJournal(id);
 			return ok({ success: true, message: `仕訳 ${id} を削除しました` });
 		} catch (e) {
@@ -308,7 +315,7 @@ const listAccountsTool: WebMCPToolDefinition = {
 	execute: async (input) => {
 		try {
 			const accounts = await getAllAccounts();
-			const type = input.type as string | undefined;
+			const type = optionalString(input, 'type');
 			const filtered = type ? accounts.filter((a) => a.type === type) : accounts;
 
 			return ok({
@@ -341,7 +348,7 @@ const listVendorsTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const query = input.query as string | undefined;
+			const query = optionalString(input, 'query');
 			const vendors = query ? await searchVendors(query) : await getAllVendors();
 
 			return ok({
@@ -380,8 +387,8 @@ const generateLedgerTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const accountCode = input.accountCode as string;
-			const year = input.fiscalYear as number;
+			const accountCode = requireString(input, 'accountCode');
+			const year = requireNumber(input, 'fiscalYear');
 			const journals = await getJournalsByYear(year);
 			const accounts = await getAllAccounts();
 			const account = accounts.find((a) => a.code === accountCode);
@@ -420,7 +427,7 @@ const generateTrialBalanceTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const year = input.fiscalYear as number;
+			const year = requireNumber(input, 'fiscalYear');
 			const journals = await getJournalsByYear(year);
 			const accounts = await getAllAccounts();
 			const tb = generateTrialBalance(journals, accounts);
@@ -463,7 +470,7 @@ const generateProfitLossTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const year = input.fiscalYear as number;
+			const year = requireNumber(input, 'fiscalYear');
 			const journals = await getJournalsByYear(year);
 			const accounts = await getAllAccounts();
 			const pl = generateProfitLoss(journals, accounts, year);
@@ -501,7 +508,7 @@ const generateBalanceSheetTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const year = input.fiscalYear as number;
+			const year = requireNumber(input, 'fiscalYear');
 			const journals = await getJournalsByYear(year);
 			const accounts = await getAllAccounts();
 			// まず損益計算書で当期純利益を求める
@@ -543,7 +550,7 @@ const calculateTaxTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const year = input.fiscalYear as number;
+			const year = requireNumber(input, 'fiscalYear');
 			const journals = await getJournalsByYear(year);
 			const tax = generateConsumptionTax(journals, year);
 

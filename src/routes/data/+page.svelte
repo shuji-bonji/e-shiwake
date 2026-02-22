@@ -81,6 +81,7 @@
 		X
 	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	// === 証憑保存設定 ===
 	let storageMode = $state<StorageType>('indexeddb');
@@ -499,15 +500,14 @@
 		await setAutoPurgeBlobSetting(enabled);
 	}
 
-	async function handlePurgeExportedBlobs() {
-		if (
-			!confirm(
-				'エクスポート済みの証憑データを削除しますか？\nメタデータは残りますが、PDFファイルは復元できなくなります。'
-			)
-		) {
-			return;
-		}
+	let purgeDialogOpen = $state(false);
 
+	async function handlePurgeExportedBlobs() {
+		purgeDialogOpen = true;
+	}
+
+	async function handleConfirmPurge() {
+		purgeDialogOpen = false;
 		isPurging = true;
 		purgeResult = null;
 		try {
@@ -573,7 +573,7 @@
 			}, 3000);
 		} catch (error) {
 			console.error('エクスポートエラー:', error);
-			alert('エクスポートに失敗しました');
+			toast.error('エクスポートに失敗しました');
 		} finally {
 			exportingYear = null;
 		}
@@ -639,7 +639,7 @@
 			}, 3000);
 		} catch (error) {
 			console.error('CSVエクスポートエラー:', error);
-			alert('CSVエクスポートに失敗しました');
+			toast.error('CSVエクスポートに失敗しました');
 		} finally {
 			exportingYear = null;
 		}
@@ -664,9 +664,9 @@
 			if (exportedCount > 0) {
 				await setLastExportedAt(new Date().toISOString());
 				unexportedCount = await getUnexportedAttachmentCount();
-				alert(`${exportedCount}件の証憑をダウンロードしました`);
+				toast.success(`${exportedCount}件の証憑をダウンロードしました`);
 			} else {
-				alert('ダウンロードする証憑がありません');
+				toast.info('ダウンロードする証憑がありません');
 			}
 
 			exportSuccess = year;
@@ -675,7 +675,7 @@
 			}, 3000);
 		} catch (error) {
 			console.error('証憑エクスポートエラー:', error);
-			alert('証憑エクスポートに失敗しました');
+			toast.error('証憑エクスポートに失敗しました');
 		} finally {
 			exportingYear = null;
 		}
@@ -729,7 +729,7 @@
 			}, 3000);
 		} catch (error) {
 			console.error('ZIP エクスポートエラー:', error);
-			alert('ZIP エクスポートに失敗しました');
+			toast.error('ZIP エクスポートに失敗しました');
 		} finally {
 			zipExportingYear = null;
 			zipProgress = null;
@@ -880,7 +880,7 @@
 			deletingYearSummary = null;
 		} catch (error) {
 			console.error('年度削除エラー:', error);
-			alert('削除に失敗しました');
+			toast.error('削除に失敗しました');
 		} finally {
 			isDeleting = false;
 		}
@@ -1899,6 +1899,27 @@
 			{:else}
 				<Button onclick={handleCancelFolderMigration}>閉じる</Button>
 			{/if}
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<!-- 証憑パージ確認ダイアログ -->
+<AlertDialog.Root bind:open={purgeDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>エクスポート済み証憑の削除</AlertDialog.Title>
+			<AlertDialog.Description>
+				エクスポート済みの証憑データを削除しますか？メタデータは残りますが、PDFファイルは復元できなくなります。
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>キャンセル</AlertDialog.Cancel>
+			<AlertDialog.Action
+				class="bg-destructive/80 text-white hover:bg-destructive/70"
+				onclick={handleConfirmPurge}
+			>
+				削除する
+			</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
