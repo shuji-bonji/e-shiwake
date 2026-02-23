@@ -173,7 +173,7 @@
 {
 	"date": "2026-02-01",
 	"description": "BIMツール開発支援 2月分",
-	"vendor": "株式会社ヘルスベイシス",
+	"vendor": "株式会社猫山",
 	"debitLines": [{ "accountCode": "1002", "amount": 550000, "taxCategory": "na" }],
 	"creditLines": [{ "accountCode": "4001", "amount": 550000, "taxCategory": "sales_10" }]
 }
@@ -185,7 +185,7 @@
 {
 	"date": "2026-03-05",
 	"description": "BIMツール開発支援：入金",
-	"vendor": "株式会社ヘルスベイシス",
+	"vendor": "株式会社猫山",
 	"debitLines": [{ "accountCode": "1003", "amount": 550000, "taxCategory": "na" }],
 	"creditLines": [{ "accountCode": "1002", "amount": 550000, "taxCategory": "na" }]
 }
