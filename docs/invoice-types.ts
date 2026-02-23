@@ -95,7 +95,7 @@ export interface Invoice {
 export interface Vendor {
 	/** 一意識別子（UUID） */
 	id: string;
-	/** 取引先名（例: "株式会社ヘルスベイシス"） */
+	/** 取引先名（例: "株式会社猫山"） */
 	name: string;
 	/** 住所（任意） */
 	address?: string;

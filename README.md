@@ -267,38 +267,20 @@ src/
 
 > **Chrome 146+ / Early Preview** — `navigator.modelContext` API を使用
 
-e-shiwake は [WebMCP](https://AzukiAzusa.dev/blog/webmcp-for-web-applications/) に対応しています。
-ブラウザ内蔵の AI エージェントから自然言語で仕訳操作や帳簿生成が可能です。
+e-shiwake は [WebMCP](https://webmachinelearning.github.io/webmcp/) に対応しています。
+Chrome 拡張「Model Context Tool Inspector」からツールを直接実行し、仕訳操作や帳簿生成が可能です。
 
 ### 前提条件
 
 1. **Chrome Canary 146+** をインストール
 2. `chrome://flags` → **「WebMCP for testing」** を有効化
-3. Chrome 拡張 **[Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/flnhcmambikafpkgpabmbaoadbhbhega)** をインストール
+3. Chrome 拡張 **[Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd)** をインストール
 
 ### 使い方
 
 e-shiwake を開くと、12 個のツールが自動で `navigator.modelContext` に登録されます。
 
-**AI Agent（自然言語で指示）:**
-
-Inspector の AI Agent タブから指示できます（Gemini API 消費あり）。
-
-```
-2026年2月のAmazonの仕訳を検索して
-```
-
-```
-2026-02-23、消耗品費 3,980円、現金払い、取引先 Amazon、摘要「USBケーブル」で仕訳を作成して
-```
-
-```
-2025年度の損益計算書を出して
-```
-
-**Tools タブ（直接実行・API 消費なし）:**
-
-Inspector の Tools タブから JSON を入力して直接実行できます。
+Inspector のサイドパネルを開き、**ツールを選択 → Input Arguments に JSON を入力 → Execute** で直接実行できます。API 消費なしで確認可能です。
 
 ```json
 { "query": "Amazon" }
