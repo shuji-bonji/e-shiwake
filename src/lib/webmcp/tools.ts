@@ -33,6 +33,7 @@ import {
 	requireArray
 } from './validate';
 import type { JournalEntry, JournalLine } from '$lib/types';
+import { dispatchJournalChange } from './events';
 
 // =============================================================================
 // ヘルパー関数
@@ -257,6 +258,9 @@ const createJournalTool: WebMCPToolDefinition = {
 
 			const id = await addJournal(journal);
 
+			// UI自動更新のためイベントを発火
+			dispatchJournalChange('create', id);
+
 			return ok({
 				success: true,
 				id,
@@ -287,6 +291,10 @@ const deleteJournalTool: WebMCPToolDefinition = {
 		try {
 			const id = requireString(input, 'id');
 			await deleteJournal(id);
+
+			// UI自動更新のためイベントを発火
+			dispatchJournalChange('delete', id);
+
 			return ok({ success: true, message: `仕訳 ${id} を削除しました` });
 		} catch (e) {
 			return err(`削除エラー: ${e instanceof Error ? e.message : String(e)}`);

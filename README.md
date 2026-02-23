@@ -263,6 +263,70 @@ src/
 │   └── data/                 # データ管理（エクスポート/インポート/削除）
 ```
 
+## WebMCP 対応（実験的）
+
+> **Chrome 146+ / Early Preview** — `navigator.modelContext` API を使用
+
+e-shiwake は [WebMCP](https://AzukiAzusa.dev/blog/webmcp-for-web-applications/) に対応しています。
+ブラウザ内蔵の AI エージェントから自然言語で仕訳操作や帳簿生成が可能です。
+
+### 前提条件
+
+1. **Chrome Canary 146+** をインストール
+2. `chrome://flags` → **「WebMCP for testing」** を有効化
+3. Chrome 拡張 **[Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/flnhcmambikafpkgpabmbaoadbhbhega)** をインストール
+
+### 使い方
+
+e-shiwake を開くと、12 個のツールが自動で `navigator.modelContext` に登録されます。
+
+**AI Agent（自然言語で指示）:**
+
+Inspector の AI Agent タブから指示できます（Gemini API 消費あり）。
+
+```
+2026年2月のAmazonの仕訳を検索して
+```
+
+```
+2026-02-23、消耗品費 3,980円、現金払い、取引先 Amazon、摘要「USBケーブル」で仕訳を作成して
+```
+
+```
+2025年度の損益計算書を出して
+```
+
+**Tools タブ（直接実行・API 消費なし）:**
+
+Inspector の Tools タブから JSON を入力して直接実行できます。
+
+```json
+{ "query": "Amazon" }
+```
+
+```json
+{ "fiscalYear": 2026 }
+```
+
+### 利用可能なツール
+
+| ツール名                    | 用途                   |
+| --------------------------- | ---------------------- |
+| `search_journals`           | 仕訳検索（全年度横断） |
+| `get_journals_by_year`      | 年度別仕訳一覧         |
+| `create_journal`            | 仕訳作成               |
+| `delete_journal`            | 仕訳削除               |
+| `list_accounts`             | 勘定科目一覧           |
+| `list_vendors`              | 取引先一覧             |
+| `generate_ledger`           | 総勘定元帳             |
+| `generate_trial_balance`    | 試算表                 |
+| `generate_profit_loss`      | 損益計算書             |
+| `generate_balance_sheet`    | 貸借対照表             |
+| `calculate_consumption_tax` | 消費税集計             |
+| `get_available_years`       | 年度一覧               |
+
+詳細なパラメータとサンプルは [docs/webmcp-tool-inputs.md](docs/webmcp-tool-inputs.md) を参照してください。
+
 ## ライセンス
 
 MIT

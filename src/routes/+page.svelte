@@ -26,6 +26,7 @@
 	import { cloneJournal } from '$lib/utils/clone';
 	import { parseSearchQuery, filterJournals, isEmptyQuery } from '$lib/utils/journal-search';
 	import { copyJournalForNew } from '$lib/utils/journal-copy';
+	import { WEBMCP_JOURNAL_CHANGE } from '$lib/webmcp/events';
 
 	// 年度ストア
 	const fiscalYear = useFiscalYear();
@@ -94,6 +95,8 @@
 		await loadData(fiscalYear.selectedYear);
 		lastLoadedYear = fiscalYear.selectedYear;
 		isInitialized = true;
+
+		// WebMCP イベントリスナーは $effect で管理（onMount async ではクリーンアップ不可）
 	});
 
 	// 年度変更時にデータを再読み込み（ページ滞在中の年度切り替え用）
@@ -104,6 +107,21 @@
 			lastLoadedYear = year;
 			loadData(year);
 		}
+	});
+
+	// WebMCP からの仕訳変更イベントをリッスン（リロード不要でUI更新）
+	$effect(() => {
+		if (!isInitialized) return;
+
+		const handleWebMCPChange = () => {
+			refreshAvailableYears();
+			loadData(fiscalYear.selectedYear);
+		};
+		window.addEventListener(WEBMCP_JOURNAL_CHANGE, handleWebMCPChange);
+
+		return () => {
+			window.removeEventListener(WEBMCP_JOURNAL_CHANGE, handleWebMCPChange);
+		};
 	});
 
 	async function loadData(year: number) {
