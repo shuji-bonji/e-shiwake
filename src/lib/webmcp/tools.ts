@@ -32,8 +32,27 @@ import {
 	optionalNumber,
 	requireArray
 } from './validate';
-import type { JournalEntry, JournalLine } from '$lib/types';
+import type { Account, JournalEntry, JournalLine } from '$lib/types';
 import { dispatchJournalChange } from './events';
+
+// =============================================================================
+// 勘定科目キャッシュ（マスタデータなので頻繁に変わらない）
+// =============================================================================
+
+let _accountsCache: Account[] | null = null;
+
+/** キャッシュ付きで全勘定科目を取得 */
+async function getCachedAccounts(): Promise<Account[]> {
+	if (!_accountsCache) {
+		_accountsCache = await getAllAccounts();
+	}
+	return _accountsCache;
+}
+
+/** 勘定科目キャッシュを無効化（科目追加・編集・削除時に呼ぶ） */
+export function invalidateAccountsCache(): void {
+	_accountsCache = null;
+}
 
 // =============================================================================
 // ヘルパー関数
@@ -88,7 +107,7 @@ const searchJournalsTool: WebMCPToolDefinition = {
 				journals = await getAllJournals();
 			}
 
-			const accounts = await getAllAccounts();
+			const accounts = await getCachedAccounts();
 			const parsedQuery = parseSearchQuery(query, accounts);
 			const results = filterJournals(journals, parsedQuery);
 
@@ -134,7 +153,7 @@ const getJournalsByYearTool: WebMCPToolDefinition = {
 		try {
 			const year = requireNumber(input, 'year');
 			const journals = await getJournalsByYear(year);
-			const accounts = await getAllAccounts();
+			const accounts = await getCachedAccounts();
 
 			return ok({
 				year,
@@ -322,7 +341,7 @@ const listAccountsTool: WebMCPToolDefinition = {
 	},
 	execute: async (input) => {
 		try {
-			const accounts = await getAllAccounts();
+			const accounts = await getCachedAccounts();
 			const type = optionalString(input, 'type');
 			const filtered = type ? accounts.filter((a) => a.type === type) : accounts;
 
@@ -398,7 +417,7 @@ const generateLedgerTool: WebMCPToolDefinition = {
 			const accountCode = requireString(input, 'accountCode');
 			const year = requireNumber(input, 'fiscalYear');
 			const journals = await getJournalsByYear(year);
-			const accounts = await getAllAccounts();
+			const accounts = await getCachedAccounts();
 			const account = accounts.find((a) => a.code === accountCode);
 
 			if (!account) {
@@ -437,7 +456,7 @@ const generateTrialBalanceTool: WebMCPToolDefinition = {
 		try {
 			const year = requireNumber(input, 'fiscalYear');
 			const journals = await getJournalsByYear(year);
-			const accounts = await getAllAccounts();
+			const accounts = await getCachedAccounts();
 			const tb = generateTrialBalance(journals, accounts);
 
 			return ok({
@@ -480,7 +499,7 @@ const generateProfitLossTool: WebMCPToolDefinition = {
 		try {
 			const year = requireNumber(input, 'fiscalYear');
 			const journals = await getJournalsByYear(year);
-			const accounts = await getAllAccounts();
+			const accounts = await getCachedAccounts();
 			const pl = generateProfitLoss(journals, accounts, year);
 
 			return ok({
@@ -518,7 +537,7 @@ const generateBalanceSheetTool: WebMCPToolDefinition = {
 		try {
 			const year = requireNumber(input, 'fiscalYear');
 			const journals = await getJournalsByYear(year);
-			const accounts = await getAllAccounts();
+			const accounts = await getCachedAccounts();
 			// まず損益計算書で当期純利益を求める
 			const pl = generateProfitLoss(journals, accounts, year);
 			const bs = generateBalanceSheet(journals, accounts, year, pl.netIncome);

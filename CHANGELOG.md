@@ -3,6 +3,16 @@
 e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に準拠。
 [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [0.2.1] - 2026-03-06
+
+### Changed
+
+- **パフォーマンス最適化**
+  - `filterJournals()` の `toLowerCase()` をループ外でキャッシュし、検索条件が複数ある場合の冗長な変換を排除
+  - `settings-repository.ts` の証憑カウント関数を `toArray()` → `each()` に変更し、全仕訳の一括メモリロードを回避
+  - `settings-repository.ts` の purge 系関数で `attachments.length > 0` の事前フィルタを追加し、添付なし仕訳のスキャンを排除
+  - WebMCP ツール群の `getAllAccounts()` にモジュールレベルキャッシュを導入（7 箇所の重複 DB 呼び出しを解消）
+
 ## [0.2.0] - 2026-02-23
 
 ### Added
@@ -79,6 +89,7 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
+[0.2.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.0.1...v0.1.0

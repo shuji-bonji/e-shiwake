@@ -150,10 +150,12 @@ export function parseSearchQuery(query: string, accounts: Account[]): SearchCrit
 export function filterJournals(journals: JournalEntry[], criteria: SearchCriteria): JournalEntry[] {
 	return journals.filter((journal) => {
 		// テキスト検索（摘要・取引先）- すべてのテキストに一致する必要がある
-		for (const text of criteria.text) {
-			const matchDesc = journal.description.toLowerCase().includes(text);
-			const matchVendor = journal.vendor.toLowerCase().includes(text);
-			if (!matchDesc && !matchVendor) return false;
+		if (criteria.text.length > 0) {
+			const descLower = journal.description.toLowerCase();
+			const vendorLower = journal.vendor.toLowerCase();
+			for (const text of criteria.text) {
+				if (!descLower.includes(text) && !vendorLower.includes(text)) return false;
+			}
 		}
 
 		// 勘定科目 - いずれかに一致すればOK

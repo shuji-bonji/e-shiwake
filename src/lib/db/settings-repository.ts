@@ -78,17 +78,18 @@ export async function setLastExportedAt(date: string): Promise<void> {
 
 /**
  * 未エクスポートの添付ファイル数を取得
+ * ストリーミング処理で全仕訳をメモリにロードしない
  */
 export async function getUnexportedAttachmentCount(): Promise<number> {
-	const journals = await db.journals.toArray();
 	let count = 0;
-	for (const journal of journals) {
+	await db.journals.each((journal) => {
+		if (journal.attachments.length === 0) return;
 		for (const attachment of journal.attachments) {
 			if (attachment.storageType === 'indexeddb' && !attachment.exportedAt) {
 				count++;
 			}
 		}
-	}
+	});
 	return count;
 }
 
@@ -180,30 +181,27 @@ export async function setBlobRetentionDays(days: number): Promise<void> {
 
 /**
  * 削除可能なBlob（エクスポート済みで保持期間を過ぎたもの）の数を取得
+ * ストリーミング処理で全仕訳をメモリにロードしない
  */
 export async function getPurgeableBlobCount(): Promise<number> {
 	const retentionDays = await getBlobRetentionDays();
-	const now = new Date();
-	const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+	const threshold = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
 
-	const journals = await db.journals.toArray();
 	let count = 0;
-
-	for (const journal of journals) {
+	await db.journals.each((journal) => {
+		if (journal.attachments.length === 0) return;
 		for (const attachment of journal.attachments) {
 			if (
 				attachment.storageType === 'indexeddb' &&
 				attachment.exportedAt &&
 				attachment.blob &&
-				!attachment.blobPurgedAt
+				!attachment.blobPurgedAt &&
+				new Date(attachment.exportedAt).getTime() <= threshold
 			) {
-				const exportedAt = new Date(attachment.exportedAt);
-				if (now.getTime() - exportedAt.getTime() >= retentionMs) {
-					count++;
-				}
+				count++;
 			}
 		}
-	}
+	});
 
 	return count;
 }
@@ -214,29 +212,28 @@ export async function getPurgeableBlobCount(): Promise<number> {
  */
 export async function purgeExportedBlobs(): Promise<number> {
 	const retentionDays = await getBlobRetentionDays();
-	const now = new Date();
-	const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
-	const purgedAt = now.toISOString();
+	const threshold = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+	const purgedAt = new Date().toISOString();
 
-	const journals = await db.journals.toArray();
+	// 添付ファイルを持つ仕訳のみフィルタして取得
+	const journalsWithAttachments = await db.journals
+		.filter((j) => j.attachments.length > 0)
+		.toArray();
 	let purgedCount = 0;
 
-	for (const journal of journals) {
+	for (const journal of journalsWithAttachments) {
 		let modified = false;
 		const updatedAttachments = journal.attachments.map((attachment) => {
 			if (
 				attachment.storageType === 'indexeddb' &&
 				attachment.exportedAt &&
 				attachment.blob &&
-				!attachment.blobPurgedAt
+				!attachment.blobPurgedAt &&
+				new Date(attachment.exportedAt).getTime() <= threshold
 			) {
-				const exportedAt = new Date(attachment.exportedAt);
-				if (now.getTime() - exportedAt.getTime() >= retentionMs) {
-					modified = true;
-					purgedCount++;
-					// Blobを削除し、削除日時を記録
-					return { ...omit(attachment, ['blob']), blobPurgedAt: purgedAt } as Attachment;
-				}
+				modified = true;
+				purgedCount++;
+				return { ...omit(attachment, ['blob']), blobPurgedAt: purgedAt } as Attachment;
 			}
 			return attachment;
 		});
@@ -260,10 +257,13 @@ export async function purgeExportedBlobs(): Promise<number> {
 export async function purgeAllExportedBlobs(): Promise<number> {
 	const now = new Date().toISOString();
 
-	const journals = await db.journals.toArray();
+	// 添付ファイルを持つ仕訳のみフィルタして取得
+	const journalsWithAttachments = await db.journals
+		.filter((j) => j.attachments.length > 0)
+		.toArray();
 	let purgedCount = 0;
 
-	for (const journal of journals) {
+	for (const journal of journalsWithAttachments) {
 		let modified = false;
 		const updatedAttachments = journal.attachments.map((attachment) => {
 			if (
@@ -274,7 +274,6 @@ export async function purgeAllExportedBlobs(): Promise<number> {
 			) {
 				modified = true;
 				purgedCount++;
-				// Blobを削除し、削除日時を記録
 				return { ...omit(attachment, ['blob']), blobPurgedAt: now } as Attachment;
 			}
 			return attachment;
