@@ -5,14 +5,22 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import { Plus, FileSpreadsheet, Pencil, Trash2 } from '@lucide/svelte';
+	import { Plus, FileSpreadsheet, Pencil, Trash2, Copy } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import type { Invoice } from '$lib/types/invoice';
 	import { InvoiceStatusLabels } from '$lib/types/invoice';
 	import type { Vendor } from '$lib/types';
-	import { initializeDatabase, getInvoicesByYear, getAllVendors, deleteInvoice } from '$lib/db';
+	import {
+		initializeDatabase,
+		getInvoicesByYear,
+		getAllVendors,
+		deleteInvoice,
+		addInvoice,
+		generateNextInvoiceNumber
+	} from '$lib/db';
 	import { useFiscalYear } from '$lib/stores/fiscalYear.svelte.js';
 	import { formatCurrency } from '$lib/utils/invoice';
+	import { copyInvoiceForNew } from '$lib/utils/invoice-copy';
 
 	const fiscalYear = useFiscalYear();
 
@@ -62,6 +70,18 @@
 
 	function editInvoice(invoice: Invoice) {
 		goto(`${base}/invoice/${invoice.id}`);
+	}
+
+	async function handleCopy(invoice: Invoice) {
+		try {
+			const copied = copyInvoiceForNew(invoice);
+			const suggestedNumber = await generateNextInvoiceNumber();
+			copied.invoiceNumber = suggestedNumber;
+			const newId = await addInvoice(copied);
+			goto(`${base}/invoice/${newId}`);
+		} catch (error) {
+			console.error('Copy failed:', error);
+		}
 	}
 
 	function openDeleteDialog(invoice: Invoice) {
@@ -190,10 +210,28 @@
 							</td>
 							<td class="py-3">
 								<div class="flex gap-2">
-									<Button size="sm" variant="outline" onclick={() => editInvoice(invoice)}>
+									<Button
+										size="sm"
+										variant="outline"
+										title="編集"
+										onclick={() => editInvoice(invoice)}
+									>
 										<Pencil class="size-4" />
 									</Button>
-									<Button size="sm" variant="outline" onclick={() => openDeleteDialog(invoice)}>
+									<Button
+										size="sm"
+										variant="outline"
+										title="コピーして新規作成"
+										onclick={() => handleCopy(invoice)}
+									>
+										<Copy class="size-4" />
+									</Button>
+									<Button
+										size="sm"
+										variant="outline"
+										title="削除"
+										onclick={() => openDeleteDialog(invoice)}
+									>
 										<Trash2 class="size-4" />
 									</Button>
 								</div>

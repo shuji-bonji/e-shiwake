@@ -3,6 +3,16 @@
 e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に準拠。
 [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [0.2.2] - 2026-03-08
+
+### Added
+
+- **請求書コピー機能** — 既存の請求書をコピーして新規作成（[#21](https://github.com/shuji-bonji/e-shiwake/issues/21)）
+  - 一覧のコピーボタン（📋）から即座にコピー＆編集画面へ遷移
+  - 発行日は今日、支払期限は翌月末、ステータスは下書きにリセット
+  - 取引先・明細行・備考はそのまま引き継ぎ
+  - 請求書番号は自動採番、仕訳紐付けはクリア
+
 ## [0.2.1] - 2026-03-06
 
 ### Changed

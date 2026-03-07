@@ -49,6 +49,33 @@
 		</HelpNote>
 	</HelpSection>
 
+	<HelpSection title="請求書のコピー">
+		<p>
+			既存の請求書をコピーして新しい請求書を作成できます。
+			毎月同じ取引先に類似の請求書を発行する場合に便利です。
+		</p>
+		<ol class="ml-4 list-decimal space-y-2">
+			<li>請求書一覧でコピーしたい請求書のコピーボタン（📋）をクリック</li>
+			<li>コピーされた請求書の編集画面が開きます</li>
+			<li>必要に応じて明細行の内容を修正</li>
+		</ol>
+		<HelpNote type="info">
+			<p>コピー時に以下の項目が自動的にリセットされます。</p>
+			<ul class="mt-1 ml-4 list-disc space-y-1">
+				<li>発行日 → 今日の日付</li>
+				<li>支払期限 → 翌月末</li>
+				<li>請求書番号 → 自動採番</li>
+				<li>ステータス → 下書き</li>
+				<li>仕訳紐付け → クリア</li>
+			</ul>
+		</HelpNote>
+		<HelpNote type="tip">
+			<p>
+				取引先・明細行・備考はそのまま引き継がれるので、日付と明細の数量・単価を修正するだけで新しい請求書が完成します。
+			</p>
+		</HelpNote>
+	</HelpSection>
+
 	<HelpSection title="入力項目">
 		<HelpTable
 			headers={['項目', '説明', '例']}
