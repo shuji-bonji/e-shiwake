@@ -34,6 +34,8 @@
 	import InvoicePrint from '$lib/components/invoice/InvoicePrint.svelte';
 	import InvoiceItemsTable from '$lib/components/invoice/InvoiceItemsTable.svelte';
 	import InvoiceJournalDialog from '$lib/components/invoice/InvoiceJournalDialog.svelte';
+	import { useUICommand, clearPendingCommand } from '$lib/stores/uiCommand.svelte';
+	import { toast } from 'svelte-sonner';
 
 	// ページパラメータ
 	const invoiceId = $derived(page.params.id);
@@ -73,6 +75,9 @@
 	// 初期化フラグ
 	let initialized = $state(false);
 
+	// UICommand ストア（WebMCP UI操作型ツールからのコマンドを受信）
+	const uiCommand = useUICommand();
+
 	async function loadInvoice(id: string) {
 		isLoading = true;
 		const existing = await getInvoiceById(id);
@@ -107,6 +112,41 @@
 	$effect(() => {
 		if (initialized && !isNew && invoiceId) {
 			loadInvoice(invoiceId);
+		}
+	});
+
+	// WebMCP UI操作: 請求書エディタ向けのコマンドを処理
+	$effect(() => {
+		if (!initialized) return;
+		const cmd = uiCommand.pending;
+		if (cmd?.type === 'open_invoice_editor') {
+			const data = cmd.data;
+			clearPendingCommand();
+
+			// プリフィルデータを適用
+			if (data.vendorId) {
+				invoice.vendorId = data.vendorId;
+			}
+			if (data.dueDate) {
+				invoice.dueDate = data.dueDate;
+			}
+			if (data.note) {
+				invoice.note = data.note;
+			}
+			if (data.items && data.items.length > 0) {
+				invoice.items = data.items.map((item) => ({
+					id: crypto.randomUUID(),
+					date: '',
+					description: item.description,
+					quantity: item.quantity,
+					unitPrice: item.unitPrice,
+					amount: item.quantity * item.unitPrice,
+					taxRate: item.taxRate
+				}));
+				recalculate();
+			}
+
+			toast.info('AIが請求書フォームを準備しました。内容を確認してください。');
 		}
 	});
 

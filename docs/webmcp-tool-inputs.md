@@ -434,7 +434,172 @@
 
 ---
 
+---
+
+## 13. navigate_to — ページ遷移（UI操作型）
+
+指定したページに移動する。**データは操作せず、UIのみを操作する。**
+
+| パラメータ | 型     | 必須 | 説明         |
+| ---------- | ------ | ---- | ------------ |
+| `page`     | string | ✅   | 移動先ページ |
+
+`page` の値: `journal`, `ledger`, `trial-balance`, `profit-loss`, `balance-sheet`, `tax-summary`, `fixed-assets`, `blue-return`, `reports`, `invoice`, `vendors`, `accounts`, `data`, `help`
+
+### サンプル
+
+**仕訳帳ページに移動**
+
+```json
+{
+	"page": "journal"
+}
+```
+
+**損益計算書ページに移動**
+
+```json
+{
+	"page": "profit-loss"
+}
+```
+
+---
+
+## 14. open_journal_editor — 仕訳入力フォームを開く（UI操作型）
+
+仕訳入力フォームを開き、指定データでプリフィルする。**ユーザーが確認して確定ボタンを押すまでデータは保存されない。**
+
+| パラメータ    | 型     | 必須 | 説明                 |
+| ------------- | ------ | ---- | -------------------- |
+| `date`        | string | -    | 取引日（YYYY-MM-DD） |
+| `description` | string | -    | 摘要                 |
+| `vendor`      | string | -    | 取引先名             |
+| `debitLines`  | array  | -    | 借方明細行           |
+| `creditLines` | array  | -    | 貸方明細行           |
+
+### サンプル
+
+**消耗品を現金で購入する仕訳フォームを開く**
+
+```json
+{
+	"date": "2026-02-23",
+	"description": "USBケーブル購入",
+	"vendor": "Amazon",
+	"debitLines": [{ "accountCode": "5003", "amount": 3980, "taxCategory": "purchase_10" }],
+	"creditLines": [{ "accountCode": "1001", "amount": 3980, "taxCategory": "na" }]
+}
+```
+
+**空の仕訳フォームを開く（日付だけセット）**
+
+```json
+{
+	"date": "2026-03-01"
+}
+```
+
+**家事按分の仕訳フォームを開く**
+
+```json
+{
+	"date": "2026-02-14",
+	"description": "NTTフレッツ光",
+	"vendor": "NTT東日本",
+	"debitLines": [
+		{ "accountCode": "5004", "amount": 2305, "taxCategory": "purchase_10", "memo": "事業分33%" },
+		{ "accountCode": "3001", "amount": 4680, "taxCategory": "na", "memo": "家事分67%" }
+	],
+	"creditLines": [{ "accountCode": "2002", "amount": 6985, "taxCategory": "na" }]
+}
+```
+
+---
+
+## 15. set_search_query — 検索クエリセット（UI操作型）
+
+仕訳帳の検索ボックスにクエリをセットする。**UIの検索ボックスを操作するだけ。**
+
+| パラメータ | 型     | 必須 | 説明       |
+| ---------- | ------ | ---- | ---------- |
+| `query`    | string | ✅   | 検索クエリ |
+
+### サンプル
+
+**Amazonの仕訳を検索表示**
+
+```json
+{
+	"query": "Amazon"
+}
+```
+
+**2026年2月の消耗品費を検索表示**
+
+```json
+{
+	"query": "消耗品費 2026-02"
+}
+```
+
+---
+
+## 16. confirm_delete_journal — 仕訳削除確認ダイアログ（UI操作型）
+
+仕訳の削除確認ダイアログを表示する。**ユーザーが確認ボタンを押すまで削除は実行されない。**
+
+| パラメータ | 型     | 必須 | 説明             |
+| ---------- | ------ | ---- | ---------------- |
+| `id`       | string | ✅   | 削除対象の仕訳ID |
+
+### サンプル
+
+```json
+{
+	"id": "e47b1d54-2f62-43b7-95ee-a0b8539975f3"
+}
+```
+
+> ※ IDは `search_journals` や `get_journals_by_year` の結果から取得
+
+---
+
+## 17. open_invoice_editor — 請求書エディタを開く（UI操作型）
+
+新規請求書エディタを開き、指定データでプリフィルする。**ユーザーが確認するまで確定されない。**
+
+| パラメータ | 型     | 必須 | 説明                           |
+| ---------- | ------ | ---- | ------------------------------ |
+| `vendorId` | string | -    | 取引先ID（list_vendorsで取得） |
+| `items`    | array  | -    | 明細行                         |
+| `note`     | string | -    | 備考                           |
+| `dueDate`  | string | -    | 支払期限（YYYY-MM-DD）         |
+
+### サンプル
+
+**開発支援の請求書フォームを開く**
+
+```json
+{
+	"items": [
+		{
+			"description": "BIMツール開発支援 3月分",
+			"quantity": 1,
+			"unitPrice": 500000,
+			"taxRate": 10
+		}
+	],
+	"note": "振込手数料はご負担ください。",
+	"dueDate": "2026-04-30"
+}
+```
+
+---
+
 ## クイックリファレンス
+
+### データ操作型ツール（データを直接操作）
 
 | #   | ツール名                    | 用途           | 必須パラメータ                                     |
 | --- | --------------------------- | -------------- | -------------------------------------------------- |
@@ -450,3 +615,13 @@
 | 10  | `generate_balance_sheet`    | 貸借対照表     | `fiscalYear`                                       |
 | 11  | `calculate_consumption_tax` | 消費税集計     | `fiscalYear`                                       |
 | 12  | `get_available_years`       | 年度一覧       | （なし）                                           |
+
+### UI操作型ツール（UIを操作、ユーザー確認が必要）
+
+| #   | ツール名                 | 用途                   | 必須パラメータ |
+| --- | ------------------------ | ---------------------- | -------------- |
+| 13  | `navigate_to`            | ページ遷移             | `page`         |
+| 14  | `open_journal_editor`    | 仕訳フォームを開く     | （なし）       |
+| 15  | `set_search_query`       | 検索クエリをセット     | `query`        |
+| 16  | `confirm_delete_journal` | 削除確認ダイアログ表示 | `id`           |
+| 17  | `open_invoice_editor`    | 請求書エディタを開く   | （なし）       |

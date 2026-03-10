@@ -27,9 +27,19 @@
 	import { parseSearchQuery, filterJournals, isEmptyQuery } from '$lib/utils/journal-search';
 	import { copyJournalForNew } from '$lib/utils/journal-copy';
 	import { WEBMCP_JOURNAL_CHANGE } from '$lib/webmcp/events';
+	import {
+		useUICommand,
+		clearPendingCommand,
+		type OpenJournalEditorCommand,
+		type PrefillJournalLine
+	} from '$lib/stores/uiCommand.svelte';
+	import { toast } from 'svelte-sonner';
 
 	// 年度ストア
 	const fiscalYear = useFiscalYear();
+
+	// UICommand ストア（WebMCP UI操作型ツールからのコマンドを受信）
+	const uiCommand = useUICommand();
 
 	// 状態
 	let journals = $state<JournalEntry[]>([]); // 選択中年度の仕訳
@@ -123,6 +133,96 @@
 			window.removeEventListener(WEBMCP_JOURNAL_CHANGE, handleWebMCPChange);
 		};
 	});
+
+	// WebMCP UI操作: 仕訳帳ページ向けのコマンドを処理
+	$effect(() => {
+		if (!isInitialized) return;
+		const cmd = uiCommand.pending;
+		if (!cmd) return;
+
+		switch (cmd.type) {
+			case 'open_journal_editor':
+				handleOpenJournalEditor(cmd);
+				clearPendingCommand();
+				break;
+			case 'set_search_query':
+				searchQuery = cmd.data.query;
+				clearPendingCommand();
+				toast.info(`検索: ${cmd.data.query}`);
+				break;
+			case 'confirm_delete_journal':
+				handleConfirmDeleteFromUI(cmd.data.id);
+				clearPendingCommand();
+				break;
+		}
+	});
+
+	/**
+	 * UIコマンドから仕訳エディタを開く
+	 * 空の仕訳を作成し、プリフィルデータを適用する
+	 */
+	async function handleOpenJournalEditor(cmd: OpenJournalEditorCommand) {
+		// 検索フィルタを解除
+		searchQuery = '';
+
+		const emptyJournal = createEmptyJournal();
+
+		// プリフィルデータを適用
+		if (cmd.data.date) emptyJournal.date = cmd.data.date;
+		if (cmd.data.description) emptyJournal.description = cmd.data.description;
+		if (cmd.data.vendor) emptyJournal.vendor = cmd.data.vendor;
+
+		// 借方・貸方明細行のプリフィル
+		const prefillLines = (lines: PrefillJournalLine[] | undefined, type: 'debit' | 'credit') => {
+			if (!lines || lines.length === 0) return [];
+			return lines.map((l) => ({
+				id: crypto.randomUUID(),
+				type,
+				accountCode: l.accountCode,
+				amount: l.amount,
+				taxCategory: (l.taxCategory ?? 'na') as 'na',
+				memo: l.memo
+			}));
+		};
+
+		const debitLines = prefillLines(cmd.data.debitLines, 'debit');
+		const creditLines = prefillLines(cmd.data.creditLines, 'credit');
+
+		if (debitLines.length > 0 || creditLines.length > 0) {
+			emptyJournal.lines = [...debitLines, ...creditLines];
+		}
+
+		const newId = await addJournal(emptyJournal);
+		const newJournal = await getJournalById(newId);
+		if (newJournal) {
+			editingJournalId = newId;
+			journals = sortJournals([newJournal, ...journals], newId);
+			refreshAllJournals();
+			toast.info('AIが仕訳フォームを準備しました。内容を確認して確定してください。');
+		}
+	}
+
+	/**
+	 * UIコマンドから削除確認ダイアログを開く
+	 */
+	function handleConfirmDeleteFromUI(journalId: string) {
+		// 該当仕訳が表示中か確認
+		const exists = journals.find((j) => j.id === journalId);
+		if (!exists) {
+			// 全年度から検索
+			const allExists = allJournals.find((j) => j.id === journalId);
+			if (!allExists) {
+				toast.error('指定された仕訳が見つかりません');
+				return;
+			}
+			// 検索クエリで該当仕訳を表示
+			searchQuery = journalId;
+		}
+
+		// フラッシュ表示して削除ダイアログを開く
+		flashJournal(journalId);
+		openDeleteDialog(journalId);
+	}
 
 	async function loadData(year: number) {
 		isLoading = true;

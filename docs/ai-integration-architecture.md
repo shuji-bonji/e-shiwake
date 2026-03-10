@@ -1,8 +1,8 @@
 # e-shiwake AI連携 アーキテクチャ設計書
 
-> **ステータス**: Draft v1.1
+> **ステータス**: Draft v2.0
 > **作成日**: 2026-02-22
-> **更新日**: 2026-02-22
+> **更新日**: 2026-03-09
 > **関連**: [GitHub Discussion #19](https://github.com/shuji-bonji/e-shiwake/discussions/19)
 
 ---
@@ -507,7 +507,102 @@ graph TB
 
 ---
 
-## 6. 推奨ロードマップ
+## 6. Phase 1 実験の学び（2026-03 追記）
+
+### 6.1 PWA内蔵AIチャットの実験
+
+Phase 0 完了後、PWA内にAIチャット機能を組み込む実験を行った（Anthropic Messages API 直接呼び出し + tool_use）。
+
+**実装した内容**:
+
+- Anthropic Messages API をブラウザから直接呼び出し（`anthropic-dangerous-direct-browser-access`）
+- WebMCP の12ツールの `execute` 関数を再利用した tool_use ループ
+- Svelte 5 rune ベースのチャット状態管理（localStorage永続化）
+- shadcn-svelte Sheet コンポーネントによるサイドパネルUI
+- APIキー・モデル選択の設定ダイアログ
+
+**得られた知見**:
+
+```mermaid
+graph TB
+    subgraph Problem["発見された課題"]
+        P1["プライバシー: 財務データが<br/>AIプロバイダーに渡る"]
+        P2["プロバイダーロックイン:<br/>Anthropic API 固定"]
+        P3["コスト: ユーザーが<br/>API契約を別途必要"]
+        P4["データ二重管理:<br/>IndexedDB + SQLite"]
+        P5["安全性: AIが直接<br/>データを作成・変更"]
+    end
+
+    subgraph Insight["気づき"]
+        I1["AIは『データの管理者』ではなく<br/>『UIのアシスタント』であるべき"]
+        I2["WebMCPツールは<br/>データ操作型 → UI操作型に"]
+        I3["プロバイダー選択は<br/>ユーザーの自由であるべき"]
+        I4["UI操作型なら<br/>SQLite不要（IndexedDB一元管理）"]
+    end
+
+    Problem --> Insight
+```
+
+### 6.2 データ操作型 vs UI操作型
+
+Phase 1 の実験で最も重要な気づきは、**WebMCPツールの設計思想**に関するものだった。
+
+#### データ操作型（Phase 1 で実装）
+
+```
+ユーザー: 「Amazonで3,980円のUSBケーブル買った」
+AI → createJournal() → IndexedDB に直接書き込み → 完了
+問題: ユーザーが確認する前にデータが確定してしまう
+```
+
+#### UI操作型（あるべき姿）
+
+```
+ユーザー: 「Amazonで3,980円のUSBケーブル買った」
+AI → openJournalEditor() → フォームに値を埋める → ユーザーに表示
+ユーザー: 「貸方はクレカだな」→ 確定ボタンを押す
+```
+
+**UI操作型の利点**:
+
+| 観点           | データ操作型     | UI操作型               |
+| -------------- | ---------------- | ---------------------- |
+| 安全性         | AIが直接変更     | ユーザーが確認・確定   |
+| 会計判断       | AIに委ねる       | ユーザーが行う         |
+| 学習効果       | なし             | AIの提案を見て学べる   |
+| エラー回復     | 取り消しが必要   | 確定前に修正可能       |
+| バリデーション | API側で実装      | 既存UIロジックを再利用 |
+| データ整合性   | 独自に保証が必要 | 既存のUIフローが保証   |
+
+**Human-in-the-Loop**: 会計データは確定申告に直結するため、「AIが勝手に作って終わり」は危険。ユーザーが確認・確定するステップがあることで安全性と信頼性が向上する。
+
+### 6.3 アーキテクチャの再評価
+
+```mermaid
+graph TB
+    subgraph Before["Phase 1 時点の構想"]
+        B1["PWA → Anthropic API → データ直接操作"]
+        B2["e-shiwake-ai: SQLite + MCP Server<br/>（データ二重管理）"]
+    end
+
+    subgraph After["Phase 1 実験後の方針"]
+        A1["PWA内チャット → WebMCP → UI操作<br/>（ユーザーが確認・確定）"]
+        A2["AIプロバイダーはユーザーが選択<br/>（マルチプロバイダー）"]
+        A3["データはIndexedDB一元管理<br/>（SQLite不要）"]
+    end
+
+    Before -->|"実験で学んだ"| After
+```
+
+**e-shiwake-ai（MCP Server + SQLite）の位置づけ変更**:
+
+- ~~本命の統合先~~ → **ヘッドレスAPI（CLIツール向け）** として残す
+- PWA内のAI体験は WebMCP + UI操作で完結
+- データ同期問題が解消（IndexedDB一元管理）
+
+---
+
+## 7. 推奨ロードマップ（v2.0 改訂版）
 
 ### Phase 0: WebMCP PoC ✅ 完了
 
@@ -525,156 +620,278 @@ graph TB
 - [x] npm run preview での動作確認
 ```
 
-### Phase 1: Skill + E2Eテスト（現在）
+### Phase 1: PWA内蔵AIチャット実験 ✅ 完了
 
 ```
-目標: SKILL.md でAIエージェント連携を実用化 + WebMCPツールをE2Eテストで検証
+目標: Anthropic API 直接呼び出しでPWA内AIチャットの実現可能性を検証
+
+完了タスク:
+- [x] Anthropic Messages API + tool_use ループ実装
+- [x] WebMCPツールのexecute関数再利用（tool-executor ブリッジ）
+- [x] Svelte 5 rune ベースのチャット状態管理
+- [x] shadcn-svelte Sheet によるサイドパネルUI
+- [x] APIキー設定・モデル選択ダイアログ
+
+得られた知見:
+- [x] プライバシー課題の発見（財務データがAPIプロバイダーに渡る）
+- [x] データ操作型 vs UI操作型の設計思想の転換
+- [x] マルチプロバイダー対応の必要性認識
+- [x] SQLite不要（UI操作型ならIndexedDB一元管理で十分）
+```
+
+### Phase 2: UI操作型WebMCPツール（次のステップ）
+
+現在のデータ操作型WebMCPツールを、UI操作型に進化させる。
+
+```
+目標: AIが「データ」ではなく「UI」を操作するWebMCPツール体系への移行
+
+タスク:
+- [ ] UI操作型ツールの設計・定義
+  - openJournalEditor(values)     ← 仕訳編集行を展開し値を埋める
+  - openJournalWithCopy(id)       ← 既存仕訳をコピーして編集行を展開
+  - confirmDeleteJournal(id)      ← 削除確認ダイアログを表示
+  - navigateTo(path)              ← 指定ページに遷移
+  - showTrialBalance(year)        ← 試算表ページを表示
+  - showProfitLoss(year)          ← 損益計算書ページを表示
+  - showBalanceSheet(year)        ← 貸借対照表ページを表示
+  - showLedger(accountCode, year) ← 総勘定元帳を表示
+  - setSearchQuery(query)         ← 検索クエリを設定して結果表示
+  - openInvoiceEditor(values)     ← 請求書編集画面を開いて値を埋める
+- [ ] 既存のデータ操作型ツール（参照系）はそのまま残す
+  - search_journals   → 結果をチャットに表示（変更なし）
+  - list_accounts     → 結果をチャットに表示（変更なし）
+  - list_vendors      → 結果をチャットに表示（変更なし）
+  - get_available_years → 結果をチャットに表示（変更なし）
+- [ ] Svelte storeとの連携
+  - UIツールがstoreを更新 → UIがリアクティブに反応
+  - 例: openJournalEditor → journalEditorStore に値をセット
+        → JournalRow.svelte が自動的に編集モードで展開
+- [ ] UIフィードバック
+  - AIが操作したことをトースト通知で表示
+  - チャットパネルに「仕訳入力フォームを開きました」等のメッセージ
+```
+
+**ツール分類の整理**:
+
+| 種別         | ツール                 | AIの動作             | ユーザーの動作   |
+| ------------ | ---------------------- | -------------------- | ---------------- |
+| **UI操作型** | openJournalEditor      | フォームに値を埋める | 確認して確定     |
+| **UI操作型** | confirmDeleteJournal   | 確認ダイアログを表示 | OK or キャンセル |
+| **UI操作型** | navigateTo             | ページ遷移           | 内容を閲覧       |
+| **参照型**   | search_journals        | 検索して結果を返す   | チャットで確認   |
+| **参照型**   | generate_trial_balance | 帳簿を生成して返す   | チャットで確認   |
+
+### Phase 3: マルチプロバイダー対応
+
+ユーザーが自分の契約しているAIプロバイダーを選べるようにする。
+
+```
+目標: ユーザーが自身のAPIキーで好きなAIプロバイダーを使えるようにする
+
+タスク:
+- [ ] プロバイダー抽象化レイヤー
+  - 共通インターフェース: sendMessage(messages, tools) → response
+  - tool_use / function_calling の差異を吸収
+- [ ] Anthropic (Claude) プロバイダー
+  - Messages API + tool_use（Phase 1 実装を再利用）
+- [ ] OpenAI (GPT) プロバイダー
+  - Chat Completions API + function calling
+  - ツール定義の変換（Anthropic形式 → OpenAI形式）
+- [ ] Google (Gemini) プロバイダー
+  - Gemini API + function calling
+- [ ] 設定UIの拡張
+  - プロバイダー選択ドロップダウン
+  - プロバイダーごとのAPIキー管理
+  - モデル選択（プロバイダーに応じて変更）
+- [ ] ツール定義の統一形式
+  - 内部的に共通形式で定義
+  - プロバイダーごとに変換アダプター
+
+アーキテクチャ:
+```
+
+```mermaid
+graph TB
+    subgraph PWA["e-shiwake PWA"]
+        Chat["💬 AIチャットUI"]
+        Provider["プロバイダー抽象化層"]
+        Tools["WebMCP Tools（UI操作型 + 参照型）"]
+        UI["既存UI（Svelte）"]
+        IDB["IndexedDB"]
+    end
+
+    subgraph Providers["AIプロバイダー（ユーザーが選択）"]
+        Claude["Claude API"]
+        GPT["OpenAI API"]
+        Gemini["Gemini API"]
+    end
+
+    Chat --> Provider
+    Provider --> Claude
+    Provider --> GPT
+    Provider --> Gemini
+    Provider --> Tools
+    Tools --> UI
+    UI --> IDB
+```
+
+```
+プライバシーの考慮:
+- 各プロバイダーへの直接API呼び出し（第三者サーバーを経由しない）
+- 財務データはツール実行結果としてのみAIに渡る
+- APIキーはlocalStorageに保存（ユーザーのブラウザ内完結）
+```
+
+### Phase 4: Skill + llms.txt 強化
+
+```
+目標: 外部AIエージェント（Claude Code / Cowork / Chrome AI）からの利用を最適化
 
 タスク:
 - [ ] e-shiwake Skill（SKILL.md）作成
-  - 仕訳入力手順
-  - 帳簿確認手順
-  - エクスポート手順
+  - UI操作型WebMCPツールの使い方ガイド
   - 会計ルール（複式簿記、消費税区分）
-- [ ] Playwright E2Eテストでの WebMCP ツール検証
-  - 仕訳 CRUD テスト
-  - 帳簿生成テスト
-  - 検索機能テスト
-- [ ] 動作検証（Claude Code / Cowork から e-shiwake を操作）
-```
-
-### Phase 2: 共通基盤パッケージ化（1-2週間）
-
-コアロジックのパッケージ化。構想2の土台。
-
-```
-目標: @e-shiwake/core パッケージの切り出し
-
-タスク:
-- [ ] pnpm workspace セットアップ
-- [ ] src/lib/types/ → packages/core/types/
-- [ ] src/lib/utils/ → packages/core/utils/
-- [ ] DatabasePort インターフェース定義
-- [ ] 既存テストの移行・動作確認
-```
-
-### Phase 3: 構想2 MCP Server MVP（2-4週間）
-
-```
-目標: 基本的な仕訳CRUD + 帳簿生成をMCPツールとして提供
-
-タスク:
-- [ ] packages/db-sqlite/ 実装
-  - SQLite スキーマ設計
-  - DatabasePort 実装
-  - Dexie JSON → SQLite インポーター
-- [ ] packages/mcp-server/ 実装
-  - stdio トランスポート
-  - 仕訳 CRUD ツール（5ツール）
-  - 帳簿生成ツール（4ツール）
-  - 勘定科目・取引先 リソース
-- [ ] Claude Desktop / Claude Code への登録・動作検証
-```
-
-### Phase 4: Skill統合 + プロンプト（1-2週間）
-
-```
-目標: MCP Serverと連携するSkillの作成
-
-タスク:
-- [ ] e-shiwake MCP Skill（SKILL.md）作成
-  - MCP ツールの使い方ガイド
-  - 会計ルール（複式簿記、消費税区分）
+  - 仕訳入力 → 確認 → 確定のワークフロー
   - 決算ワークフロー
-- [ ] MCP プロンプト定義
-  - monthly_review
-  - year_end_closing
-  - journal_suggestion
-- [ ] Cowork プラグイン化の検討
+- [ ] llms.txt の更新
+  - UI操作型ツールの仕様追記
+  - ツールの使い分けガイド（UI操作型 vs 参照型）
+- [ ] Playwright E2Eテスト
+  - UI操作型ツールの動作検証
+  - WebMCP → UI反映のE2Eフロー
 ```
 
 ### Phase 5: WebMCP 安定版統合（2026年後半〜）
 
 ```
-目標: Chrome 安定版でのWebMCP正式対応
+目標: Chrome安定版でのWebMCP正式対応 + AIチャット体験の完成
 
 タスク:
 - [ ] Chrome 安定版リリースに合わせたAPI更新
-- [ ] WebMCP ← → MCP Server の連携（ハイブリッド運用）
-- [ ] ユーザー向けWebMCP機能の案内ページ
+- [ ] チャットUI + WebMCPの統合完成
+  - AIチャットからのUI操作がシームレスに動作
+  - 会話コンテキストの保持（セッション管理）
+- [ ] ユーザー向けAI機能の案内ページ
+- [ ] Cowork プラグイン化の検討
 ```
 
 ### Phase 6: 高度な統合（2027年〜）
 
 ```
-- [ ] ブラウザ ↔ MCP Server リアルタイム同期
-- [ ] Cowork プラグインとしてパッケージ化
+- [ ] 音声入力対応（Web Speech API → AIチャット）
+- [ ] 証憑OCR連携（画像/PDF → AI解析 → 仕訳提案）
 - [ ] 多言語対応（i18n）
-- [ ] マルチデバイス同期
+- [ ] Cowork プラグインとしてパッケージ化
 ```
 
 ---
 
-## 7. 技術的課題と対策
+## 8. 技術的課題と対策（v2.0 改訂版）
 
-### 7.1 データ同期（構想2の最大課題）
+### 8.1 UI操作型WebMCPの課題
 
-| 課題                          | 影響                     | 対策                                   |
-| ----------------------------- | ------------------------ | -------------------------------------- |
-| IndexedDB ↔ SQLite の二重管理 | データ不整合のリスク     | Phase 1 は手動同期、段階的に自動化     |
-| 証憑PDF の扱い                | Blob はJSON化できない    | ZIP エクスポートを活用                 |
-| 競合解決                      | 同時編集時のコンフリクト | タイムスタンプベースの Last-Write-Wins |
+| 課題                           | 影響                                | 対策                                            |
+| ------------------------------ | ----------------------------------- | ----------------------------------------------- |
+| Svelte storeとの連携設計       | ツールからUIへの橋渡し              | 専用のUI操作storeを設計                         |
+| 複数コンポーネント間の状態同期 | 画面遷移 + フォーム展開の組み合わせ | navigateTo → onMount でフォーム展開のシーケンス |
+| 操作のフィードバック           | AIが操作したことをユーザーに伝える  | トースト通知 + チャットメッセージ               |
 
-### 7.2 WebMCP の制約（構想1）
+### 8.2 マルチプロバイダーの課題
 
-| 課題               | 影響                 | 対策                                          |
-| ------------------ | -------------------- | --------------------------------------------- |
-| Chrome 146+ のみ   | iPad / Safari 非対応 | 構想2（MCP Server）をフォールバックとして活用 |
-| Early Preview 段階 | API変更のリスク      | 抽象化層を設けて変更に対応                    |
-| Blob の直列化不可  | PDF添付が困難        | Base64 エンコード or ファイルパス参照         |
+| 課題                    | 影響                                           | 対策                                   |
+| ----------------------- | ---------------------------------------------- | -------------------------------------- |
+| ツール定義形式の差異    | Anthropic / OpenAI / Google で形式が異なる     | 共通形式 → プロバイダー別アダプター    |
+| tool_use の振る舞い差異 | ツール呼び出しの精度がプロバイダーにより異なる | プロバイダー別のシステムプロンプト調整 |
+| APIキーの安全管理       | ブラウザ内にキーを保存                         | localStorage + 将来的にIndexedDB暗号化 |
+| ユーザーの契約状況      | プロバイダーのAPI利用は別途課金                | 設定画面で明確に説明                   |
 
-### 7.3 MCP Server の運用（構想2）
+### 8.3 WebMCP の制約
 
-| 課題                       | 影響                       | 対策                              |
-| -------------------------- | -------------------------- | --------------------------------- |
-| Node.js サーバー起動が必要 | 非エンジニアには敷居が高い | npx 一発起動、Cowork プラグイン化 |
-| SQLiteファイル管理         | バックアップ・移行         | e-shiwakeのJSON形式と互換維持     |
-| MCP仕様の進化              | 破壊的変更のリスク         | SDK のバージョン固定 + 定期更新   |
+| 課題               | 影響                 | 対策                                  |
+| ------------------ | -------------------- | ------------------------------------- |
+| Chrome 146+ のみ   | iPad / Safari 非対応 | AIチャット + 直接API呼び出しで代替    |
+| Early Preview 段階 | API変更のリスク      | 抽象化層を設けて変更に対応            |
+| Blob の直列化不可  | PDF添付が困難        | Base64 エンコード or ファイルパス参照 |
 
----
+### 8.4 e-shiwake-ai（MCP Server）の位置づけ
 
-## 8. 判断基準と推奨
-
-### 8.1 どちらを先に進めるべきか
-
-**推奨: 構想1（WebMCP + Skill）→ 構想2（MCP Server）の順**
-
-理由：
-
-1. **構想1はWebMCP PoC実装済み** — 12ツールが動作確認済み
-2. **Skillは即座に始められる** — SKILL.md を書くだけで最低限の連携が可能
-3. **構想2は構想1の学びを活かせる** — AIエージェントが実際に何を操作したいかの知見が得られる
-4. **共通基盤（@e-shiwake/core）は両方に必要** — パッケージ化で無駄がない
-5. **構想2はe-shiwakeの価値を最大化する** — 最終的にはMCP Serverが本命
-
-### 8.2 ゴールイメージ
-
-```
-ユーザー: 「1月の経費をまとめて」
-
-Claude（e-shiwake Skill + MCP Server 経由）:
-  1. search_journals({keyword: "1月", fiscalYear: 2026})
-  2. 勘定科目別に集計
-  3. generate_profit_loss({fiscalYear: 2026, month: 1})
-  4. 結果をMarkdownテーブルで表示
-
-  → 「2026年1月の経費は合計 ¥187,340 です。
-     内訳: 通信費 ¥15,000、旅費交通費 ¥32,400、...」
-```
+| 課題                        | 影響                       | 対策                                                  |
+| --------------------------- | -------------------------- | ----------------------------------------------------- |
+| SQLiteとIndexedDBの二重管理 | データ不整合リスク         | PWA内はWebMCPで完結、MCP Serverはヘッドレス用途に限定 |
+| 利用シーンの限定            | 非エンジニアには使いにくい | Claude Code / Cowork 向けの補助ツールとして維持       |
+| メンテナンスコスト          | 2つのDB層を維持            | core パッケージでロジック共有、DB層のみ分離           |
 
 ---
 
-## 9. 参考リソース
+## 9. 判断基準と推奨（v2.0 改訂版）
+
+### 9.1 設計思想
+
+**「AIはUIのアシスタントであって、データの管理者ではない」**
+
+- AIは賢い入力補助をするが、最終判断と確定操作はユーザーが行う
+- データの整合性は既存のUIバリデーションが保証する
+- AIプロバイダーの選択はユーザーの自由
+
+### 9.2 ゴールイメージ
+
+```
+ユーザー: 「Amazonで3,980円のUSBケーブル買った」
+
+AI（PWA内チャット、ユーザー選択のプロバイダー経由）:
+  1. list_accounts({type: "expense"})     → 勘定科目確認
+  2. openJournalEditor({                  → UI操作型ツール実行
+       date: "2026-03-09",
+       description: "USBケーブル購入",
+       vendor: "Amazon",
+       debitLines: [{accountCode: "5003", amount: 3980}],
+       creditLines: []  ← 支払方法が不明なので空
+     })
+  3. チャットに「仕訳入力フォームを開きました。
+     貸方（支払方法）を選択して確定してください」と表示
+
+ユーザー: 貸方に「未払金」を選択 → 確定ボタン
+  → IndexedDB に保存（既存のUIフローで）
+```
+
+### 9.3 棲み分け
+
+```mermaid
+graph LR
+    subgraph PWA内["PWA内のAI体験"]
+        Chat["💬 AIチャット"]
+        WebMCP["WebMCP Tools<br/>（UI操作型）"]
+        UIUX["既存UI"]
+    end
+
+    subgraph External["外部AIエージェント"]
+        CC["Claude Code"]
+        CW["Cowork"]
+        CD["Claude Desktop"]
+    end
+
+    subgraph MCP["e-shiwake-ai"]
+        MCPServer["MCP Server<br/>（SQLite）"]
+    end
+
+    Chat --> WebMCP --> UIUX
+    External --> MCPServer
+
+    style PWA内 fill:#e3f2fd
+    style External fill:#e8f5e9
+    style MCP fill:#fff3e0
+```
+
+| 方式                | 用途                           | ユーザー            | データの場所          |
+| ------------------- | ------------------------------ | ------------------- | --------------------- |
+| PWA内AIチャット     | カジュアルな仕訳入力、帳簿確認 | 一般ユーザー        | IndexedDB（一元管理） |
+| WebMCP（Chrome AI） | ブラウザAIからの直接操作       | Chrome 146+ユーザー | IndexedDB（一元管理） |
+| e-shiwake-ai（MCP） | ヘッドレス分析、一括操作       | エンジニア          | SQLite（独立）        |
+
+---
+
+## 10. 参考リソース
 
 ### MCP 仕様・SDK
 
@@ -688,6 +905,12 @@ Claude（e-shiwake Skill + MCP Server 経由）:
 - [Chrome DevTools MCP](https://developer.chrome.com/blog/chrome-devtools-mcp)
 - [Chrome for Developers - WebMCP EPP](https://developer.chrome.com/blog/webmcp-epp)
 
+### AIプロバイダー API
+
+- [Anthropic Messages API](https://docs.anthropic.com/en/api/messages)
+- [OpenAI Chat Completions API](https://platform.openai.com/docs/api-reference/chat)
+- [Google Gemini API](https://ai.google.dev/docs)
+
 ### Skill 開発
 
 - [Claude をスキルで拡張する](https://code.claude.com/docs/ja/skills)
@@ -695,5 +918,5 @@ Claude（e-shiwake Skill + MCP Server 経由）:
 
 ### データストア
 
-- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
 - [Dexie.js](https://dexie.org/)
+- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)（e-shiwake-ai用）

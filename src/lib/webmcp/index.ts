@@ -16,6 +16,7 @@
 
 import type { ToolRegistration } from './types';
 import { webmcpTools } from './tools';
+import { webmcpUITools } from './ui-tools';
 
 /** 登録済みツールの参照を保持 */
 let registrations: ToolRegistration[] = [];
@@ -48,7 +49,10 @@ export function initWebMCP(): number {
 
 	const mc = navigator.modelContext!;
 
-	for (const tool of webmcpTools) {
+	// データ操作型 + UI操作型ツールをすべて登録
+	const allTools = [...webmcpTools, ...webmcpUITools];
+
+	for (const tool of allTools) {
 		try {
 			const registration = mc.registerTool(tool);
 			registrations.push(registration);
@@ -59,7 +63,7 @@ export function initWebMCP(): number {
 	}
 
 	console.info(
-		`[e-shiwake WebMCP] ${registrations.length}/${webmcpTools.length} ツールを登録しました`
+		`[e-shiwake WebMCP] ${registrations.length}/${allTools.length} ツールを登録しました（データ操作: ${webmcpTools.length}, UI操作: ${webmcpUITools.length}）`
 	);
 	return registrations.length;
 }
@@ -82,5 +86,5 @@ export function destroyWebMCP(): void {
  * 登録済みツールの情報を取得する（デバッグ用）
  */
 export function getRegisteredToolNames(): string[] {
-	return webmcpTools.map((t) => t.name);
+	return [...webmcpTools, ...webmcpUITools].map((t) => t.name);
 }

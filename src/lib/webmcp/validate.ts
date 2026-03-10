@@ -85,3 +85,15 @@ export function requireArray<T = unknown>(input: Input, key: string): T[] {
 	}
 	return value as T[];
 }
+
+/**
+ * オプションの配列フィールドを取得
+ */
+export function optionalArray<T = unknown>(input: Input, key: string): T[] | undefined {
+	const value = input[key];
+	if (value === undefined || value === null) return undefined;
+	if (!Array.isArray(value)) {
+		throw new ValidationError(`${key} は配列である必要があります（受信: ${typeof value}）`);
+	}
+	return value as T[];
+}

@@ -20,11 +20,15 @@
 	import { AlertTriangle } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { initWebMCP, destroyWebMCP } from '$lib/webmcp';
+	import { useUICommand, clearPendingCommand } from '$lib/stores/uiCommand.svelte';
 	import { toast } from 'svelte-sonner';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import './layout.css';
 
 	let { children } = $props();
+
+	// UICommand ストア（WebMCP UI操作型ツールからのコマンドを受信）
+	const uiCommand = useUICommand();
 
 	// 容量警告ダイアログの状態
 	let showStorageWarning = $state(false);
@@ -120,6 +124,17 @@
 			window.removeEventListener('offline', handleOffline);
 			destroyWebMCP();
 		};
+	});
+
+	// WebMCP UI操作: navigate_to コマンドを処理
+	$effect(() => {
+		const cmd = uiCommand.pending;
+		if (cmd?.type === 'navigate_to') {
+			const path = cmd.data.path;
+			clearPendingCommand();
+			goto(`${base}${path}`);
+			console.info(`[e-shiwake UICommand] ナビゲーション実行: ${path}`);
+		}
 	});
 
 	function handleOpenSettings() {
