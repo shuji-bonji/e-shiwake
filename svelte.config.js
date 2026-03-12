@@ -21,17 +21,25 @@ const config = {
 			handleUnseenRoutes: 'ignore', // クロールで見つからないルートは無視
 			// すべてのページをプリレンダリング（GitHub Pagesで404を回避）
 			entries: [
+				// メインページ
 				'/',
-				'/accounts',
-				'/data',
+				// 帳簿
 				'/ledger',
 				'/trial-balance',
-				'/balance-sheet',
 				'/profit-loss',
+				'/balance-sheet',
 				'/tax-summary',
+				'/fixed-assets',
+				'/blue-return',
 				'/reports',
+				// 請求書
 				'/invoice',
+				// 管理
 				'/vendors',
+				'/accounts',
+				'/data',
+				'/export',
+				// ヘルプ
 				'/help',
 				'/help/getting-started',
 				'/help/journal',
@@ -40,14 +48,13 @@ const config = {
 				'/help/tax-category',
 				'/help/evidence',
 				'/help/accounts',
+				'/help/fixed-assets',
+				'/help/blue-return',
+				'/help/invoice',
 				'/help/data-management',
 				'/help/pwa',
 				'/help/shortcuts',
 				'/help/glossary',
-				'/help/fixed-assets',
-				'/help/blue-return',
-				'/help/invoice',
-				'/help/webmcp',
 				// LLM用テキストエンドポイント
 				'/llms.txt',
 				'/help/getting-started/llms.txt',
@@ -64,6 +71,7 @@ const config = {
 				'/help/pwa/llms.txt',
 				'/help/shortcuts/llms.txt',
 				'/help/glossary/llms.txt',
+				'/help/webmcp',
 				'/help/webmcp/llms.txt'
 			]
 		}

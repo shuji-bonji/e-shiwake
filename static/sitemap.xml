@@ -1,31 +1,85 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- メインページ -->
+  <!-- メインページ（仕訳帳） -->
   <url>
     <loc>https://shuji-bonji.github.io/e-shiwake/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
 
-  <!-- 勘定科目管理 -->
+  <!-- 帳簿 -->
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/ledger</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/trial-balance</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/profit-loss</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/balance-sheet</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/tax-summary</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/fixed-assets</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/blue-return</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/reports</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 請求書 -->
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/invoice</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- 管理 -->
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/vendors</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
   <url>
     <loc>https://shuji-bonji.github.io/e-shiwake/accounts</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
-  <!-- データ管理 -->
   <url>
     <loc>https://shuji-bonji.github.io/e-shiwake/data</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-  </url>
-
-  <!-- エクスポート -->
-  <url>
-    <loc>https://shuji-bonji.github.io/e-shiwake/export</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
   </url>
 
   <!-- ヘルプ -->
@@ -48,7 +102,19 @@
   </url>
 
   <url>
-    <loc>https://shuji-bonji.github.io/e-shiwake/help/accounts</loc>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/ledger</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/trial-balance</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/tax-category</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -60,7 +126,25 @@
   </url>
 
   <url>
-    <loc>https://shuji-bonji.github.io/e-shiwake/help/tax-category</loc>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/accounts</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/fixed-assets</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/blue-return</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/invoice</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -87,5 +171,11 @@
     <loc>https://shuji-bonji.github.io/e-shiwake/help/glossary</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/webmcp</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>

@@ -14,7 +14,8 @@
 		ClipboardList,
 		BookText,
 		Scale,
-		FileSpreadsheet
+		FileSpreadsheet,
+		Bot
 	} from '@lucide/svelte';
 
 	const pageDescription =
@@ -104,6 +105,12 @@
 			label: '用語集',
 			icon: BookA,
 			description: '簿記・会計用語の解説'
+		},
+		{
+			href: `${base}/help/webmcp`,
+			label: 'WebMCP',
+			icon: Bot,
+			description: 'AIエージェント連携（Chrome 146+）'
 		}
 	];
 </script>

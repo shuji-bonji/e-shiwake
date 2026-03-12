@@ -372,7 +372,8 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
     ├── /data-management    # データ管理
     ├── /pwa                # PWA・インストール
     ├── /shortcuts          # キーボードショートカット
-    └── /glossary           # 用語集
+    ├── /glossary           # 用語集
+    └── /webmcp             # WebMCP（AIエージェント連携）
 ```
 
 **URL**: `https://shuji-bonji.github.io/e-shiwake/`
@@ -972,6 +973,20 @@ src/
 - **iPad 対応**: File System Access API が使えないため、IndexedDB + エクスポートで対応
 - **PWA**: Service Worker でオフライン動作必須
 
+### ページの追加・削除・変更時の更新チェックリスト
+
+ルート（ページ）を追加・削除・変更した際は、以下のファイルも更新すること：
+
+1. **`svelte.config.js`** — `prerender.entries` にルートを追加/削除
+2. **`static/sitemap.xml`** — `<url>` エントリを追加/削除
+3. **`CLAUDE.md`** — 「サイトマップ」セクションのルート一覧を更新
+4. **`README.md`** — 「ページ構成」セクションのルート一覧を更新
+
+ヘルプページの場合はさらに：
+
+5. **`content.md`** + **`llms.txt/+server.ts`** の作成/削除
+6. **CLAUDE.md** — 「llms.txtエンドポイント一覧」テーブルを更新
+
 ## ヘルプページ・llms.txt 管理
 
 ### 概要
@@ -1024,6 +1039,8 @@ src/routes/help/{slug}/
    - `/help/{slug}`
    - `/help/{slug}/llms.txt`
 
+5. `static/sitemap.xml` に `<url>` エントリを追加
+
 ### llms.txtエンドポイント一覧
 
 | URL                              | 内容                                       |
@@ -1043,6 +1060,7 @@ src/routes/help/{slug}/
 | `/help/pwa/llms.txt`             | PWA・オフライン                            |
 | `/help/shortcuts/llms.txt`       | ショートカット                             |
 | `/help/glossary/llms.txt`        | 用語集                                     |
+| `/help/webmcp/llms.txt`          | WebMCP（AIエージェント連携）               |
 
 ### Markdownの書式ガイドライン
 

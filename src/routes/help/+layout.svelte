@@ -20,7 +20,8 @@
 		Keyboard,
 		BookA,
 		FileCode2,
-		FileSpreadsheet
+		FileSpreadsheet,
+		Bot
 	} from '@lucide/svelte';
 	import { cn } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
@@ -57,7 +58,8 @@
 		{ href: `${base}/help/data-management`, label: '設定・データ管理', icon: Database },
 		{ href: `${base}/help/pwa`, label: 'PWA・オフライン', icon: Smartphone },
 		{ href: `${base}/help/shortcuts`, label: 'ショートカット', icon: Keyboard },
-		{ href: `${base}/help/glossary`, label: '用語集', icon: BookA }
+		{ href: `${base}/help/glossary`, label: '用語集', icon: BookA },
+		{ href: `${base}/help/webmcp`, label: 'WebMCP', icon: Bot }
 	];
 </script>
 

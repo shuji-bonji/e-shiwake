@@ -224,7 +224,8 @@ IndexedDB に Blob として保存。定期的なエクスポートを推奨。
     ├── /data-management    データ管理
     ├── /pwa                PWA・インストール
     ├── /shortcuts          キーボードショートカット
-    └── /glossary           用語集
+    ├── /glossary           用語集
+    └── /webmcp             WebMCP（AIエージェント連携）
 ```
 
 ## 開発者向け
@@ -245,7 +246,8 @@ src/
 │   ├── stores/         # Svelte stores
 │   ├── db/             # IndexedDB 関連（Dexie）
 │   ├── types/          # TypeScript 型定義
-│   └── utils/          # ユーティリティ関数
+│   ├── utils/          # ユーティリティ関数
+│   └── webmcp/         # WebMCP ツール定義（データ操作型 + UI操作型）
 ├── routes/
 │   ├── +layout.svelte        # サイドバーレイアウト
 │   ├── +page.svelte          # 仕訳帳（ホーム）
@@ -279,7 +281,7 @@ Chrome 拡張「Model Context Tool Inspector」からツールを直接実行し
 
 ### 使い方
 
-e-shiwake を開くと、12 個のツールが自動で `navigator.modelContext` に登録されます。
+e-shiwake を開くと、17 個のツール（データ操作型 12 + UI操作型 5）が自動で `navigator.modelContext` に登録されます。
 
 Inspector のサイドパネルを開き、**ツールを選択 → Input Arguments に JSON を入力 → Execute** で直接実行できます。API 消費なしで確認可能です。
 
@@ -291,7 +293,7 @@ Inspector のサイドパネルを開き、**ツールを選択 → Input Argume
 { "fiscalYear": 2026 }
 ```
 
-### 利用可能なツール
+### データ操作型ツール（12個）
 
 | ツール名                    | 用途                   |
 | --------------------------- | ---------------------- |
@@ -307,6 +309,18 @@ Inspector のサイドパネルを開き、**ツールを選択 → Input Argume
 | `generate_balance_sheet`    | 貸借対照表             |
 | `calculate_consumption_tax` | 消費税集計             |
 | `get_available_years`       | 年度一覧               |
+
+### UI操作型ツール（5個）
+
+AIがUIを操作し、ユーザーが確認・確定する Human-in-the-Loop パターン。
+
+| ツール名                 | 用途                                 |
+| ------------------------ | ------------------------------------ |
+| `navigate_to`            | ページ遷移                           |
+| `open_journal_editor`    | 仕訳入力フォームをプリフィルして表示 |
+| `set_search_query`       | 検索クエリをセット                   |
+| `confirm_delete_journal` | 仕訳の削除確認ダイアログを表示       |
+| `open_invoice_editor`    | 請求書エディタをプリフィルして表示   |
 
 詳細なパラメータとサンプルは [docs/webmcp-tool-inputs.md](docs/webmcp-tool-inputs.md) を参照してください。
 
