@@ -75,6 +75,8 @@ export {
 	setSetting,
 	getStorageMode,
 	setStorageMode,
+	getAllSettingsForExport,
+	restoreAllSettings,
 	getLastExportedAt,
 	setLastExportedAt,
 	getUnexportedAttachmentCount,

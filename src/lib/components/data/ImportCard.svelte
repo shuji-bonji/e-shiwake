@@ -36,6 +36,11 @@
 		newAccountCount: number;
 		vendorCount: number;
 		newVendorCount: number;
+		fixedAssetCount: number;
+		newFixedAssetCount: number;
+		invoiceCount: number;
+		newInvoiceCount: number;
+		hasSettings: boolean;
 	} | null>(null);
 	let importMode = $state<ImportMode>('merge');
 	let isImporting = $state(false);
@@ -234,7 +239,35 @@
 							{/if}
 						</p>
 					</div>
+					{#if importPreview.invoiceCount > 0}
+						<div>
+							<p class="text-muted-foreground">請求書</p>
+							<p class="font-semibold">
+								{importPreview.invoiceCount}件
+								{#if importPreview.newInvoiceCount > 0}
+									<span class="text-green-600">（新規 {importPreview.newInvoiceCount}件）</span>
+								{/if}
+							</p>
+						</div>
+					{/if}
+					{#if importPreview.fixedAssetCount > 0}
+						<div>
+							<p class="text-muted-foreground">固定資産</p>
+							<p class="font-semibold">
+								{importPreview.fixedAssetCount}件
+								{#if importPreview.newFixedAssetCount > 0}
+									<span class="text-green-600">（新規 {importPreview.newFixedAssetCount}件）</span>
+								{/if}
+							</p>
+						</div>
+					{/if}
 				</div>
+
+				{#if importPreview.hasSettings}
+					<div class="flex items-center gap-2 rounded-md bg-muted p-2 text-sm">
+						<span>事業者情報・青色申告設定を含む</span>
+					</div>
+				{/if}
 
 				{#if isZipImport && zipImportBlobs.size > 0}
 					<div class="flex items-center gap-2 rounded-md bg-muted p-2 text-sm">
@@ -302,6 +335,24 @@
 							<p class="text-muted-foreground">取引先</p>
 							<p class="font-semibold">{importResult.vendorsImported}件</p>
 						</div>
+						{#if importResult.fixedAssetsImported > 0}
+							<div>
+								<p class="text-muted-foreground">固定資産</p>
+								<p class="font-semibold">{importResult.fixedAssetsImported}件</p>
+							</div>
+						{/if}
+						{#if importResult.invoicesImported > 0}
+							<div>
+								<p class="text-muted-foreground">請求書</p>
+								<p class="font-semibold">{importResult.invoicesImported}件</p>
+							</div>
+						{/if}
+						{#if importResult.settingsRestored}
+							<div>
+								<p class="text-muted-foreground">設定</p>
+								<p class="font-semibold text-green-600">復元済み</p>
+							</div>
+						{/if}
 					</div>
 					{#if blobRestoreResult}
 						<div class="mt-4 border-t pt-4">
@@ -347,7 +398,7 @@
 		{/if}
 
 		<p class="text-sm text-muted-foreground">
-			※証憑ファイル（PDF）はインポートされません。証憑は別途保存してください。
+			※JSONインポートでは証憑ファイル（PDF）は復元されません。ZIPファイルからのインポートでは証憑も復元されます。
 		</p>
 	</Card.Content>
 </Card.Root>

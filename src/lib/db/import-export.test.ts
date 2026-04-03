@@ -1,6 +1,7 @@
 /**
  * インポート/エクスポートのテスト（添付ファイル + データ移行）
  */
+import type { FixedAssetCategory, DepreciationMethod } from '$lib/types/blue-return-types';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
 	initializeDatabase,
@@ -185,6 +186,23 @@ describe('インポート/エクスポート', () => {
 					vendors: []
 				})
 			).toBe(false);
+		});
+
+		it('v2データ（fixedAssets/invoices/allSettings付き）も有効', () => {
+			const validData = {
+				version: '2.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [],
+				accounts: [],
+				vendors: [],
+				settings: {},
+				fixedAssets: [],
+				invoices: [],
+				allSettings: { storageMode: 'indexeddb' }
+			};
+
+			expect(validateExportData(validData)).toBe(true);
 		});
 
 		it('仕訳にid/date/linesがない場合は無効', () => {
@@ -373,6 +391,83 @@ describe('インポート/エクスポート', () => {
 			expect(preview.newAccountCount).toBe(1);
 			expect(preview.vendorCount).toBe(1);
 			expect(preview.newVendorCount).toBe(1);
+		});
+
+		it('v2データのプレビューに固定資産・請求書・設定が含まれる', async () => {
+			const exportData = {
+				version: '2.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [],
+				accounts: [],
+				vendors: [],
+				settings: testSettings,
+				fixedAssets: [
+					{
+						id: 'fa-1',
+						name: 'PC',
+						category: 'equipment' as FixedAssetCategory,
+						acquisitionDate: '2024-01-01',
+						acquisitionCost: 200000,
+						usefulLife: 4,
+						depreciationMethod: 'declining-balance' as DepreciationMethod,
+						depreciationRate: 0.5,
+						businessRatio: 100,
+						status: 'active' as const,
+						createdAt: '2024-01-01T00:00:00.000Z',
+						updatedAt: '2024-01-01T00:00:00.000Z'
+					}
+				],
+				invoices: [
+					{
+						id: 'inv-1',
+						invoiceNumber: 'INV-2024-0001',
+						issueDate: '2024-01-31',
+						dueDate: '2024-02-28',
+						vendorId: 'v1',
+						items: [],
+						subtotal: 0,
+						taxAmount: 0,
+						total: 0,
+						taxBreakdown: { taxable10: 0, tax10: 0, taxable8: 0, tax8: 0 },
+						status: 'draft' as const,
+						createdAt: '2024-01-15T00:00:00.000Z',
+						updatedAt: '2024-01-15T00:00:00.000Z'
+					}
+				],
+				allSettings: {
+					storageMode: 'indexeddb' as const,
+					blobRetentionDays: 60
+				}
+			};
+
+			const preview = await getImportPreview(exportData);
+
+			expect(preview.fixedAssetCount).toBe(1);
+			expect(preview.newFixedAssetCount).toBe(1);
+			expect(preview.invoiceCount).toBe(1);
+			expect(preview.newInvoiceCount).toBe(1);
+			expect(preview.hasSettings).toBe(true);
+		});
+
+		it('v1データのプレビューでは固定資産・請求書・設定が0', async () => {
+			const exportData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [],
+				accounts: [],
+				vendors: [],
+				settings: testSettings
+			};
+
+			const preview = await getImportPreview(exportData);
+
+			expect(preview.fixedAssetCount).toBe(0);
+			expect(preview.newFixedAssetCount).toBe(0);
+			expect(preview.invoiceCount).toBe(0);
+			expect(preview.newInvoiceCount).toBe(0);
+			expect(preview.hasSettings).toBe(false);
 		});
 
 		it('既存データがある場合は新規カウントが正しい', async () => {
@@ -647,6 +742,160 @@ describe('インポート/エクスポート', () => {
 			const debitLine2 = journal?.lines.find((l) => l.id === 'line-2');
 			expect(debitLine2?._businessRatioApplied).toBe(true);
 			expect(debitLine2?._businessRatioGenerated).toBe(true);
+		});
+
+		it('固定資産をマージモードでインポートできる', async () => {
+			const exportData = {
+				version: '2.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [],
+				accounts: [],
+				vendors: [],
+				settings: testSettings,
+				fixedAssets: [
+					{
+						id: 'fa-1',
+						name: 'ノートPC',
+						category: 'equipment' as FixedAssetCategory,
+						acquisitionDate: '2024-04-01',
+						acquisitionCost: 250000,
+						usefulLife: 4,
+						depreciationMethod: 'declining-balance' as DepreciationMethod,
+						depreciationRate: 0.5,
+						businessRatio: 100,
+						status: 'active' as const,
+						memo: 'MacBook Pro',
+						createdAt: '2024-04-01T00:00:00.000Z',
+						updatedAt: '2024-04-01T00:00:00.000Z'
+					}
+				]
+			};
+
+			const result = await importData(exportData, 'merge');
+
+			expect(result.success).toBe(true);
+			expect(result.fixedAssetsImported).toBe(1);
+
+			// DBに保存されていることを確認
+			const { db } = await import('./index');
+			const asset = await db.fixedAssets.get('fa-1');
+			expect(asset).toBeDefined();
+			expect(asset?.name).toBe('ノートPC');
+			expect(asset?.acquisitionCost).toBe(250000);
+		});
+
+		it('請求書をマージモードでインポートできる', async () => {
+			// 取引先を先に追加
+			const { db } = await import('./index');
+			await db.vendors.add({
+				id: 'vendor-1',
+				name: 'クライアントA',
+				createdAt: '2024-01-01T00:00:00.000Z',
+				updatedAt: '2024-01-01T00:00:00.000Z'
+			});
+
+			const exportData = {
+				version: '2.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [],
+				accounts: [],
+				vendors: [],
+				settings: testSettings,
+				invoices: [
+					{
+						id: 'inv-1',
+						invoiceNumber: 'INV-2024-0001',
+						issueDate: '2024-01-31',
+						dueDate: '2024-02-28',
+						vendorId: 'vendor-1',
+						items: [
+							{
+								id: 'item-1',
+								date: '1月分',
+								description: 'コンサルティング',
+								quantity: 1,
+								unitPrice: 100000,
+								amount: 100000,
+								taxRate: 10 as const
+							}
+						],
+						subtotal: 100000,
+						taxAmount: 10000,
+						total: 110000,
+						taxBreakdown: {
+							taxable10: 100000,
+							tax10: 10000,
+							taxable8: 0,
+							tax8: 0
+						},
+						status: 'issued' as const,
+						createdAt: '2024-01-15T00:00:00.000Z',
+						updatedAt: '2024-01-15T00:00:00.000Z'
+					}
+				]
+			};
+
+			const result = await importData(exportData, 'merge');
+
+			expect(result.success).toBe(true);
+			expect(result.invoicesImported).toBe(1);
+
+			const invoice = await db.invoices.get('inv-1');
+			expect(invoice).toBeDefined();
+			expect(invoice?.invoiceNumber).toBe('INV-2024-0001');
+			expect(invoice?.total).toBe(110000);
+		});
+
+		it('allSettingsが復元される', async () => {
+			const exportData = {
+				version: '2.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [],
+				accounts: [],
+				vendors: [],
+				settings: testSettings,
+				allSettings: {
+					storageMode: 'indexeddb' as const,
+					autoPurgeBlobAfterExport: false,
+					blobRetentionDays: 60
+				}
+			};
+
+			const result = await importData(exportData, 'merge');
+
+			expect(result.success).toBe(true);
+			expect(result.settingsRestored).toBe(true);
+
+			// 設定が復元されていることを確認
+			const { db } = await import('./index');
+			const blobRetention = await db.settings.get('blobRetentionDays');
+			expect(blobRetention?.value).toBe(60);
+
+			const autoPurge = await db.settings.get('autoPurgeBlobAfterExport');
+			expect(autoPurge?.value).toBe(false);
+		});
+
+		it('v1データ（fixedAssets/invoices/allSettingsなし）でも正常にインポートできる', async () => {
+			const exportData = {
+				version: '1.0.0',
+				exportedAt: '2024-01-15T00:00:00.000Z',
+				fiscalYear: 2024,
+				journals: [],
+				accounts: [],
+				vendors: [],
+				settings: testSettings
+				// fixedAssets, invoices, allSettings は存在しない
+			};
+
+			const result = await importData(exportData, 'merge');
+
+			expect(result.success).toBe(true);
+			expect(result.fixedAssetsImported).toBe(0);
+			expect(result.invoicesImported).toBe(0);
+			expect(result.settingsRestored).toBe(false);
 		});
 
 		it('家事按分メタデータが上書きモードで保持される', async () => {

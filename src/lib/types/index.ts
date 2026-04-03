@@ -276,6 +276,9 @@ export interface Settings {
 
 /**
  * エクスポートデータ
+ *
+ * version "1.0.0": 初期フォーマット（journals, accounts, vendors, settings）
+ * version "2.0.0": 固定資産・請求書・全設定を追加（後方互換: 追加フィールドはoptional）
  */
 export interface ExportData {
 	version: string; // データフォーマットバージョン
@@ -285,6 +288,10 @@ export interface ExportData {
 	accounts: Account[];
 	vendors: Vendor[];
 	settings: Settings;
+	// v2.0.0 追加フィールド（optional で v1 との後方互換を維持）
+	fixedAssets?: import('./blue-return-types').FixedAsset[];
+	invoices?: import('./invoice').Invoice[];
+	allSettings?: Partial<SettingsValueMap>; // IndexedDB の全設定キーバリュー
 }
 
 /**

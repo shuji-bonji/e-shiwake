@@ -1,5 +1,14 @@
-import type { Attachment, ExportData, JournalEntry, StorageType } from '$lib/types';
+import type {
+	Attachment,
+	ExportData,
+	JournalEntry,
+	SettingsValueMap,
+	StorageType
+} from '$lib/types';
+import type { FixedAsset } from '$lib/types/blue-return-types';
+import type { Invoice } from '$lib/types/invoice';
 import { db } from './database';
+import { restoreAllSettings } from './settings-repository';
 
 // ==================== インポート関連 ====================
 
@@ -16,6 +25,9 @@ export interface ImportResult {
 	journalsImported: number;
 	accountsImported: number;
 	vendorsImported: number;
+	fixedAssetsImported: number;
+	invoicesImported: number;
+	settingsRestored: boolean;
 	errors: string[];
 }
 
@@ -61,6 +73,9 @@ export async function importData(
 		journalsImported: 0,
 		accountsImported: 0,
 		vendorsImported: 0,
+		fixedAssetsImported: 0,
+		invoicesImported: 0,
+		settingsRestored: false,
 		errors: []
 	};
 
@@ -233,6 +248,102 @@ export async function importData(
 			// mergeモードで既存がある場合はスキップ
 		}
 
+		// 固定資産のインポート（v2.0.0 以降）
+		if (data.fixedAssets && Array.isArray(data.fixedAssets)) {
+			for (const asset of data.fixedAssets as FixedAsset[]) {
+				const existing = await db.fixedAssets.get(asset.id);
+				if (!existing) {
+					await db.fixedAssets.add({
+						id: asset.id,
+						name: asset.name,
+						category: asset.category,
+						acquisitionDate: asset.acquisitionDate,
+						acquisitionCost: asset.acquisitionCost,
+						usefulLife: asset.usefulLife,
+						depreciationMethod: asset.depreciationMethod,
+						depreciationRate: asset.depreciationRate,
+						businessRatio: asset.businessRatio,
+						status: asset.status,
+						disposalDate: asset.disposalDate,
+						memo: asset.memo,
+						createdAt: asset.createdAt,
+						updatedAt: asset.updatedAt
+					});
+					result.fixedAssetsImported++;
+				} else if (mode === 'overwrite') {
+					await db.fixedAssets.update(asset.id, {
+						name: asset.name,
+						category: asset.category,
+						acquisitionDate: asset.acquisitionDate,
+						acquisitionCost: asset.acquisitionCost,
+						usefulLife: asset.usefulLife,
+						depreciationMethod: asset.depreciationMethod,
+						depreciationRate: asset.depreciationRate,
+						businessRatio: asset.businessRatio,
+						status: asset.status,
+						disposalDate: asset.disposalDate,
+						memo: asset.memo,
+						updatedAt: asset.updatedAt
+					});
+					result.fixedAssetsImported++;
+				}
+			}
+		}
+
+		// 請求書のインポート（v2.0.0 以降）
+		if (data.invoices && Array.isArray(data.invoices)) {
+			for (const invoice of data.invoices as Invoice[]) {
+				const existing = await db.invoices.get(invoice.id);
+				if (!existing) {
+					await db.invoices.add({
+						id: invoice.id,
+						invoiceNumber: invoice.invoiceNumber,
+						issueDate: invoice.issueDate,
+						dueDate: invoice.dueDate,
+						vendorId: invoice.vendorId,
+						items: invoice.items,
+						subtotal: invoice.subtotal,
+						taxAmount: invoice.taxAmount,
+						total: invoice.total,
+						taxBreakdown: invoice.taxBreakdown,
+						status: invoice.status,
+						note: invoice.note,
+						journalId: invoice.journalId,
+						createdAt: invoice.createdAt,
+						updatedAt: invoice.updatedAt
+					});
+					result.invoicesImported++;
+				} else if (mode === 'overwrite') {
+					await db.invoices.update(invoice.id, {
+						invoiceNumber: invoice.invoiceNumber,
+						issueDate: invoice.issueDate,
+						dueDate: invoice.dueDate,
+						vendorId: invoice.vendorId,
+						items: invoice.items,
+						subtotal: invoice.subtotal,
+						taxAmount: invoice.taxAmount,
+						total: invoice.total,
+						taxBreakdown: invoice.taxBreakdown,
+						status: invoice.status,
+						note: invoice.note,
+						journalId: invoice.journalId,
+						updatedAt: invoice.updatedAt
+					});
+					result.invoicesImported++;
+				}
+			}
+		}
+
+		// 全設定の復元（v2.0.0 以降）
+		if (data.allSettings && typeof data.allSettings === 'object') {
+			try {
+				await restoreAllSettings(data.allSettings as Partial<SettingsValueMap>);
+				result.settingsRestored = true;
+			} catch (e) {
+				result.errors.push(`設定の復元に失敗: ${e instanceof Error ? e.message : '不明なエラー'}`);
+			}
+		}
+
 		result.success = true;
 	} catch (error) {
 		result.errors.push(error instanceof Error ? error.message : '不明なエラー');
@@ -341,6 +452,11 @@ export async function getImportPreview(data: ExportData): Promise<{
 	newAccountCount: number;
 	vendorCount: number;
 	newVendorCount: number;
+	fixedAssetCount: number;
+	newFixedAssetCount: number;
+	invoiceCount: number;
+	newInvoiceCount: number;
+	hasSettings: boolean;
 }> {
 	// 既存の仕訳ID一覧
 	const existingJournalIds = new Set((await db.journals.toArray()).map((j) => j.id));
@@ -351,10 +467,21 @@ export async function getImportPreview(data: ExportData): Promise<{
 	// 既存の取引先名一覧
 	const existingVendorNames = new Set((await db.vendors.toArray()).map((v) => v.name));
 
+	// 既存の固定資産ID一覧
+	const existingFixedAssetIds = new Set((await db.fixedAssets.toArray()).map((a) => a.id));
+
+	// 既存の請求書ID一覧
+	const existingInvoiceIds = new Set((await db.invoices.toArray()).map((i) => i.id));
+
 	// 新規追加される件数をカウント
 	const newJournals = data.journals.filter((j) => !existingJournalIds.has(j.id));
 	const newAccounts = data.accounts.filter((a) => !a.isSystem && !existingAccountCodes.has(a.code));
 	const newVendors = data.vendors.filter((v) => !existingVendorNames.has(v.name));
+
+	const fixedAssets = (data.fixedAssets as FixedAsset[] | undefined) ?? [];
+	const invoices = (data.invoices as Invoice[] | undefined) ?? [];
+	const newFixedAssets = fixedAssets.filter((a) => !existingFixedAssetIds.has(a.id));
+	const newInvoices = invoices.filter((i) => !existingInvoiceIds.has(i.id));
 
 	return {
 		fiscalYear: data.fiscalYear,
@@ -363,6 +490,11 @@ export async function getImportPreview(data: ExportData): Promise<{
 		accountCount: data.accounts.filter((a) => !a.isSystem).length,
 		newAccountCount: newAccounts.length,
 		vendorCount: data.vendors.length,
-		newVendorCount: newVendors.length
+		newVendorCount: newVendors.length,
+		fixedAssetCount: fixedAssets.length,
+		newFixedAssetCount: newFixedAssets.length,
+		invoiceCount: invoices.length,
+		newInvoiceCount: newInvoices.length,
+		hasSettings: !!data.allSettings && Object.keys(data.allSettings).length > 0
 	};
 }

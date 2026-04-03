@@ -641,13 +641,17 @@ function getFiscalYear(date: string, fiscalYearStart: number): number {
 
 ```typescript
 interface ExportData {
-	version: string; // データフォーマットバージョン
+	version: string; // データフォーマットバージョン（v1.0.0 / v2.0.0）
 	exportedAt: string; // エクスポート日時
 	fiscalYear: number; // 会計年度
 	journals: JournalEntry[];
 	accounts: Account[];
 	vendors: Vendor[];
 	settings: Settings;
+	// v2.0.0 追加フィールド（optional: v1との後方互換性）
+	fixedAssets?: FixedAsset[]; // 固定資産台帳
+	invoices?: Invoice[]; // 請求書
+	allSettings?: Partial<SettingsValueMap>; // 全設定（青色申告設定・事業者情報等）
 }
 ```
 

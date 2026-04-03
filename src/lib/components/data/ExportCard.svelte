@@ -6,9 +6,12 @@
 	import {
 		deleteYearData,
 		getAllAccounts,
+		getAllFixedAssets,
 		getAllVendors,
 		getAvailableYears,
+		getInvoicesByYear,
 		getJournalsByYear,
+		getAllSettingsForExport,
 		getUnexportedAttachmentCount,
 		setLastExportedAt
 	} from '$lib/db';
@@ -82,19 +85,34 @@
 		URL.revokeObjectURL(url);
 	}
 
-	async function getYearSummary(
-		year: number
-	): Promise<{ journalCount: number; attachmentCount: number }> {
-		const journals = await getJournalsByYear(year);
+	async function getYearSummary(year: number): Promise<{
+		journalCount: number;
+		attachmentCount: number;
+		invoiceCount: number;
+		fixedAssetCount: number;
+	}> {
+		const [journals, invoices, fixedAssets] = await Promise.all([
+			getJournalsByYear(year),
+			getInvoicesByYear(year),
+			getAllFixedAssets()
+		]);
 		const attachmentCount = journals.reduce((sum, j) => sum + j.attachments.length, 0);
-		return { journalCount: journals.length, attachmentCount };
+		return {
+			journalCount: journals.length,
+			attachmentCount,
+			invoiceCount: invoices.length,
+			fixedAssetCount: fixedAssets.length
+		};
 	}
 
 	async function createExportData(year: number): Promise<ExportData> {
-		const [journals, accounts, vendors] = await Promise.all([
+		const [journals, accounts, vendors, fixedAssets, invoices, allSettings] = await Promise.all([
 			getJournalsByYear(year),
 			getAllAccounts(),
-			getAllVendors()
+			getAllVendors(),
+			getAllFixedAssets(),
+			getInvoicesByYear(year),
+			getAllSettingsForExport()
 		]);
 
 		const journalsWithoutBlob = journals.map((journal) => ({
@@ -103,7 +121,7 @@
 		}));
 
 		return {
-			version: '1.0.0',
+			version: '2.0.0',
 			exportedAt: new Date().toISOString(),
 			fiscalYear: year,
 			journals: journalsWithoutBlob,
@@ -113,9 +131,12 @@
 				fiscalYearStart: 1,
 				defaultCurrency: 'JPY',
 				storageMode,
-				autoPurgeBlobAfterExport: true,
-				blobRetentionDays: 30
-			}
+				autoPurgeBlobAfterExport: autoPurgeEnabled,
+				blobRetentionDays: retentionDays
+			},
+			fixedAssets,
+			invoices,
+			allSettings
 		};
 	}
 
@@ -247,12 +268,17 @@
 		zipProgress = null;
 
 		try {
-			const journals = await getJournalsByYear(year);
-			const accounts = await getAllAccounts();
-			const vendors = await getAllVendors();
+			const [journals, accounts, vendors, fixedAssets, invoices, allSettings] = await Promise.all([
+				getJournalsByYear(year),
+				getAllAccounts(),
+				getAllVendors(),
+				getAllFixedAssets(),
+				getInvoicesByYear(year),
+				getAllSettingsForExport()
+			]);
 
 			const exportData: ExportData = {
-				version: '1.0.0',
+				version: '2.0.0',
 				exportedAt: new Date().toISOString(),
 				fiscalYear: year,
 				journals: journals.map((journal) => ({
@@ -267,7 +293,10 @@
 					storageMode,
 					autoPurgeBlobAfterExport: autoPurgeEnabled,
 					blobRetentionDays: retentionDays
-				}
+				},
+				fixedAssets,
+				invoices,
+				allSettings
 			};
 
 			const zipBlob = await exportToZip(exportData, journals, {
@@ -378,7 +407,7 @@
 							</div>
 						</div>
 
-						<div class="mb-4 grid grid-cols-2 gap-4 text-sm">
+						<div class="mb-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
 							<div>
 								<p class="text-muted-foreground">仕訳数</p>
 								<p class="font-semibold">{summary.journalCount}件</p>
@@ -387,6 +416,18 @@
 								<p class="text-muted-foreground">証憑</p>
 								<p class="font-semibold">{summary.attachmentCount}ファイル</p>
 							</div>
+							{#if summary.invoiceCount > 0}
+								<div>
+									<p class="text-muted-foreground">請求書</p>
+									<p class="font-semibold">{summary.invoiceCount}件</p>
+								</div>
+							{/if}
+							{#if summary.fixedAssetCount > 0}
+								<div>
+									<p class="text-muted-foreground">固定資産</p>
+									<p class="font-semibold">{summary.fixedAssetCount}件</p>
+								</div>
+							{/if}
 						</div>
 
 						<div class="flex flex-wrap gap-2">

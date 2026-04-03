@@ -53,6 +53,37 @@ export async function setStorageMode(mode: StorageType): Promise<void> {
 	await setSetting('storageMode', mode);
 }
 
+/**
+ * エクスポート用に全設定をまとめて取得
+ * lastExportedAt は動的な値のため除外
+ */
+export async function getAllSettingsForExport(): Promise<Partial<SettingsValueMap>> {
+	const allRecords = await db.settings.toArray();
+	const result: Partial<SettingsValueMap> = {};
+	for (const record of allRecords) {
+		// lastExportedAt はエクスポート時の動的な値のため含めない
+		if (record.key === 'lastExportedAt') continue;
+		(result as Record<string, unknown>)[record.key] = record.value;
+	}
+	return result;
+}
+
+/**
+ * エクスポートデータから全設定を復元
+ * lastExportedAt は復元しない
+ */
+export async function restoreAllSettings(settings: Partial<SettingsValueMap>): Promise<void> {
+	for (const [key, value] of Object.entries(settings)) {
+		if (key === 'lastExportedAt') continue;
+		if (value === undefined) continue;
+		await db.settings.put({
+			key: key as keyof SettingsValueMap,
+			value: structuredClone(value),
+			updatedAt: new Date().toISOString()
+		});
+	}
+}
+
 // ディレクトリハンドルの操作は $lib/utils/filesystem.ts を使用すること
 // キー: 'outputDirectoryHandle', 構造: { key, handle, updatedAt }
 

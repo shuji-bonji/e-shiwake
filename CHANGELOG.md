@@ -8,6 +8,13 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 ### Added
 
 - サイドバーフッターにアプリバージョン表示（`package.json` の version を Vite define で注入）
+- **ExportData v2.0.0** — エクスポート/インポートに固定資産・請求書・全設定を追加（[#29](https://github.com/shuji-bonji/e-shiwake/issues/29)）
+  - 固定資産台帳（`fixedAssets`）のエクスポート/インポート対応
+  - 請求書（`invoices`）のエクスポート/インポート対応
+  - 全設定（`allSettings`）のエクスポート/インポート対応（青色申告設定・事業者情報等）
+  - v1 データとの後方互換性を維持（optional フィールド）
+  - エクスポートカードに固定資産・請求書件数表示
+  - インポートプレビューに固定資産・請求書・設定有無を表示
 
 ### Changed
 
