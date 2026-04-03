@@ -239,6 +239,30 @@ describe('blue-return', () => {
 			expect(result.isBalanced).toBe(true);
 			expect(Math.abs(leftSide - rightSide)).toBeLessThan(100);
 		});
+
+		it('Issue #27: 初年度（前年度データなし）でも元入金が正しく表示される', () => {
+			// beginningBalanceSheet = null（初年度）
+			// mockBalanceSheet.equity に元入金 3,400,000 が含まれている
+			const result = generatePage4(mockBalanceSheet, null);
+
+			// 元入金が0ではなく、当期の元入金残高が反映されること
+			expect(result.equity.capital).toBe(3400000);
+			expect(result.equity.capitalEnding).toBe(3400000);
+		});
+
+		it('前年度データがある場合は前年度の元入金を期首として使用する', () => {
+			const beginningBS: BalanceSheetData = {
+				...mockBalanceSheet,
+				equity: [{ accountCode: '3001', accountName: '元入金', amount: 2000000 }],
+				totalEquity: 2000000
+			};
+
+			const result = generatePage4(mockBalanceSheet, beginningBS);
+
+			// 前年度の元入金が期首に反映される
+			expect(result.equity.capital).toBe(2000000);
+			expect(result.equity.capitalEnding).toBe(2000000);
+		});
 	});
 
 	describe('generateBlueReturnData', () => {

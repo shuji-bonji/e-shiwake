@@ -246,12 +246,19 @@ export function generatePage4(
 		fixedLiabilities.reduce((sum, a) => sum + a.endingBalance, 0);
 
 	// 純資産（資本）
-	const capitalBeginning = beginningBalanceSheet?.totalEquity ?? 0;
+	// 元入金は equity 配列の中のコード3001（元入金）の残高を使用
+	// 前年度データがある場合は前年度の純資産合計、なければ当期の元入金残高
+	const capitalFromCurrentYear =
+		balanceSheet.equity.find((e) => e.accountCode === '3001')?.amount ?? 0;
+	const capitalBeginning = beginningBalanceSheet
+		? (beginningBalanceSheet.equity.find((e) => e.accountCode === '3001')?.amount ??
+			beginningBalanceSheet.totalEquity)
+		: capitalFromCurrentYear;
 	const netIncome = balanceSheet.retainedEarnings;
 
 	// 期末元入金の計算
-	// 翌年の期首元入金 = 期首元入金 + 所得 + 事業主借 - 事業主貸
-	// ただし青色申告決算書の貸借対照表では元入金は変動しないのが一般的
+	// 青色申告決算書の貸借対照表では、当年度中は元入金は変動しない
+	// 翌年の期首元入金 = 期首元入金 + 所得 + 事業主借 - 事業主貸（翌年度の繰越処理で反映）
 	const capitalEnding = capitalBeginning;
 
 	// 貸借バランス確認
