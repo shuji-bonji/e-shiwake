@@ -62,8 +62,9 @@
 			</Sidebar.MenuItem>
 		{/if}
 		<Sidebar.MenuItem>
-			<div class="p-2 text-xs text-muted-foreground">
+			<div class="flex items-center justify-between p-2 text-xs text-muted-foreground">
 				<span>選択中: {selectedYear}年度</span>
+				<span>v{__APP_VERSION__}</span>
 			</div>
 		</Sidebar.MenuItem>
 	</Sidebar.Menu>

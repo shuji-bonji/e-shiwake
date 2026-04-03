@@ -3,6 +3,32 @@
 e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に準拠。
 [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [Unreleased]
+
+### Added
+
+- サイドバーフッターにアプリバージョン表示（`package.json` の version を Vite define で注入）
+
+### Changed
+
+- 請求書→仕訳生成の摘要を変更（証憑ファイル名の `_請求書_請求書_` 重複を解消）
+  - 売掛金仕訳: `請求書 INV-XXXX-XXXX` → `売掛金計上 INV-XXXX-XXXX`
+  - 入金仕訳: `入金 請求書 INV-XXXX-XXXX` → `入金 INV-XXXX-XXXX`
+- 証憑ファイル命名テンプレートのドキュメントを修正（`{勘定科目}` → `{摘要}`）
+- ヘルプドキュメント（証憑管理・請求書）を最新仕様に合わせて更新
+
+### Fixed
+
+- 青色申告決算書の控除額・棚卸設定が再読み込みで消える問題（IndexedDB に永続化）([#35](https://github.com/shuji-bonji/e-shiwake/issues/35))
+- 証憑PDFリネームロジックの包括的改善 ([#34](https://github.com/shuji-bonji/e-shiwake/issues/34))
+  - ファイルシステムリネーム失敗時にメタデータをロールバック（不整合防止）
+  - 手動ファイル名のバリデーション追加（パストラバーサル、禁止文字、`.pdf` 重複、UTF-8 バイト長）
+  - 長いファイル名の自動切り詰め（UTF-8 で 240 バイト上限）
+  - 金額 0 円が falsy 扱いされる問題を修正
+  - 摘要・取引先が空の場合の自動補完（「未分類」「不明」）
+- 請求書→仕訳生成時に取引先未選択でエラーになる問題（ボタン無効化 + トースト通知）
+- 売掛金仕訳の証憑添付時に書類種別が `請求書`（受領）と推定される問題を修正（売掛金が借方 → `請求書発行` に自動判定）
+
 ## [0.2.2] - 2026-03-08
 
 ### Added
@@ -99,6 +125,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.1.0...v0.1.1

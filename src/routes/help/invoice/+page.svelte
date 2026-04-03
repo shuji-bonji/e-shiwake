@@ -127,12 +127,19 @@
 
 	<HelpSection title="仕訳の自動生成">
 		<p>請求書から以下の仕訳を自動生成できます。</p>
+		<HelpNote type="warning">
+			<p>
+				仕訳を生成するには、請求書に取引先が設定されている必要があります。
+				取引先が未選択の場合、仕訳ボタンは無効になります。
+			</p>
+		</HelpNote>
 
 		<h3 class="mt-4 mb-2 font-medium">売掛金仕訳</h3>
 		<p>「売掛金仕訳」ボタンをクリックすると、売上計上の仕訳が作成されます。</p>
 		<ul class="mt-2 ml-4 list-disc space-y-1">
 			<li>借方：売掛金（税込合計）</li>
 			<li>貸方：売上高（10%対象、8%対象それぞれ）</li>
+			<li>摘要：「売掛金計上 INV-XXXX-XXXX」（請求書番号が自動設定）</li>
 		</ul>
 
 		<h3 class="mt-4 mb-2 font-medium">入金仕訳</h3>
@@ -142,6 +149,7 @@
 		<ul class="mt-2 ml-4 list-disc space-y-1">
 			<li>借方：普通預金（税込合計）</li>
 			<li>貸方：売掛金（税込合計）</li>
+			<li>摘要：「入金 INV-XXXX-XXXX」（請求書番号が自動設定）</li>
 		</ul>
 
 		<HelpNote type="warning">

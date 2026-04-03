@@ -8,6 +8,9 @@ declare global {
 		// interface PageState {}
 		// interface Platform {}
 	}
+
+	/** package.json の version フィールド（Vite define で注入） */
+	declare const __APP_VERSION__: string;
 }
 
 export {};

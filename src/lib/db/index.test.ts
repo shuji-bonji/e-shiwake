@@ -785,6 +785,14 @@ describe('添付ファイル', () => {
 			// 他の負債は請求書（受領）
 			expect(suggestDocumentType('liability', '2001')).toBe('bill');
 		});
+
+		it('借方が売掛金の場合は請求書（発行）を提案', () => {
+			// 売掛金（1005）が借方 → 自社発行の請求書に基づく売上計上
+			expect(suggestDocumentType('asset', '1005')).toBe('invoice');
+			// 他の資産は請求書（受領）のまま
+			expect(suggestDocumentType('asset', '1001')).toBe('bill'); // 現金
+			expect(suggestDocumentType('asset', '1003')).toBe('bill'); // 普通預金
+		});
 	});
 });
 

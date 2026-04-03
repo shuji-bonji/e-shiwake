@@ -4,12 +4,17 @@ import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import config from './svelte.config.js';
+import { readFileSync } from 'node:fs';
 
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const base = config.kit?.paths?.base || '';
 // PWAのパスにはトレイリングスラッシュが必要
 const pwaBase = base ? `${base}/` : '/';
 
 export default defineConfig({
+	define: {
+		__APP_VERSION__: JSON.stringify(pkg.version)
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit(),

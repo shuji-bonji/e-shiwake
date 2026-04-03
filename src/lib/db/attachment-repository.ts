@@ -127,9 +127,14 @@ export function validateManualFileName(fileName: string): string[] {
 export const UNPAID_ACCOUNT_CODES = ['2004', '2005', '2006']; // 未払金、未払費用、未払消費税
 
 /**
+ * 売掛金系の勘定科目コード（借方にある場合は自社発行 = 請求書発行）
+ */
+export const RECEIVABLE_ACCOUNT_CODES = ['1005']; // 売掛金
+
+/**
  * 勘定科目タイプから書類の種類を推測
  * @param accountType 勘定科目タイプ
- * @param accountCode 勘定科目コード（未払金系の判定用）
+ * @param accountCode 勘定科目コード（未払金系・売掛金系の判定用）
  */
 export function suggestDocumentType(
 	accountType: Account['type'] | null,
@@ -138,6 +143,11 @@ export function suggestDocumentType(
 	// 借方が未払金系の場合は領収書（支払済みの証拠）
 	if (accountCode && UNPAID_ACCOUNT_CODES.includes(accountCode)) {
 		return 'receipt';
+	}
+
+	// 借方が売掛金系の場合は請求書（発行）（自社発行の請求書に基づく売上計上）
+	if (accountCode && RECEIVABLE_ACCOUNT_CODES.includes(accountCode)) {
+		return 'invoice';
 	}
 
 	if (!accountType) return 'bill'; // デフォルトは請求書（受領）
