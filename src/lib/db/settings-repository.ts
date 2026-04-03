@@ -76,9 +76,11 @@ export async function restoreAllSettings(settings: Partial<SettingsValueMap>): P
 	for (const [key, value] of Object.entries(settings)) {
 		if (key === 'lastExportedAt') continue;
 		if (value === undefined) continue;
+		// DataCloneError回避: Svelte $stateプロキシをプレーンオブジェクトに変換
+		const plainValue = JSON.parse(JSON.stringify(value));
 		await db.settings.put({
 			key: key as keyof SettingsValueMap,
-			value: structuredClone(value),
+			value: plainValue,
 			updatedAt: new Date().toISOString()
 		});
 	}

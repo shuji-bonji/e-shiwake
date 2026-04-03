@@ -38,6 +38,9 @@
 	let autoPurgeEnabled = $state(true);
 	let retentionDays = $state(30);
 
+	// === インポート後のUI再描画用 ===
+	let importGeneration = $state(0);
+
 	// === 開発用ツール ===
 	let isSeeding = $state(false);
 	let seedResult = $state<string | null>(null);
@@ -69,6 +72,8 @@
 	// === コールバック ===
 	function handleYearsChange(years: number[]) {
 		availableYears = years;
+		// インポート完了後にBusinessInfoCard等を再描画
+		importGeneration++;
 	}
 
 	function handleUnexportedCountChange(count: number) {
@@ -119,7 +124,9 @@
 	</div>
 
 	<!-- 事業者情報 -->
-	<BusinessInfoCard />
+	{#key importGeneration}
+		<BusinessInfoCard />
+	{/key}
 
 	<!-- 証憑保存先設定 + 証憑確認設定 + マイグレーションダイアログ群 -->
 	<StorageSettingsCard

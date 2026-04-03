@@ -294,6 +294,9 @@ export async function importData(
 		if (data.invoices && Array.isArray(data.invoices)) {
 			for (const invoice of data.invoices as Invoice[]) {
 				const existing = await db.invoices.get(invoice.id);
+				// DataCloneError回避: ネストした配列/オブジェクトをプレーン化
+				const cleanItems = JSON.parse(JSON.stringify(invoice.items || []));
+				const cleanTaxBreakdown = JSON.parse(JSON.stringify(invoice.taxBreakdown));
 				if (!existing) {
 					await db.invoices.add({
 						id: invoice.id,
@@ -301,11 +304,11 @@ export async function importData(
 						issueDate: invoice.issueDate,
 						dueDate: invoice.dueDate,
 						vendorId: invoice.vendorId,
-						items: invoice.items,
+						items: cleanItems,
 						subtotal: invoice.subtotal,
 						taxAmount: invoice.taxAmount,
 						total: invoice.total,
-						taxBreakdown: invoice.taxBreakdown,
+						taxBreakdown: cleanTaxBreakdown,
 						status: invoice.status,
 						note: invoice.note,
 						journalId: invoice.journalId,
@@ -319,11 +322,11 @@ export async function importData(
 						issueDate: invoice.issueDate,
 						dueDate: invoice.dueDate,
 						vendorId: invoice.vendorId,
-						items: invoice.items,
+						items: cleanItems,
 						subtotal: invoice.subtotal,
 						taxAmount: invoice.taxAmount,
 						total: invoice.total,
-						taxBreakdown: invoice.taxBreakdown,
+						taxBreakdown: cleanTaxBreakdown,
 						status: invoice.status,
 						note: invoice.note,
 						journalId: invoice.journalId,

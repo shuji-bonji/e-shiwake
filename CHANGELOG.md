@@ -5,6 +5,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-04
+
 ### Added
 
 - サイドバーフッターにアプリバージョン表示（`package.json` の version を Vite define で注入）
@@ -35,6 +37,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 摘要・取引先が空の場合の自動補完（「未分類」「不明」）
 - 請求書→仕訳生成時に取引先未選択でエラーになる問題（ボタン無効化 + トースト通知）
 - 売掛金仕訳の証憑添付時に書類種別が `請求書`（受領）と推定される問題を修正（売掛金が借方 → `請求書発行` に自動判定）
+- インポート時の DataCloneError を修正（Svelte $state プロキシのプレーンオブジェクト変換）
+- インポート後に事業者情報が画面に反映されない問題を修正
 
 ## [0.2.2] - 2026-03-08
 
@@ -132,7 +136,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
-[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.1.1...v0.2.0
