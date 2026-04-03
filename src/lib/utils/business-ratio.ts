@@ -160,6 +160,35 @@ export function getBusinessRatioTargetLine(
 }
 
 /**
+ * 按分適用済みの仕訳行を新しい合計金額で再計算する
+ *
+ * 貸方金額を変更した際に、借方の按分済み行（事業分）と
+ * 自動生成された事業主貸行（個人分）の金額を再計算する。
+ *
+ * @param lines 仕訳行配列
+ * @param newTotal 新しい合計金額（＝貸方合計）
+ * @returns 再計算後の仕訳行配列（按分未適用の場合はそのまま返す）
+ */
+export function recalculateBusinessRatio(lines: JournalLine[], newTotal: number): JournalLine[] {
+	const appliedLine = lines.find((l) => l._businessRatioApplied);
+	if (!appliedLine || appliedLine._businessRatio === undefined) return lines;
+
+	const ratio = appliedLine._businessRatio;
+	const businessAmount = Math.floor((newTotal * ratio) / 100);
+	const personalAmount = newTotal - businessAmount;
+
+	return lines.map((line) => {
+		if (line._businessRatioApplied) {
+			return { ...line, amount: businessAmount, _originalAmount: newTotal };
+		}
+		if (line._businessRatioGenerated) {
+			return { ...line, amount: personalAmount };
+		}
+		return line;
+	});
+}
+
+/**
  * JournalLine から内部フラグを除外してエクスポート用にクリーンアップ
  */
 export function cleanJournalLineForExport(line: JournalLine): JournalLine {

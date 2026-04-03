@@ -35,6 +35,7 @@
 		getAppliedBusinessRatio,
 		getBusinessRatioTargetLine,
 		hasBusinessRatioApplied,
+		recalculateBusinessRatio,
 		removeBusinessRatio
 	} from '$lib/utils/business-ratio';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
@@ -320,6 +321,21 @@
 				}
 				return line;
 			});
+			onupdate({ ...journal, lines: newLines });
+			return;
+		}
+
+		// 貸方金額の変更 → 按分適用中なら借方を自動再計算
+		if (field === 'amount' && targetLine?.type === 'credit' && isBusinessRatioApplied) {
+			// まず貸方の金額を更新
+			let newLines = journal.lines.map((line) =>
+				line.id === lineId ? { ...line, [field]: value } : line
+			);
+			// 貸方合計を算出して借方の按分を再計算
+			const newCreditTotal = newLines
+				.filter((l) => l.type === 'credit')
+				.reduce((sum, l) => sum + l.amount, 0);
+			newLines = recalculateBusinessRatio(newLines, newCreditTotal);
 			onupdate({ ...journal, lines: newLines });
 			return;
 		}

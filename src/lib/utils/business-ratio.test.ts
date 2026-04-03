@@ -6,6 +6,7 @@ import {
 	getAppliedBusinessRatio,
 	calculateBusinessRatioPreview,
 	getBusinessRatioTargetLine,
+	recalculateBusinessRatio,
 	cleanJournalLineForExport
 } from './business-ratio';
 import type { JournalLine, Account } from '$lib/types';
@@ -390,6 +391,150 @@ describe('business-ratio', () => {
 			expect(result).not.toBeNull();
 			expect(result?.line.id).toBe('2');
 			expect(result?.account.code).toBe('5004');
+		});
+	});
+
+	describe('recalculateBusinessRatio', () => {
+		it('Issue #33: 貸方金額変更時に按分済み借方を再計算する', () => {
+			// 33%按分適用済み: 地代家賃33,000 + 事業主貸67,000 = 100,000
+			const lines: JournalLine[] = [
+				{
+					id: '1',
+					type: 'debit',
+					accountCode: '5017',
+					amount: 33000,
+					_businessRatioApplied: true,
+					_originalAmount: 100000,
+					_businessRatio: 33
+				},
+				{
+					id: '2',
+					type: 'debit',
+					accountCode: '3002',
+					amount: 67000,
+					_businessRatioGenerated: true
+				},
+				{ id: '3', type: 'credit', accountCode: '1003', amount: 100000 }
+			];
+
+			// 貸方を120,000に変更
+			const result = recalculateBusinessRatio(lines, 120000);
+
+			// 事業分: floor(120000 * 33 / 100) = 39600
+			expect(result[0].amount).toBe(39600);
+			expect(result[0]._originalAmount).toBe(120000);
+			expect(result[0]._businessRatio).toBe(33);
+			expect(result[0]._businessRatioApplied).toBe(true);
+
+			// 個人分: 120000 - 39600 = 80400
+			expect(result[1].amount).toBe(80400);
+			expect(result[1]._businessRatioGenerated).toBe(true);
+
+			// 貸方は変更なし（呼び出し側で更新済み）
+			expect(result[2].amount).toBe(100000);
+		});
+
+		it('按分未適用の場合はそのまま返す', () => {
+			const lines: JournalLine[] = [
+				{ id: '1', type: 'debit', accountCode: '5017', amount: 100000 },
+				{ id: '2', type: 'credit', accountCode: '1003', amount: 100000 }
+			];
+
+			const result = recalculateBusinessRatio(lines, 120000);
+
+			// 変更なし
+			expect(result).toBe(lines);
+		});
+
+		it('0円への変更でも再計算できる', () => {
+			const lines: JournalLine[] = [
+				{
+					id: '1',
+					type: 'debit',
+					accountCode: '5017',
+					amount: 30000,
+					_businessRatioApplied: true,
+					_originalAmount: 100000,
+					_businessRatio: 30
+				},
+				{
+					id: '2',
+					type: 'debit',
+					accountCode: '3002',
+					amount: 70000,
+					_businessRatioGenerated: true
+				},
+				{ id: '3', type: 'credit', accountCode: '1003', amount: 100000 }
+			];
+
+			const result = recalculateBusinessRatio(lines, 0);
+
+			expect(result[0].amount).toBe(0);
+			expect(result[0]._originalAmount).toBe(0);
+			expect(result[1].amount).toBe(0);
+		});
+
+		it('端数は切り捨て、残りが個人分になる', () => {
+			const lines: JournalLine[] = [
+				{
+					id: '1',
+					type: 'debit',
+					accountCode: '5017',
+					amount: 33000,
+					_businessRatioApplied: true,
+					_originalAmount: 100000,
+					_businessRatio: 33
+				},
+				{
+					id: '2',
+					type: 'debit',
+					accountCode: '3002',
+					amount: 67000,
+					_businessRatioGenerated: true
+				},
+				{ id: '3', type: 'credit', accountCode: '1003', amount: 100000 }
+			];
+
+			// 99,999円に変更 → floor(99999 * 33 / 100) = 32999
+			const result = recalculateBusinessRatio(lines, 99999);
+
+			expect(result[0].amount).toBe(32999);
+			expect(result[1].amount).toBe(99999 - 32999); // 67000
+			expect(result[0].amount + result[1].amount).toBe(99999);
+		});
+
+		it('Issue #33: コピーした仕訳の貸方金額変更シナリオ', () => {
+			// ユースケース: 33%按分の仕訳をコピー → 貸方金額を80,000に変更
+			const lines: JournalLine[] = [
+				{
+					id: '1',
+					type: 'debit',
+					accountCode: '5017',
+					amount: 33000,
+					_businessRatioApplied: true,
+					_originalAmount: 100000,
+					_businessRatio: 33
+				},
+				{
+					id: '2',
+					type: 'debit',
+					accountCode: '3002',
+					amount: 67000,
+					_businessRatioGenerated: true
+				},
+				{ id: '3', type: 'credit', accountCode: '1003', amount: 80000 }
+			];
+
+			const newCreditTotal = 80000;
+			const result = recalculateBusinessRatio(lines, newCreditTotal);
+
+			// floor(80000 * 33 / 100) = 26400
+			expect(result[0].amount).toBe(26400);
+			expect(result[0]._originalAmount).toBe(80000);
+			// 80000 - 26400 = 53600
+			expect(result[1].amount).toBe(53600);
+			// 合計が貸方と一致
+			expect(result[0].amount + result[1].amount).toBe(80000);
 		});
 	});
 
