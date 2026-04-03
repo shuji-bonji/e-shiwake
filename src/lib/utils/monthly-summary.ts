@@ -2,7 +2,13 @@
  * 月別集計ユーティリティ
  *
  * 仕訳データから月別の売上・仕入・経費を集計し、
- * 青色申告決算書2ページ目のデータを生成する
+ * 青色申告決算書2ページ目（月別売上（収入）金額及び仕入金額）のデータを生成する。
+ *
+ * 主な機能:
+ * - 月別（1月〜12月）の売上高・仕入高の集計
+ * - 科目別の年間合計（経費内訳）
+ * - 雑収入・地代家賃・給与賃金の個別集計
+ * - 2ページ目全体のデータ統合（generatePage2Details）
  */
 
 import type { JournalEntry, Account, JournalLine } from '$lib/types';
@@ -73,7 +79,14 @@ function getLineAmount(line: JournalLine, account: Account | undefined): number 
 }
 
 /**
- * 月別売上・仕入データを生成
+ * 月別（1月〜12月）の売上高・仕入高を集計する。
+ *
+ * 売上高（科目コード4001）と仕入高（科目コード5001）を
+ * 月ごとに集計し、年間合計も算出する。
+ *
+ * @param journals - 対象年度の仕訳一覧
+ * @param accounts - 勘定科目マスタ
+ * @returns 月別売上・仕入データの配列（12ヶ月分 + 合計行）
  */
 export function generateMonthlySales(
 	journals: JournalEntry[],
@@ -170,7 +183,15 @@ export function generateMonthlyTotals(
 }
 
 /**
- * 科目別の年間集計を生成
+ * 勘定科目別の年間合計を生成する（経費内訳等に使用）。
+ *
+ * 指定したタイプ（収益/費用）の科目ごとに年間の借方・貸方合計を集計し、
+ * 純額（費用は借方-貸方、収益は貸方-借方）を算出する。
+ *
+ * @param journals - 対象年度の仕訳一覧
+ * @param accounts - 勘定科目マスタ
+ * @param filterType - フィルタするタイプ（'revenue' / 'expense'、省略時は両方）
+ * @returns 科目別年間合計の配列（科目コード昇順）
  */
 export function generateAccountYearlyTotals(
 	journals: JournalEntry[],

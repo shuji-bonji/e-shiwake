@@ -1,7 +1,10 @@
 import type { JournalEntry, Account } from '$lib/types';
 
 /**
- * 元帳の1行
+ * 元帳の1行（総勘定元帳の各取引を表す）
+ *
+ * 1つの仕訳から対象科目に関連する借方・貸方金額と残高を保持する。
+ * 相手科目が複数ある場合（複合仕訳）は「諸口」と表示される。
  */
 export interface LedgerEntry {
 	date: string;
@@ -15,7 +18,12 @@ export interface LedgerEntry {
 }
 
 /**
- * 元帳データ
+ * 総勘定元帳データ（特定の勘定科目に対する全取引の集約）
+ *
+ * 期首残高から始まり、各取引の借方・貸方を積み上げて期末残高を算出する。
+ * 残高の増減方向は勘定科目タイプに依存する：
+ * - 資産・費用: 借方で増加、貸方で減少
+ * - 負債・純資産・収益: 貸方で増加、借方で減少
  */
 export interface LedgerData {
 	accountCode: string;
@@ -29,12 +37,20 @@ export interface LedgerData {
 }
 
 /**
- * 仕訳から総勘定元帳を生成
+ * 仕訳データから特定の勘定科目の総勘定元帳を生成する。
  *
- * @param journals 仕訳一覧（日付順にソート済み）
- * @param accountCode 対象の勘定科目コード
- * @param accounts 勘定科目マスタ
- * @param openingBalance 期首残高（デフォルト0）
+ * 処理の流れ:
+ * 1. 仕訳を日付順（同日はcreatedAt順）にソート
+ * 2. 各仕訳から対象科目の借方・貸方金額を集計
+ * 3. 科目タイプに応じた残高計算（資産・費用は借方+、それ以外は貸方+）
+ * 4. 相手科目の特定（1科目なら科目名、複数なら「諸口」）
+ *
+ * @param journals - 対象年度の仕訳一覧
+ * @param accountCode - 元帳を生成する勘定科目コード（4桁）
+ * @param accounts - 勘定科目マスタ（相手科目名の解決に使用）
+ * @param openingBalance - 期首残高（前年度からの繰越額、デフォルト0）
+ * @returns 元帳データ（取引一覧・合計・期末残高を含む）
+ * @throws 指定した勘定科目コードがマスタに存在しない場合
  */
 export function generateLedger(
 	journals: JournalEntry[],
@@ -125,7 +141,15 @@ export function generateLedger(
 }
 
 /**
- * 使用されている勘定科目の一覧を取得
+ * 仕訳で実際に使用されている勘定科目の一覧を取得する。
+ *
+ * 仕訳明細行に含まれる全勘定科目コードを抽出し、
+ * マスタと照合して科目コード昇順でソートして返す。
+ * 総勘定元帳の科目選択ドロップダウンなどで使用される。
+ *
+ * @param journals - 対象の仕訳一覧
+ * @param accounts - 勘定科目マスタ
+ * @returns 使用中の勘定科目（コード昇順）
  */
 export function getUsedAccounts(journals: JournalEntry[], accounts: Account[]): Account[] {
 	const usedCodes = new Set<string>();

@@ -6,14 +6,30 @@ import type { Invoice } from '$lib/types/invoice';
 import type { JournalEntry, JournalLine, Vendor } from '$lib/types';
 
 /**
- * 売掛金仕訳を生成（請求書発行時）
+ * 請求書から売掛金計上仕訳を自動生成する
  *
- * 借方: 売掛金（税込合計）
- * 貸方: 売上高（税率別）
+ * 請求書の発行時に、売掛金を計上する仕訳を自動生成する。
+ * 10%と8%の異なる税率がある場合は、それぞれ独立した売上高行として生成される。
  *
- * @param invoice 請求書
- * @param vendor 取引先
- * @returns 仕訳データ（ID、タイムスタンプを除く）
+ * 仕訳構造：
+ * - 借方: 売掛金（税込合計額）
+ * - 貸方: 売上高10%（10%対象の税込金額、該当分がある場合）
+ * - 貸方: 売上高8%（8%対象の税込金額、該当分がある場合）
+ *
+ * @param invoice 請求書データ
+ * @param vendor 取引先情報（vendor.name が仕訳の「取引先」欄に使用される）
+ * @returns 生成された仕訳データ（ID、タイムスタンプを除く）
+ *
+ * @example
+ * const invoice = {
+ *   issueDate: '2025-04-04',
+ *   invoiceNumber: 'INV-2025-0001',
+ *   total: 11000,
+ *   taxBreakdown: { taxable10: 10000, tax10: 1000, taxable8: 0, tax8: 0 }
+ * };
+ * const vendor = { name: 'クライアントA' };
+ * const journal = generateSalesJournal(invoice, vendor);
+ * // => { date: '2025-04-04', lines: [...], vendor: 'クライアントA', description: '請求書 INV-2025-0001', ... }
  */
 export function generateSalesJournal(
 	invoice: Invoice,
@@ -65,16 +81,35 @@ export function generateSalesJournal(
 }
 
 /**
- * 入金仕訳を生成（入金時）
+ * 入金仕訳を自動生成する
  *
- * 借方: 普通預金（税込合計）
- * 貸方: 売掛金（税込合計）
+ * 請求書の入金時に、売掛金から銀行口座への資金移動を仕訳として生成する。
+ * この仕訳は売掛金を決済する（売掛金残高をゼロに戻す）。
  *
- * @param invoice 請求書
- * @param vendor 取引先
- * @param depositDate 入金日（YYYY-MM-DD）
- * @param bankAccountCode 入金先の勘定科目コード（デフォルト: 普通預金）
- * @returns 仕訳データ（ID、タイムスタンプを除く）
+ * 仕訳構造：
+ * - 借方: 入金先の銀行口座（通常は普通預金、指定可能）
+ * - 貸方: 売掛金（売上時の逆仕訳）
+ *
+ * @param invoice 請求書データ
+ * @param vendor 取引先情報（vendor.name が仕訳の「取引先」欄に使用される）
+ * @param depositDate 入金日（YYYY-MM-DD形式）
+ * @param bankAccountCode 入金先の勘定科目コード（デフォルト: '1003' = 普通預金）
+ * @returns 生成された入金仕訳データ（ID、タイムスタンプを除く）
+ *
+ * @example
+ * const invoice = { invoiceNumber: 'INV-2025-0001', total: 11000 };
+ * const vendor = { name: 'クライアントA' };
+ * const journal = generateDepositJournal(invoice, vendor, '2025-05-10');
+ * // => {
+ * //   date: '2025-05-10',
+ * //   lines: [
+ * //     { type: 'debit', accountCode: '1003', amount: 11000, ... },
+ * //     { type: 'credit', accountCode: '1005', amount: 11000, ... }
+ * //   ],
+ * //   vendor: 'クライアントA',
+ * //   description: '入金 請求書 INV-2025-0001',
+ * //   ...
+ * // }
  */
 export function generateDepositJournal(
 	invoice: Invoice,

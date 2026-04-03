@@ -34,6 +34,9 @@ function cloneAttachment(attachment: Attachment): Attachment {
  * 仕訳をディープクローン（Blobを保持）
  * Svelte 5のリアクティブプロキシを解除するために使用
  * JSON.parse(JSON.stringify())はBlobを{}に変換してしまうため使用不可
+ *
+ * @param journal - クローンする仕訳オブジェクト
+ * @returns クローンされた仕訳オブジェクト。Blob参照は保持されます
  */
 export function cloneJournal(journal: JournalEntry): JournalEntry {
 	return {

@@ -5,7 +5,13 @@ import type { ExportData, Attachment } from '$lib/types';
 import { validateExportData } from '$lib/db';
 
 /**
- * ZIP インポートの進捗コールバック
+ * ZIPインポートの進捗情報
+ * onProgressコールバック経由でUI更新用に利用
+ *
+ * @property phase - 現在のフェーズ（extracting: 展開中、processing: 処理中、storing: 保存中、complete: 完了）
+ * @property current - 処理済み件数
+ * @property total - 合計件数
+ * @property message - ユーザー向けメッセージ
  */
 export interface ZipImportProgress {
 	phase: 'extracting' | 'processing' | 'storing' | 'complete';
@@ -15,11 +21,16 @@ export interface ZipImportProgress {
 }
 
 /**
- * ZIP インポートの結果
+ * ZIPインポートの結果
+ * インポート成功時に返される完全なデータ
+ *
+ * @property exportData - インポートされた仕訳・勘定科目・取引先・設定データ
+ * @property attachmentBlobs - 証憑PDFのBlobマップ（attachmentId -> Blob）
+ * @property warnings - インポート時の警告メッセージ配列
  */
 export interface ZipImportResult {
 	exportData: ExportData;
-	attachmentBlobs: Map<string, Blob>; // attachmentId -> Blob
+	attachmentBlobs: Map<string, Blob>;
 	warnings: string[];
 }
 
@@ -62,7 +73,13 @@ function parseEvidencePath(path: string): EvidencePathInfo | null {
 }
 
 /**
- * ZIP ファイルからデータと証憑を抽出
+ * ZIPファイルからデータ（JSON）と証憑（PDF）を抽出
+ * data.jsonの妥当性を検証し、証憑ファイルを収集。新形式（年度別フォルダ）と旧形式の両方に対応
+ *
+ * @param file - インポートするZIPファイル
+ * @param onProgress - 進捗コールバック関数（オプション）
+ * @returns インポート結果（仕訳データ、証憑Blob、警告メッセージ）
+ * @throws data.jsonが存在しない、または形式が不正な場合
  */
 export async function importFromZip(
 	file: File,
@@ -246,7 +263,11 @@ export async function importFromZip(
 }
 
 /**
- * ファイルがZIPファイルかどうかを判定
+ * ファイルがZIPファイルかどうかをMIMEタイプで判定
+ * MIMEタイプまたはファイル名拡張子で判定
+ *
+ * @param file - 判定するファイル
+ * @returns ZIPファイルの場合true
  */
 export function isZipFile(file: File): boolean {
 	return (

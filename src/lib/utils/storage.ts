@@ -5,14 +5,16 @@
 
 import type { JournalEntry, StorageUsage } from '$lib/types';
 
-// 推奨上限（500MB）- iPad/Safariの1GB制限に対して余裕を持たせる
+/** 推奨上限（500MB）- iPad/Safariの1GB制限に対して余裕を持たせる */
 export const RECOMMENDED_QUOTA = 500 * 1024 * 1024;
 
-// 警告しきい値（80%）
+/** 警告しきい値（80%） */
 export const WARNING_THRESHOLD = 80;
 
 /**
- * ストレージ使用状況を取得
+ * IndexedDBとブラウザキャッシュのストレージ使用状況を取得
+ *
+ * @returns ストレージ使用状況（used: 使用量バイト、quota: 割り当て量バイト、percentage: 使用率%）
  */
 export async function getStorageUsage(): Promise<StorageUsage> {
 	if ('storage' in navigator && 'estimate' in navigator.storage) {
@@ -35,13 +37,19 @@ export async function getStorageUsage(): Promise<StorageUsage> {
 
 /**
  * 推奨上限に対する使用率を計算
+ *
+ * @param used - 使用量（バイト）
+ * @returns 推奨上限に対する使用率（%）
  */
 export function getRecommendedUsagePercentage(used: number): number {
 	return (used / RECOMMENDED_QUOTA) * 100;
 }
 
 /**
- * バイト数を人間が読みやすい形式に変換
+ * バイト数を人間が読みやすい形式に変換（B/KB/MB/GB）
+ *
+ * @param bytes - バイト数
+ * @returns フォーマット済みの文字列（例：「25.5 MB」）
  */
 export function formatBytes(bytes: number): string {
 	if (bytes === 0) return '0 B';
@@ -55,6 +63,9 @@ export function formatBytes(bytes: number): string {
 
 /**
  * 容量警告が必要かチェック
+ *
+ * @param usage - ストレージ使用状況
+ * @returns 推奨上限の80%以上を使用している場合true
  */
 export function shouldShowStorageWarning(usage: StorageUsage): boolean {
 	const recommendedPercentage = getRecommendedUsagePercentage(usage.used);
@@ -63,6 +74,11 @@ export function shouldShowStorageWarning(usage: StorageUsage): boolean {
 
 /**
  * 削除可能なBlob（エクスポート済みで保持期間を過ぎたもの）の数を取得
+ * IndexedDBに保存されていて、かつエクスポート済みで、保持期間を超えた証憑をカウント
+ *
+ * @param journals - 仕訳配列
+ * @param retentionDays - 保持期間（日数）。この期間を超えたBlob削除対象にする
+ * @returns 削除可能なBlob数
  */
 export function getPurgeableAttachmentCount(
 	journals: JournalEntry[],

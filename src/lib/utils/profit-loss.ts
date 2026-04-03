@@ -12,7 +12,22 @@ const COST_OF_SALES_CODES = ['5001'];
 const SALES_REVENUE_CODES = ['4001'];
 
 /**
- * 仕訳から損益計算書データを生成
+ * 仕訳データから損益計算書（P/L）を生成する。
+ *
+ * 処理の流れ:
+ * 1. 収益・費用科目のみを対象に残高を集計
+ *    - 収益: 貸方でプラス、借方でマイナス
+ *    - 費用: 借方でプラス、貸方でマイナス
+ * 2. 売上高 / 営業外収益 / 売上原価 / 販管費に分類
+ * 3. 利益を階層計算:
+ *    - 売上総利益 = 売上高 - 売上原価
+ *    - 営業利益 = 売上総利益 - 販管費
+ *    - 当期純利益 = 営業利益 + 営業外収益
+ *
+ * @param journals - 対象年度の仕訳一覧
+ * @param accounts - 勘定科目マスタ
+ * @param fiscalYear - 会計年度（表示用）
+ * @returns 損益計算書データ（各カテゴリの明細と利益合計を含む）
  */
 export function generateProfitLoss(
 	journals: JournalEntry[],
@@ -119,7 +134,12 @@ export function generateProfitLoss(
 }
 
 /**
- * 金額をフォーマット（カンマ区切り、負の値は△表示）
+ * 損益計算書用の金額フォーマット。
+ *
+ * 負の値には会計慣行に従い「△」（三角マーク）を付与する。
+ *
+ * @param amount - フォーマット対象の金額
+ * @returns フォーマット済み文字列（例: "1,234" / "△500"）
  */
 export function formatPLAmount(amount: number): string {
 	if (amount === 0) return '0';
@@ -130,7 +150,13 @@ export function formatPLAmount(amount: number): string {
 }
 
 /**
- * 損益計算書をCSV形式に変換
+ * 損益計算書データをCSV形式の文字列に変換する。
+ *
+ * 売上高→売上原価→売上総利益→販管費→営業利益→営業外収益→当期純利益の
+ * 順で出力する。他ソフトとの連携やエクスポートに使用。
+ *
+ * @param data - generateProfitLoss() の出力
+ * @returns CSV形式の文字列（改行区切り）
  */
 export function profitLossToCsv(data: ProfitLossData): string {
 	const lines: string[] = [];

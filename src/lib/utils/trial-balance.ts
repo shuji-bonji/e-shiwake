@@ -1,7 +1,11 @@
 import type { JournalEntry, Account, AccountType } from '$lib/types';
 
 /**
- * 試算表の1行
+ * 試算表の1行（勘定科目ごとの借方・貸方の合計と残高）
+ *
+ * 合計残高試算表と残高試算表の両方に対応する。
+ * - 合計: debitTotal / creditTotal（借方・貸方の合計金額）
+ * - 残高: debitBalance / creditBalance（差引残高、どちらか一方のみ正値）
  */
 export interface TrialBalanceRow {
 	accountCode: string;
@@ -14,7 +18,10 @@ export interface TrialBalanceRow {
 }
 
 /**
- * 試算表データ
+ * 試算表データ（全勘定科目の集約結果）
+ *
+ * 全科目の合計と残高を保持し、貸借一致チェック（isBalanced）を提供する。
+ * 複式簿記の原則により、totalDebit === totalCredit であれば正常。
  */
 export interface TrialBalanceData {
 	rows: TrialBalanceRow[];
@@ -26,7 +33,10 @@ export interface TrialBalanceData {
 }
 
 /**
- * 勘定科目タイプ別のグループ
+ * 勘定科目タイプ別のグループ（資産/負債/純資産/収益/費用）
+ *
+ * 試算表を5分類にグループ化した際の各カテゴリを表す。
+ * 各グループには小計（subtotal）が含まれる。
  */
 export interface TrialBalanceGroup {
 	type: AccountType;
@@ -40,6 +50,9 @@ export interface TrialBalanceGroup {
 
 /**
  * グループ化された試算表データ
+ *
+ * 資産→負債→純資産→収益→費用の順に並んだグループと、
+ * 全体の合計・残高・貸借一致フラグを保持する。
  */
 export interface GroupedTrialBalanceData {
 	groups: TrialBalanceGroup[];
@@ -61,7 +74,15 @@ const TYPE_LABELS: Record<AccountType, string> = {
 const TYPE_ORDER: AccountType[] = ['asset', 'liability', 'equity', 'revenue', 'expense'];
 
 /**
- * 仕訳から試算表を生成
+ * 仕訳データから試算表（合計残高試算表）を生成する。
+ *
+ * 全仕訳の明細行を走査し、勘定科目ごとに借方・貸方の合計金額を集計。
+ * 各科目の差引残高（借方残高 or 貸方残高）を算出し、
+ * 全体の貸借一致チェック（totalDebit === totalCredit）を行う。
+ *
+ * @param journals - 対象年度の仕訳一覧
+ * @param accounts - 勘定科目マスタ（科目名・タイプの解決に使用）
+ * @returns 試算表データ（科目コード昇順、貸借一致フラグ付き）
  */
 export function generateTrialBalance(
 	journals: JournalEntry[],
@@ -133,7 +154,13 @@ export function generateTrialBalance(
 }
 
 /**
- * 試算表を勘定科目タイプ別にグループ化
+ * 試算表を勘定科目タイプ別（資産/負債/純資産/収益/費用）にグループ化する。
+ *
+ * generateTrialBalance() の結果を受け取り、各科目をタイプ別に分類。
+ * グループごとの小計を算出する。使用されていないタイプのグループは除外される。
+ *
+ * @param data - generateTrialBalance() の出力
+ * @returns グループ化された試算表データ
  */
 export function groupTrialBalance(data: TrialBalanceData): GroupedTrialBalanceData {
 	const groupMap = new Map<AccountType, TrialBalanceRow[]>();
@@ -179,7 +206,12 @@ export function groupTrialBalance(data: TrialBalanceData): GroupedTrialBalanceDa
 }
 
 /**
- * 金額をフォーマット（カンマ区切り、0は空文字）
+ * 金額をカンマ区切りでフォーマットする。
+ *
+ * null または 0 の場合は空文字を返す（帳簿表示で空欄にするため）。
+ *
+ * @param amount - フォーマット対象の金額（nullも許容）
+ * @returns フォーマット済み文字列（例: "1,234"）、0/nullの場合は空文字
  */
 export function formatAmount(amount: number | null): string {
 	if (amount === null || amount === 0) return '';

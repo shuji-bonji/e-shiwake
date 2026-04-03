@@ -1,13 +1,24 @@
 /**
  * 消費税計算ユーティリティ
  *
- * 税込経理を前提とした計算ヘルパー関数群
+ * 税込経理方式を前提とした消費税計算のヘルパー関数群。
+ * 日本の消費税制度（標準税率10%・軽減税率8%）に対応し、
+ * 課税売上/仕入、非課税、不課税、対象外の区分管理を行う。
+ *
+ * 主な計算方式:
+ * - 割戻し計算: 税込合計 → 税抜金額・税額を逆算（端数切り捨て）
+ * - 整数演算: 浮動小数点誤差を回避するため、分子を先に乗算
+ *
+ * @see Issue #26 - 浮動小数点誤差と端数蓄積の修正
  */
 
 import type { TaxCategory, TaxRate, JournalLine } from '$lib/types';
 
 /**
- * 税区分から税率を取得
+ * 税区分（TaxCategory）から対応する税率を取得する。
+ *
+ * @param category - 消費税区分（undefined の場合は非課税扱い）
+ * @returns 税率（10 / 8 / 0）
  */
 export function getTaxRateFromCategory(category: TaxCategory | undefined): TaxRate {
 	if (!category) return 0;
@@ -25,7 +36,10 @@ export function getTaxRateFromCategory(category: TaxCategory | undefined): TaxRa
 }
 
 /**
- * 税区分が課税対象かどうか
+ * 税区分が課税対象（10%または8%）かどうかを判定する。
+ *
+ * @param category - 消費税区分
+ * @returns 課税売上/仕入のいずれかであれば true
  */
 export function isTaxable(category: TaxCategory | undefined): boolean {
 	if (!category) return false;
@@ -38,7 +52,10 @@ export function isTaxable(category: TaxCategory | undefined): boolean {
 }
 
 /**
- * 税区分が売上系かどうか
+ * 税区分が課税売上（sales_10 / sales_8）かどうかを判定する。
+ *
+ * @param category - 消費税区分
+ * @returns 課税売上であれば true
  */
 export function isSalesCategory(category: TaxCategory | undefined): boolean {
 	if (!category) return false;
@@ -46,7 +63,10 @@ export function isSalesCategory(category: TaxCategory | undefined): boolean {
 }
 
 /**
- * 税区分が仕入系かどうか
+ * 税区分が課税仕入（purchase_10 / purchase_8）かどうかを判定する。
+ *
+ * @param category - 消費税区分
+ * @returns 課税仕入であれば true
  */
 export function isPurchaseCategory(category: TaxCategory | undefined): boolean {
 	if (!category) return false;
@@ -54,9 +74,18 @@ export function isPurchaseCategory(category: TaxCategory | undefined): boolean {
 }
 
 /**
- * 税込金額から税抜金額を計算
- * 端数は切り捨て
- * 浮動小数点誤差を避けるため整数演算を使用
+ * 税込金額から税抜金額を逆算する（割戻し計算）。
+ *
+ * 計算式: floor(税込金額 × 100 ÷ (100 + 税率))
+ * 浮動小数点誤差を避けるため、分子を先に乗算する整数演算方式を採用。
+ *
+ * @param taxIncludedAmount - 税込金額（円）
+ * @param rate - 税率（10 / 8 / 0）
+ * @returns 税抜金額（端数切り捨て）
+ *
+ * @example
+ * calculateTaxExcluded(11000, 10) // => 10000
+ * calculateTaxExcluded(1080, 8)   // => 1000
  */
 export function calculateTaxExcluded(taxIncludedAmount: number, rate: TaxRate): number {
 	if (rate === 0) return taxIncludedAmount;
@@ -64,8 +93,14 @@ export function calculateTaxExcluded(taxIncludedAmount: number, rate: TaxRate): 
 }
 
 /**
- * 税込金額から消費税額を計算
- * 端数は切り捨て
+ * 税込金額から消費税額を計算する。
+ *
+ * 計算式: 税込金額 - 税抜金額（calculateTaxExcluded の結果）
+ * 税抜→税額の順で計算することで、端数の一貫性を保証する。
+ *
+ * @param taxIncludedAmount - 税込金額（円）
+ * @param rate - 税率（10 / 8 / 0）
+ * @returns 消費税額（端数切り捨て）
  */
 export function calculateTaxAmount(taxIncludedAmount: number, rate: TaxRate): number {
 	if (rate === 0) return 0;
@@ -74,7 +109,11 @@ export function calculateTaxAmount(taxIncludedAmount: number, rate: TaxRate): nu
 }
 
 /**
- * 税抜金額から税込金額を計算
+ * 税抜金額から税込金額を計算する。
+ *
+ * @param taxExcludedAmount - 税抜金額（円）
+ * @param rate - 税率（10 / 8 / 0）
+ * @returns 税込金額（端数切り捨て）
  */
 export function calculateTaxIncluded(taxExcludedAmount: number, rate: TaxRate): number {
 	if (rate === 0) return taxExcludedAmount;
@@ -82,7 +121,11 @@ export function calculateTaxIncluded(taxExcludedAmount: number, rate: TaxRate): 
 }
 
 /**
- * 仕訳行から税込金額の合計を計算（カテゴリ別）
+ * 仕訳行から税込金額の合計を計算する（カテゴリでフィルタ可能）。
+ *
+ * @param lines - 仕訳明細行の配列
+ * @param categoryFilter - 税区分のフィルタ関数（省略時は全課税対象）
+ * @returns 条件に合致する行の金額合計
  */
 export function calculateTaxIncludedByCategory(
 	lines: JournalLine[],
@@ -98,7 +141,14 @@ export function calculateTaxIncludedByCategory(
 }
 
 /**
- * 仕訳行から消費税額の合計を計算（カテゴリ別）
+ * 仕訳行から消費税額の合計を計算する（カテゴリでフィルタ可能）。
+ *
+ * 各行の税率に基づいて消費税額を個別計算し、合算する。
+ * ※年間集計には calculateTaxSummary() の割戻し方式を推奨。
+ *
+ * @param lines - 仕訳明細行の配列
+ * @param categoryFilter - 税区分のフィルタ関数（省略時は全課税対象）
+ * @returns 条件に合致する行の消費税額合計
  */
 export function calculateTotalTax(
 	lines: JournalLine[],
@@ -117,7 +167,11 @@ export function calculateTotalTax(
 }
 
 /**
- * 税率別の課税売上・仕入を集計
+ * 税率別の課税売上・仕入集計データ
+ *
+ * 10%と8%（軽減税率）ごとに税込・税抜・税額を保持し、
+ * 非課税・不課税の金額も別途集計する。
+ * netTax（納付税額）= 売上消費税合計 - 仕入消費税合計。
  */
 export interface TaxSummary {
 	// 10%
@@ -146,11 +200,19 @@ export interface TaxSummary {
 }
 
 /**
- * 仕訳行から税率別の集計を作成
+ * 仕訳行から税率別の消費税集計を作成する（割戻し計算方式）。
  *
- * 割戻し計算方式: 税込合計を先に集計し、合計に対して税額を計算する。
- * 行ごとに個別計算して合算すると端数（Math.floor）が蓄積して
- * 誤差が生じるため（Issue #26）。
+ * 処理の流れ:
+ * 1. 税込合計を税区分ごとに集計（sales_10, sales_8, purchase_10, purchase_8, exempt, out_of_scope）
+ * 2. 税込合計から税抜金額・税額を一括で割戻し計算
+ *
+ * この方式は、行ごとに個別計算して合算する積上げ方式と比べて
+ * Math.floor() の端数蓄積を防ぐ利点がある。
+ *
+ * @param lines - 仕訳明細行の配列（全年度・全仕訳の行を渡す）
+ * @returns 税率別集計データ（税込・税抜・税額・納付税額）
+ *
+ * @see Issue #26 - 端数蓄積による消費税計算誤差の修正
  */
 export function calculateTaxSummary(lines: JournalLine[]): TaxSummary {
 	const summary: TaxSummary = {
@@ -233,16 +295,23 @@ export function calculateTaxSummary(lines: JournalLine[]): TaxSummary {
 }
 
 /**
- * 年間の消費税集計用
- * 複数の仕訳行から年間の税計算を行う
+ * 年間の消費税集計を行う（calculateTaxSummary のエイリアス）。
+ *
+ * 消費税集計ページ（/tax-summary）で使用される。
+ * 内部的には calculateTaxSummary() をそのまま呼び出す。
+ *
+ * @param allLines - 対象年度の全仕訳明細行
+ * @returns 税率別集計データ
  */
 export function calculateAnnualTaxSummary(allLines: JournalLine[]): TaxSummary {
 	return calculateTaxSummary(allLines);
 }
 
 /**
- * 簡易課税の場合のみなし仕入率を取得
- * 事業区分によって異なる
+ * 簡易課税制度の事業区分（第1種〜第6種）
+ *
+ * 基準期間の課税売上高が5,000万円以下の事業者が選択可能。
+ * 事業区分ごとに異なるみなし仕入率が適用される。
  */
 export type BusinessCategory =
 	| 'wholesale'
@@ -252,6 +321,12 @@ export type BusinessCategory =
 	| 'services'
 	| 'realestate';
 
+/**
+ * 事業区分に応じたみなし仕入率（%）を取得する。
+ *
+ * @param category - 事業区分
+ * @returns みなし仕入率（90〜40%）
+ */
 export function getSimplifiedTaxRate(category: BusinessCategory): number {
 	switch (category) {
 		case 'wholesale':
@@ -272,7 +347,14 @@ export function getSimplifiedTaxRate(category: BusinessCategory): number {
 }
 
 /**
- * 簡易課税の場合の納付税額を計算
+ * 簡易課税方式による納付税額を計算する。
+ *
+ * 売上の消費税額にみなし仕入率を掛けて仕入税額控除額とし、
+ * 差額を納付税額として返す。実際の仕入額は使用しない。
+ *
+ * @param salesTaxIncluded - 課税売上の税込合計
+ * @param businessCategory - 事業区分（みなし仕入率の決定に使用）
+ * @returns 売上消費税・みなし仕入税額・納付税額
  */
 export function calculateSimplifiedTax(
 	salesTaxIncluded: number,

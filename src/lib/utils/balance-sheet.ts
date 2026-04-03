@@ -39,7 +39,22 @@ function isFixedLiability(code: string): boolean {
 }
 
 /**
- * 仕訳から貸借対照表データを生成
+ * 仕訳データから貸借対照表（B/S）を生成する。
+ *
+ * 処理の流れ:
+ * 1. 資産・負債・純資産科目のみを対象に残高を集計
+ *    - 資産: 借方でプラス、貸方でマイナス
+ *    - 負債・純資産: 貸方でプラス、借方でマイナス
+ *    - 収益・費用は損益計算書で処理するため除外
+ * 2. 流動/固定の区分に分類（FIXED_ASSET_CODES / FIXED_LIABILITY_CODES で判定）
+ * 3. 当期純利益（netIncome）を繰越利益として純資産に加算
+ * 4. 資産合計 = 負債合計 + 純資産合計 が成立すれば正常
+ *
+ * @param journals - 対象年度の仕訳一覧
+ * @param accounts - 勘定科目マスタ
+ * @param fiscalYear - 会計年度（表示用）
+ * @param netIncome - 当期純利益（損益計算書から取得、繰越利益として純資産に加算）
+ * @returns 貸借対照表データ（各区分の明細と合計を含む）
  */
 export function generateBalanceSheet(
 	journals: JournalEntry[],
@@ -164,7 +179,12 @@ export function generateBalanceSheet(
 }
 
 /**
- * 金額をフォーマット（カンマ区切り、負の値は△表示）
+ * 貸借対照表用の金額フォーマット。
+ *
+ * 負の値には会計慣行に従い「△」を付与する。
+ *
+ * @param amount - フォーマット対象の金額
+ * @returns フォーマット済み文字列（例: "1,234" / "△500"）
  */
 export function formatBSAmount(amount: number): string {
 	if (amount === 0) return '0';
@@ -175,7 +195,13 @@ export function formatBSAmount(amount: number): string {
 }
 
 /**
- * 貸借対照表をCSV形式に変換
+ * 貸借対照表データをCSV形式の文字列に変換する。
+ *
+ * 資産の部（流動→固定）→負債の部（流動→固定）→純資産の部の順で出力。
+ * 繰越利益（当期純利益）が0でない場合は純資産に含めて表示する。
+ *
+ * @param data - generateBalanceSheet() の出力
+ * @returns CSV形式の文字列（改行区切り）
  */
 export function balanceSheetToCsv(data: BalanceSheetData): string {
 	const lines: string[] = [];

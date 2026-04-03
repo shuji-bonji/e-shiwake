@@ -1,3 +1,21 @@
+/**
+ * 家事按分ユーティリティ
+ *
+ * 個人事業主が事業用と私的用途で共有する経費（通信費、地代家賃、水道光熱費など）を
+ * 事業割合（%）で按分するための関数群。
+ *
+ * 按分適用時の動作:
+ * - 元の費用行の金額を「事業分」に縮小し、メタデータ（_businessRatioApplied等）を付与
+ * - 差額を「事業主貸」（OWNER_WITHDRAWAL_CODE）行として自動生成
+ * - 借方合計 = 貸方合計 が維持される
+ *
+ * メタデータフィールド（エクスポート時は cleanJournalLineForExport() で除去）:
+ * - _businessRatioApplied: 按分適用済みフラグ
+ * - _originalAmount: 按分前の元金額
+ * - _businessRatio: 適用した按分率（%）
+ * - _businessRatioGenerated: 按分で自動生成された行フラグ（事業主貸）
+ */
+
 import type { JournalLine, Account } from '$lib/types';
 import { OWNER_WITHDRAWAL_CODE } from '$lib/constants/accounts';
 
@@ -76,7 +94,13 @@ export function applyBusinessRatio(params: ApplyBusinessRatioParams): ApplyBusin
 }
 
 /**
- * 按分を解除して元の金額に戻す
+ * 按分を解除して元の金額に復元する。
+ *
+ * 自動生成された事業主貸行を削除し、按分適用行の金額を
+ * _originalAmount に復元する。メタデータも全て除去される。
+ *
+ * @param lines - 仕訳明細行の配列
+ * @returns 按分解除後の行配列（按分未適用の場合はそのまま返す）
  */
 export function removeBusinessRatio(lines: JournalLine[]): JournalLine[] {
 	const result: JournalLine[] = [];
@@ -111,14 +135,20 @@ export function removeBusinessRatio(lines: JournalLine[]): JournalLine[] {
 }
 
 /**
- * 按分が適用されているか確認
+ * 仕訳行に按分が適用されているかを確認する。
+ *
+ * @param lines - 仕訳明細行の配列
+ * @returns いずれかの行に按分が適用されていれば true
  */
 export function hasBusinessRatioApplied(lines: JournalLine[]): boolean {
 	return lines.some((line) => line._businessRatioApplied);
 }
 
 /**
- * 適用されている按分率を取得
+ * 適用されている按分率（%）を取得する。
+ *
+ * @param lines - 仕訳明細行の配列
+ * @returns 按分率（0〜100）、按分未適用の場合は null
  */
 export function getAppliedBusinessRatio(lines: JournalLine[]): number | null {
 	const appliedLine = lines.find((line) => line._businessRatioApplied);
@@ -126,7 +156,14 @@ export function getAppliedBusinessRatio(lines: JournalLine[]): number | null {
 }
 
 /**
- * 按分のプレビュー計算
+ * 按分適用前のプレビュー計算を行う。
+ *
+ * UI上で按分率を変更した際にリアルタイムで事業分・個人分を表示するために使用。
+ * 端数は事業分を切り捨て、個人分を残額とする。
+ *
+ * @param amount - 元金額
+ * @param ratio - 按分率（0〜100）
+ * @returns 事業分・個人分の金額
  */
 export function calculateBusinessRatioPreview(
 	amount: number,
@@ -138,8 +175,15 @@ export function calculateBusinessRatioPreview(
 }
 
 /**
- * 按分対象の借方行を取得
- * 既に按分適用済みの行はスキップする
+ * 按分対象となる借方行を検索する。
+ *
+ * 勘定科目マスタの businessRatioEnabled フラグが true の科目を対象に、
+ * 未適用の借方行を先頭から検索して返す。
+ * 既に按分適用済みの行はスキップされる。
+ *
+ * @param lines - 仕訳明細行の配列
+ * @param accounts - 勘定科目マスタ（按分設定の参照に使用）
+ * @returns 対象の行情報（行データ・インデックス・科目情報）、見つからなければ null
  */
 export function getBusinessRatioTargetLine(
 	lines: JournalLine[],
@@ -160,14 +204,22 @@ export function getBusinessRatioTargetLine(
 }
 
 /**
- * 按分適用済みの仕訳行を新しい合計金額で再計算する
+ * 按分適用済みの仕訳行を新しい合計金額で再計算する。
  *
- * 貸方金額を変更した際に、借方の按分済み行（事業分）と
- * 自動生成された事業主貸行（個人分）の金額を再計算する。
+ * 貸方金額を変更した際に、借方の事業分と個人分（事業主貸）の
+ * 金額を現在の按分率で自動再計算する。
+ * 端数は事業分を切り捨て、残額を個人分とする。
  *
- * @param lines 仕訳行配列
- * @param newTotal 新しい合計金額（＝貸方合計）
- * @returns 再計算後の仕訳行配列（按分未適用の場合はそのまま返す）
+ * @param lines - 仕訳明細行の配列
+ * @param newTotal - 新しい合計金額（＝変更後の貸方合計）
+ * @returns 再計算後の行配列（按分未適用の場合は元の配列をそのまま返す）
+ *
+ * @example
+ * // 33%按分で貸方を100,000→80,000に変更
+ * recalculateBusinessRatio(lines, 80000)
+ * // → 事業分: 26,400円、個人分: 53,600円
+ *
+ * @see Issue #33 - 按分再計算のロジック導入
  */
 export function recalculateBusinessRatio(lines: JournalLine[], newTotal: number): JournalLine[] {
 	const appliedLine = lines.find((l) => l._businessRatioApplied);
@@ -189,7 +241,13 @@ export function recalculateBusinessRatio(lines: JournalLine[], newTotal: number)
 }
 
 /**
- * JournalLine から内部フラグを除外してエクスポート用にクリーンアップ
+ * JournalLine から按分関連の内部メタデータを除去してエクスポート用にする。
+ *
+ * _businessRatioApplied, _originalAmount, _businessRatio, _businessRatioGenerated を
+ * 除去した新しいオブジェクトを返す。JSONエクスポート時に使用。
+ *
+ * @param line - クリーンアップ対象の仕訳明細行
+ * @returns 内部フラグを除去した仕訳明細行
  */
 export function cleanJournalLineForExport(line: JournalLine): JournalLine {
 	/* eslint-disable @typescript-eslint/no-unused-vars */

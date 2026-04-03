@@ -15,6 +15,15 @@ import { generateConsumptionTax } from '$lib/utils/consumption-tax';
 // 印刷用 HTML 生成
 // ========================================
 
+/**
+ * 仕訳帳の印刷用HTMLを生成
+ * 日付順にソートされた仕訳を表形式で出力
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @param selectedYear - 会計年度
+ * @returns HTML文字列
+ */
 export function generateJournalHTML(
 	journals: JournalEntry[],
 	accounts: Account[],
@@ -68,6 +77,16 @@ export function generateJournalHTML(
     `;
 }
 
+/**
+ * 総勘定元帳の印刷用HTMLを生成
+ * 勘定科目ごとに取引履歴と残高推移を表形式で出力
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @param selectedYear - 会計年度
+ * @param ledgerOption - 表示対象（'all': 全科目、'used': 使用科目のみ）
+ * @returns HTML文字列
+ */
 export function generateLedgerHTML(
 	journals: JournalEntry[],
 	accounts: Account[],
@@ -136,6 +155,15 @@ export function generateLedgerHTML(
     `;
 }
 
+/**
+ * 試算表（合計残高試算表）の印刷用HTMLを生成
+ * カテゴリ別にグループ化した勘定科目と借方・貸方残高を表示。貸借一致チェック付き
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @param selectedYear - 会計年度
+ * @returns HTML文字列
+ */
 export function generateTrialBalanceHTML(
 	journals: JournalEntry[],
 	accounts: Account[],
@@ -206,6 +234,15 @@ export function generateTrialBalanceHTML(
     `;
 }
 
+/**
+ * 損益計算書の印刷用HTMLを生成
+ * 収益と費用をセクション分けして表示。当期純利益（利益/損失）を強調表示
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @param selectedYear - 会計年度
+ * @returns HTML文字列
+ */
 export function generateProfitLossHTML(
 	journals: JournalEntry[],
 	accounts: Account[],
@@ -290,6 +327,15 @@ export function generateProfitLossHTML(
     `;
 }
 
+/**
+ * 貸借対照表の印刷用HTMLを生成
+ * 左側に資産、右側に負債と純資産を並べて表示。貸借一致チェック付き
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @param selectedYear - 会計年度
+ * @returns HTML文字列
+ */
 export function generateBalanceSheetHTML(
 	journals: JournalEntry[],
 	accounts: Account[],
@@ -392,6 +438,14 @@ export function generateBalanceSheetHTML(
     `;
 }
 
+/**
+ * 消費税集計表の印刷用HTMLを生成
+ * 課税売上と課税仕入を税率別に集計。本則課税と簡易課税の納付税額を概算表示
+ *
+ * @param journals - 仕訳配列
+ * @param selectedYear - 会計年度
+ * @returns HTML文字列
+ */
 export function generateTaxSummaryHTML(journals: JournalEntry[], selectedYear: number): string {
 	const tax = generateConsumptionTax(journals, selectedYear);
 
@@ -488,6 +542,12 @@ export function generateTaxSummaryHTML(journals: JournalEntry[], selectedYear: n
 // 印刷用スタイルシート
 // ========================================
 
+/**
+ * 帳簿印刷用のCSSスタイルシートを生成
+ * 表の罫線、背景色、ページ分割、フォント設定などを定義
+ *
+ * @returns <style>タグ内に記述するCSS文字列
+ */
 export function getPrintStyles(): string {
 	return `
       <style>
@@ -665,6 +725,14 @@ export function getPrintStyles(): string {
 // CSV 生成
 // ========================================
 
+/**
+ * 仕訳帳のCSV形式文字列を生成
+ * BOM付きUTF-8、ダブルクォート囲みのCSV形式（Excelで開くことを想定）
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @returns CSV形式文字列（BOM付き）
+ */
 export function generateJournalCSV(journals: JournalEntry[], accounts: Account[]): string {
 	const sortedJournals = [...journals].sort((a, b) => a.date.localeCompare(b.date));
 	const accountMap = new Map(accounts.map((a) => [a.code, a.name]));
@@ -696,6 +764,15 @@ export function generateJournalCSV(journals: JournalEntry[], accounts: Account[]
 	return '\uFEFF' + rows.map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
 }
 
+/**
+ * 総勘定元帳のCSV形式文字列を生成
+ * 科目ごとに取引履歴と残高推移をCSV形式で出力
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @param ledgerOption - 表示対象（'all': 全科目、'used': 使用科目のみ）
+ * @returns CSV形式文字列（BOM付き）
+ */
 export function generateLedgerCSV(
 	journals: JournalEntry[],
 	accounts: Account[],
@@ -728,6 +805,14 @@ export function generateLedgerCSV(
 	return '\uFEFF' + rows.map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
 }
 
+/**
+ * 試算表のCSV形式文字列を生成
+ * カテゴリ別にグループ化した勘定科目と借方・貸方残高をCSV形式で出力
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @returns CSV形式文字列（BOM付き）
+ */
 export function generateTrialBalanceCSV(journals: JournalEntry[], accounts: Account[]): string {
 	const data = generateTrialBalance(journals, accounts);
 	const grouped = groupTrialBalance(data);
@@ -770,6 +855,15 @@ export function generateTrialBalanceCSV(journals: JournalEntry[], accounts: Acco
 	return '\uFEFF' + rows.map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
 }
 
+/**
+ * 損益計算書のCSV形式文字列を生成
+ * 収益と費用をセクション分けしてCSV形式で出力。当期純利益を最後に記載
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @param selectedYear - 会計年度
+ * @returns CSV形式文字列（BOM付き）
+ */
 export function generateProfitLossCSV(
 	journals: JournalEntry[],
 	accounts: Account[],
@@ -804,6 +898,15 @@ export function generateProfitLossCSV(
 	return '\uFEFF' + rows.map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
 }
 
+/**
+ * 貸借対照表のCSV形式文字列を生成
+ * 資産・負債・純資産をセクション分けしてCSV形式で出力
+ *
+ * @param journals - 仕訳配列
+ * @param accounts - 勘定科目マスタ
+ * @param selectedYear - 会計年度
+ * @returns CSV形式文字列（BOM付き）
+ */
 export function generateBalanceSheetCSV(
 	journals: JournalEntry[],
 	accounts: Account[],
@@ -847,6 +950,14 @@ export function generateBalanceSheetCSV(
 	return '\uFEFF' + rows.map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
 }
 
+/**
+ * 消費税集計表のCSV形式文字列を生成
+ * 課税売上と課税仕入を税率別に集計。本則課税と簡易課税の納付税額を概算出力
+ *
+ * @param journals - 仕訳配列
+ * @param selectedYear - 会計年度
+ * @returns CSV形式文字列（BOM付き）
+ */
 export function generateTaxSummaryCSV(journals: JournalEntry[], selectedYear: number): string {
 	const tax = generateConsumptionTax(journals, selectedYear);
 	const simplifiedTax = Math.floor(tax.totalSalesTax * 0.5);

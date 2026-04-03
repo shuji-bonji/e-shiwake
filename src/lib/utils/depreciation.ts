@@ -1,8 +1,17 @@
 /**
  * 減価償却計算ユーティリティ
  *
- * 固定資産台帳から減価償却費を計算し、
- * 青色申告決算書3ページ目のデータを生成する
+ * 固定資産台帳のデータから減価償却費を計算し、
+ * 青色申告決算書3ページ目（減価償却費の計算）のデータを生成する。
+ *
+ * 対応する償却方法:
+ * - 定額法（straight_line）: 取得価額 × 償却率（一定額を毎年償却）
+ * - 定率法（declining_balance）: 未償却残高 × 償却率（初期に多く償却）
+ *
+ * 備忘価額（1円）まで償却し、残存簿価は必ず1円以上となる。
+ * 定率法では償却保証額を下回った時点で改定償却率に切り替わる。
+ *
+ * @see 国税庁「減価償却のあらまし」
  */
 
 import type {
@@ -107,7 +116,11 @@ export const REVISED_RATES: Record<number, number> = {
 // ============================================================
 
 /**
- * 償却率を取得
+ * 償却方法と耐用年数から償却率を取得する。
+ *
+ * @param method - 償却方法（'straight_line' / 'declining_balance'）
+ * @param usefulLife - 耐用年数（年）
+ * @returns 償却率（例: 0.2 = 20%）、テーブルにない場合は 1/耐用年数 で概算
  */
 export function getDepreciationRate(method: DepreciationMethod, usefulLife: number): number {
 	const rates = method === 'straight-line' ? STRAIGHT_LINE_RATES : DECLINING_BALANCE_RATES;
@@ -191,7 +204,14 @@ export function calculateDepreciationMonths(
 }
 
 /**
- * 累計償却額を計算
+ * 指定年度末時点での累計償却額を計算する。
+ *
+ * 取得年度から指定年度まで各年の償却額を積み上げて算出。
+ * 売却・除却済みの場合は処分年度以降の償却は行わない。
+ *
+ * @param asset - 固定資産データ
+ * @param fiscalYear - 計算対象の年度
+ * @returns 累計償却額
  */
 export function calculateAccumulatedDepreciation(asset: FixedAsset, fiscalYear: number): number {
 	const acqDate = new Date(asset.acquisitionDate);
@@ -238,7 +258,20 @@ export function calculateAccumulatedDepreciation(asset: FixedAsset, fiscalYear: 
 }
 
 /**
- * 年間償却額を計算
+ * 年間の減価償却額を計算する。
+ *
+ * 定額法: 取得価額 × 償却率 × (月数/12)
+ * 定率法: 未償却残高 × 償却率 × (月数/12)
+ *         ※ 保証額を下回ったら改定償却率に切替
+ * いずれの場合も備忘価額（1円）を下回らないよう調整。
+ *
+ * @param acquisitionCost - 取得価額
+ * @param bookValue - 期首簿価（未償却残高）
+ * @param method - 償却方法
+ * @param rate - 償却率
+ * @param months - 当年の償却月数（1〜12）
+ * @param usefulLife - 耐用年数（保証率・改定償却率の参照に使用）
+ * @returns 年間償却額（円、端数切り捨て）
  */
 export function calculateYearlyDepreciation(
 	acquisitionCost: number,
@@ -276,7 +309,14 @@ export function calculateYearlyDepreciation(
 // ============================================================
 
 /**
- * 固定資産から減価償却資産行を生成
+ * 固定資産データから青色申告決算書用の減価償却資産行を生成する。
+ *
+ * 取得価額・累計償却額・当年償却額・期末簿価を算出し、
+ * 3ページ目のテーブル1行分のデータとして返す。
+ *
+ * @param asset - 固定資産データ
+ * @param fiscalYear - 対象年度
+ * @returns 減価償却資産行データ
  */
 export function generateDepreciationRow(
 	asset: FixedAsset,
@@ -330,7 +370,14 @@ export function generateDepreciationRow(
 }
 
 /**
- * 青色申告決算書3ページ目のデータを生成
+ * 青色申告決算書3ページ目（減価償却費の計算）の全データを生成する。
+ *
+ * 全固定資産について減価償却資産行を生成し、
+ * 当年度の減価償却費合計を算出する。
+ *
+ * @param assets - 固定資産台帳の全データ
+ * @param fiscalYear - 対象年度
+ * @returns 3ページ目データ（資産行一覧・減価償却費合計）
  */
 export function generatePage3Depreciation(
 	assets: FixedAsset[],

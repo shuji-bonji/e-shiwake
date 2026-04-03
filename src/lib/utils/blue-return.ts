@@ -2,7 +2,15 @@
  * 青色申告決算書生成ユーティリティ
  *
  * 仕訳データ、固定資産台帳、設定情報から
- * 青色申告決算書（一般用・4ページ）のデータを生成する
+ * 青色申告決算書（一般用・4ページ）のデータを生成する。
+ *
+ * 4ページ構成:
+ * - 1ページ目: 損益計算書（generatePage1）
+ * - 2ページ目: 月別売上・仕入、経費内訳（monthly-summary.ts で生成）
+ * - 3ページ目: 減価償却費の計算（depreciation.ts で生成）
+ * - 4ページ目: 貸借対照表（generatePage4）
+ *
+ * @see generateBlueReturnData - 全ページを統合生成するメイン関数
  */
 
 import type { JournalEntry, Account, ProfitLossData, BalanceSheetData } from '$lib/types';
@@ -24,9 +32,16 @@ import { generatePage3Depreciation } from './depreciation';
 // ============================================================
 
 /**
- * 仕訳データから事業主貸/事業主借の発生額を計算
- * - 事業主貸（3002）: 借方発生額を集計
- * - 事業主借（3003）: 貸方発生額を集計
+ * 仕訳データから事業主貸/事業主借の年間発生額を計算する。
+ *
+ * 4ページ目（貸借対照表）で使用。事業主勘定は期末残高ではなく
+ * 期中の発生額（借方・貸方それぞれ）を表示する必要がある。
+ *
+ * - 事業主貸（3002）: 借方発生額を集計（事業→個人への引出）
+ * - 事業主借（3003）: 貸方発生額を集計（個人→事業への元入）
+ *
+ * @param journals - 対象年度の仕訳一覧
+ * @returns 事業主貸・事業主借の発生額
  */
 export function calculateOwnerTransactions(journals: JournalEntry[]): {
 	ownerWithdrawal: number; // 事業主貸
@@ -64,7 +79,14 @@ export function calculateOwnerTransactions(journals: JournalEntry[]): {
 export type BlueReturnDeductionType = 65 | 55 | 10;
 
 /**
- * 既存のProfitLossDataから1ページ目データを生成
+ * 損益計算書データから青色申告決算書1ページ目（損益計算書部分）を生成する。
+ *
+ * 経費を所定の科目順にマッピングし、青色申告特別控除額を差し引いて
+ * 所得金額を算出する。控除額は e-Tax利用時65万円 / 紙55万円 / 10万円。
+ *
+ * @param profitLoss - generateProfitLoss() の出力
+ * @param options - 青色申告特別控除額の指定（デフォルト65万円）
+ * @returns 1ページ目データ
  */
 export function generatePage1(
 	profitLoss: ProfitLossData,
@@ -298,7 +320,21 @@ export function generatePage4(
 // ============================================================
 
 /**
- * 青色申告決算書の全データを生成
+ * 青色申告決算書の全4ページ分のデータを統合生成する。
+ *
+ * 各ページの生成を委譲し、事業者情報と組み合わせて返す:
+ * - 1ページ目: generatePage1()（損益計算書）
+ * - 2ページ目: generatePage2Details()（月別売上・仕入、経費内訳）
+ * - 3ページ目: generatePage3Depreciation()（減価償却費）
+ * - 4ページ目: generatePage4()（貸借対照表）
+ *
+ * @param fiscalYear - 会計年度
+ * @param journals - 対象年度の仕訳一覧
+ * @param accounts - 勘定科目マスタ
+ * @param profitLoss - 損益計算書データ
+ * @param balanceSheet - 貸借対照表データ
+ * @param options - 事業者情報・固定資産・前年度B/S・家賃内訳・控除額等
+ * @returns 青色申告決算書の全データ
  */
 export function generateBlueReturnData(
 	fiscalYear: number,
@@ -367,7 +403,12 @@ export function generateBlueReturnData(
 // ============================================================
 
 /**
- * 青色申告決算書データをCSV形式に変換（サマリー）
+ * 青色申告決算書データをCSV形式のサマリーに変換する。
+ *
+ * 1ページ目（損益計算書）と4ページ目（貸借対照表）の主要数値を出力。
+ *
+ * @param data - generateBlueReturnData() の出力
+ * @returns CSV形式の文字列
  */
 export function blueReturnSummaryToCsv(data: BlueReturnData): string {
 	const lines: string[] = [];
@@ -438,7 +479,16 @@ export function blueReturnSummaryToCsv(data: BlueReturnData): string {
 // ============================================================
 
 /**
- * 青色申告決算書データの整合性チェック
+ * 青色申告決算書データの整合性をチェックする。
+ *
+ * 以下の項目を検証し、不整合があれば警告メッセージを返す:
+ * - 貸借対照表の貸借一致
+ * - 経費合計の一致
+ * - 所得金額の計算整合性
+ * - 事業者情報の必須項目
+ *
+ * @param data - generateBlueReturnData() の出力
+ * @returns 警告メッセージの配列（問題なければ空配列）
  */
 export function validateBlueReturnData(data: BlueReturnData): string[] {
 	const errors: string[] = [];

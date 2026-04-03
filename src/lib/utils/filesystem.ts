@@ -22,14 +22,18 @@ interface ExtendedFileSystemDirectoryHandle extends FileSystemDirectoryHandle {
 const DIRECTORY_HANDLE_KEY = 'outputDirectoryHandle';
 
 /**
- * File System Access API がサポートされているか判定
+ * File System Access APIがブラウザでサポートされているか判定
+ *
+ * @returns File System Access APIが利用可能な場合true
  */
 export function supportsFileSystemAccess(): boolean {
 	return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 }
 
 /**
- * ディレクトリピッカーを表示して保存先を選択
+ * ディレクトリピッカーを表示してユーザーに保存先フォルダを選択させる
+ *
+ * @returns 選択されたディレクトリハンドル。キャンセルされた場合はnull
  */
 export async function pickDirectory(): Promise<FileSystemDirectoryHandle | null> {
 	if (!supportsFileSystemAccess()) {
@@ -53,8 +57,10 @@ export async function pickDirectory(): Promise<FileSystemDirectoryHandle | null>
 }
 
 /**
- * 保存したディレクトリハンドルを取得
- * IndexedDBから取得し、権限を確認
+ * IndexedDBに保存済みのディレクトリハンドルを取得
+ * 権限を確認し、必要に応じて再リクエストを実施
+ *
+ * @returns 取得したディレクトリハンドル。存在しない、または権限がない場合はnull
  */
 export async function getSavedDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
 	if (!supportsFileSystemAccess()) {
@@ -89,7 +95,9 @@ export async function getSavedDirectoryHandle(): Promise<FileSystemDirectoryHand
 }
 
 /**
- * ディレクトリハンドルを保存
+ * ディレクトリハンドルをIndexedDBに保存
+ *
+ * @param handle - 保存するディレクトリハンドル
  */
 export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
 	await db.table('settings').put({
@@ -100,7 +108,7 @@ export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Pr
 }
 
 /**
- * ディレクトリハンドルをクリア
+ * IndexedDBに保存済みディレクトリハンドルをクリア
  */
 export async function clearDirectoryHandle(): Promise<void> {
 	await db.table('settings').delete(DIRECTORY_HANDLE_KEY);
@@ -108,6 +116,10 @@ export async function clearDirectoryHandle(): Promise<void> {
 
 /**
  * 年度別サブディレクトリを取得（なければ作成）
+ *
+ * @param rootHandle - ルートディレクトリハンドル
+ * @param year - 年度
+ * @returns 年度別ディレクトリハンドル
  */
 export async function getYearDirectory(
 	rootHandle: FileSystemDirectoryHandle,
@@ -138,12 +150,13 @@ export async function fileExistsInDirectory(
 }
 
 /**
- * ファイルを保存
- * @param rootHandle ルートディレクトリハンドル
- * @param year 年度
- * @param fileName ファイル名
- * @param file ファイルデータ
- * @returns 保存したファイルの相対パス
+ * ファイルを年度別ディレクトリに保存
+ *
+ * @param rootHandle - ルートディレクトリハンドル
+ * @param year - 年度
+ * @param fileName - ファイル名
+ * @param file - ファイルデータ（FileまたはBlob）
+ * @returns 保存したファイルの相対パス（{年度}/{ファイル名}）
  */
 export async function saveFileToDirectory(
 	rootHandle: FileSystemDirectoryHandle,
@@ -167,10 +180,11 @@ export async function saveFileToDirectory(
 }
 
 /**
- * ファイルを読み込み
- * @param rootHandle ルートディレクトリハンドル
- * @param filePath 相対パス（{年度}/{ファイル名}）
- * @returns ファイルのBlob
+ * ディレクトリからファイルを読み込み
+ *
+ * @param rootHandle - ルートディレクトリハンドル
+ * @param filePath - 相対パス（{年度}/{ファイル名}形式）
+ * @returns ファイルのBlob。ファイルが存在しない場合はnull
  */
 export async function readFileFromDirectory(
 	rootHandle: FileSystemDirectoryHandle,
@@ -191,9 +205,10 @@ export async function readFileFromDirectory(
 }
 
 /**
- * ファイルを削除
- * @param rootHandle ルートディレクトリハンドル
- * @param filePath 相対パス（{年度}/{ファイル名}）
+ * ディレクトリからファイルを削除
+ *
+ * @param rootHandle - ルートディレクトリハンドル
+ * @param filePath - 相対パス（{年度}/{ファイル名}形式）
  */
 export async function deleteFileFromDirectory(
 	rootHandle: FileSystemDirectoryHandle,
@@ -218,11 +233,13 @@ export function getDirectoryDisplayName(handle: FileSystemDirectoryHandle): stri
 }
 
 /**
- * ファイルをリネーム
- * @param rootHandle ルートディレクトリハンドル
- * @param oldFilePath 旧ファイルの相対パス（{年度}/{ファイル名}）
- * @param newFileName 新しいファイル名
- * @returns 新しいファイルの相対パス
+ * ディレクトリ内のファイルをリネーム
+ * コピー→削除方式で実装（ファイルシステムのrename操作を直接サポートしないため）
+ *
+ * @param rootHandle - ルートディレクトリハンドル
+ * @param oldFilePath - 旧ファイルの相対パス（{年度}/{ファイル名}形式）
+ * @param newFileName - 新しいファイル名（ファイル名のみ、パスは不可）
+ * @returns 新しいファイルの相対パス（{年度}/{新しいファイル名}）
  */
 export async function renameFileInDirectory(
 	rootHandle: FileSystemDirectoryHandle,

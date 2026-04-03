@@ -1,29 +1,54 @@
 import type { JournalEntry, Account } from '$lib/types';
 
 /**
- * 検索条件
+ * パース済みの検索条件を保持するインターフェース
+ *
+ * ユーザーが入力した検索クエリを`parseSearchQuery`で解析した結果。
+ * 複数の検索条件を組み合わせてAND検索を実行する。
  */
 export interface SearchCriteria {
-	text: string[]; // 摘要・取引先（部分一致）
-	accounts: string[]; // 勘定科目コード
-	amounts: number[]; // 金額（完全一致）
-	year?: number; // 年（YYYY）
-	yearMonth?: string; // YYYY-MM
-	month?: number; // 月のみ（1-12）
-	date?: string; // YYYY-MM-DD
-	monthDay?: string; // MM-DD（年度内検索用）
+	/** 摘要・取引先の検索テキスト（部分一致） */
+	text: string[];
+	/** 勘定科目コード */
+	accounts: string[];
+	/** 金額（完全一致） */
+	amounts: number[];
+	/** 年（YYYY形式） */
+	year?: number;
+	/** 年月（YYYY-MM形式） */
+	yearMonth?: string;
+	/** 月のみ（1-12） */
+	month?: number;
+	/** 完全な日付（YYYY-MM-DD形式） */
+	date?: string;
+	/** 月日（MM-DD形式、年度内検索用） */
+	monthDay?: string;
 }
 
 /**
- * 検索クエリをパースして検索条件に変換
+ * 検索クエリ文字列をパースして検索条件に変換する
  *
- * @param query 検索クエリ（スペース区切り）
+ * スペース区切りで複数の検索条件を指定でき、すべてがAND条件で適用される。
+ * 金額、日付、月などのパターンを自動的に判別し、対応する検索条件に振り分ける。
+ *
+ * @param query 検索クエリ文字列（スペース区切りで複数条件を指定）
  * @param accounts 勘定科目一覧（科目名 → コード のマッチング用）
- * @returns 検索条件
+ * @returns 検索条件オブジェクト
  *
  * @example
+ * // 「Amazon」と「12月」と「消耗品費」をAND検索
  * parseSearchQuery("Amazon 12月 消耗品費", accounts)
  * // => { text: ["amazon"], accounts: ["5001"], month: 12 }
+ *
+ * @example
+ * // 金額検索（カンマ付きでも可）
+ * parseSearchQuery("Amazon 10000", accounts)
+ * // => { text: ["amazon"], amounts: [10000] }
+ *
+ * @example
+ * // 日付検索（複数フォーマット対応）
+ * parseSearchQuery("2025-01-15", accounts)
+ * // => { date: "2025-01-15" }
  */
 export function parseSearchQuery(query: string, accounts: Account[]): SearchCriteria {
 	const tokens = query.trim().split(/\s+/).filter(Boolean);
@@ -145,7 +170,13 @@ export function parseSearchQuery(query: string, accounts: Account[]): SearchCrit
 }
 
 /**
- * 検索条件で仕訳をフィルタリング
+ * 検索条件で仕訳をフィルタリングする
+ *
+ * 指定された検索条件のすべてをAND条件で適用し、マッチした仕訳を返す。
+ *
+ * @param journals フィルタリング対象の仕訳配列
+ * @param criteria 検索条件
+ * @returns 検索条件にマッチした仕訳の配列
  */
 export function filterJournals(journals: JournalEntry[], criteria: SearchCriteria): JournalEntry[] {
 	return journals.filter((journal) => {
@@ -204,7 +235,12 @@ export function filterJournals(journals: JournalEntry[], criteria: SearchCriteri
 }
 
 /**
- * 検索クエリが空かどうか
+ * 検索クエリが空かどうかを判定する
+ *
+ * 空文字列、空白のみの文字列の場合は`true`を返す。
+ *
+ * @param query 検索クエリ文字列
+ * @returns クエリが空またはホワイトスペースのみの場合`true`
  */
 export function isEmptyQuery(query: string): boolean {
 	return !query.trim();

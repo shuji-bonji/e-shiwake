@@ -12,7 +12,11 @@ import { getAttachmentBlob } from '$lib/db';
 import { omit } from '$lib/utils';
 
 /**
- * 取得失敗した証憑情報
+ * ZIPエクスポート時に取得失敗した証憑情報
+ *
+ * @property fileName - 証憑ファイル名
+ * @property journalId - 紐付く仕訳ID
+ * @property error - エラーメッセージ
  */
 export interface FailedAttachment {
 	fileName: string;
@@ -21,19 +25,29 @@ export interface FailedAttachment {
 }
 
 /**
- * ZIP エクスポートの進捗コールバック
+ * ZIPエクスポートの進捗情報
+ * onProgressコールバック経由でUI更新用に利用
+ *
+ * @property phase - 現在のフェーズ（preparing: 準備中、collecting: 証憑収集中、compressing: 圧縮中、complete: 完了）
+ * @property current - 処理済み件数
+ * @property total - 合計件数
+ * @property message - ユーザー向けメッセージ
+ * @property failedAttachments - 取得失敗した証憑一覧（complete時のみ設定）
  */
 export interface ZipExportProgress {
 	phase: 'preparing' | 'collecting' | 'compressing' | 'complete';
 	current: number;
 	total: number;
 	message: string;
-	/** 取得失敗した証憑一覧（complete時に設定） */
 	failedAttachments?: FailedAttachment[];
 }
 
 /**
- * ZIP エクスポートのオプション
+ * ZIPエクスポートのオプション
+ *
+ * @property includeEvidences - 証憑ファイルを含めるか
+ * @property onProgress - 進捗コールバック関数（オプション）
+ * @property directoryHandle - ファイルシステム保存の場合のディレクトリハンドル（オプション）
  */
 export interface ZipExportOptions {
 	includeEvidences: boolean;
@@ -44,7 +58,14 @@ export interface ZipExportOptions {
 const CONCURRENCY = 4;
 
 /**
- * 年度データを ZIP ファイルとしてエクスポート
+ * 年度データ（仕訳・設定・証憑）をZIPファイルとしてエクスポート
+ * JSZipライブラリを使用して、data.json + 証憑PDFをZIP形式で圧縮
+ *
+ * @param exportData - エクスポートするデータ（仕訳、勘定科目、取引先、設定）
+ * @param journals - 仕訳配列（証憑の仕訳IDマッピング用）
+ * @param options - エクスポートオプション
+ * @returns ZIPファイルのBlob
+ * @throws ZIPフォルダ作成に失敗した場合
  */
 export async function exportToZip(
 	exportData: ExportData,
@@ -285,7 +306,11 @@ function collectAttachments(journals: JournalEntry[]): AttachmentInfo[] {
 }
 
 /**
- * ZIP ファイルをダウンロード
+ * ZIPファイルのBlobをブラウザダウンロード
+ * ObjectURL経由でダウンロード処理を実行
+ *
+ * @param blob - ダウンロードするZIPファイルのBlob
+ * @param filename - ダウンロード時のファイル名（例：「e-shiwake-2025.zip」）
  */
 export function downloadZip(blob: Blob, filename: string): void {
 	const url = URL.createObjectURL(blob);
