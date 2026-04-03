@@ -80,9 +80,9 @@ describe('consumption-tax', () => {
 
 			const sales10 = data.salesRows.find((r) => r.taxCategory === 'sales_10');
 			expect(sales10).toBeDefined();
-			// 110,000 税込 → floor(110000/1.1) = 99999 税抜、10001 税額
-			expect(sales10?.taxableAmount).toBe(99999);
-			expect(sales10?.taxAmount).toBe(10001);
+			// 110,000 税込 → 110000 * 100 / 110 = 100,000 税抜、10,000 税額
+			expect(sales10?.taxableAmount).toBe(100000);
+			expect(sales10?.taxAmount).toBe(10000);
 		});
 
 		it('課税仕入8%（軽減税率）を正しく集計する', () => {
@@ -100,25 +100,25 @@ describe('consumption-tax', () => {
 
 			const purchase10 = data.purchaseRows.find((r) => r.taxCategory === 'purchase_10');
 			expect(purchase10).toBeDefined();
-			// 33,000 税込 → floor(33000/1.1) = 29999 税抜、3001 税額
-			expect(purchase10?.taxableAmount).toBe(29999);
-			expect(purchase10?.taxAmount).toBe(3001);
+			// 33,000 税込 → 33000 * 100 / 110 = 30,000 税抜、3,000 税額
+			expect(purchase10?.taxableAmount).toBe(30000);
+			expect(purchase10?.taxAmount).toBe(3000);
 		});
 
 		it('課税売上合計を正しく計算する', () => {
 			const data = generateConsumptionTax(mockJournals, 2025);
 
-			expect(data.totalTaxableSales).toBe(99999);
-			expect(data.totalSalesTax).toBe(10001);
+			expect(data.totalTaxableSales).toBe(100000);
+			expect(data.totalSalesTax).toBe(10000);
 		});
 
 		it('課税仕入合計を正しく計算する', () => {
 			const data = generateConsumptionTax(mockJournals, 2025);
 
-			// 10,000 (8%) + 29,999 (10%) = 39,999
-			expect(data.totalTaxablePurchases).toBe(39999);
-			// 800 + 3,001 = 3,801
-			expect(data.totalPurchaseTax).toBe(3801);
+			// 10,000 (8%) + 30,000 (10%) = 40,000
+			expect(data.totalTaxablePurchases).toBe(40000);
+			// 800 + 3,000 = 3,800
+			expect(data.totalPurchaseTax).toBe(3800);
 		});
 
 		it('納付税額を正しく計算する', () => {
@@ -230,16 +230,16 @@ describe('consumption-tax', () => {
 			const data = generateConsumptionTax(mockJournals, 2025);
 			const csv = consumptionTaxToCsv(data);
 
-			expect(csv).toContain('課税売上 合計,99999,10001');
-			expect(csv).toContain('課税仕入 合計,39999,3801');
+			expect(csv).toContain('課税売上 合計,100000,10000');
+			expect(csv).toContain('課税仕入 合計,40000,3800');
 		});
 
 		it('納付税額が含まれる', () => {
 			const data = generateConsumptionTax(mockJournals, 2025);
 			const csv = consumptionTaxToCsv(data);
 
-			expect(csv).toContain('売上に係る消費税額,,10001');
-			expect(csv).toContain('仕入に係る消費税額,,3801');
+			expect(csv).toContain('売上に係る消費税額,,10000');
+			expect(csv).toContain('仕入に係る消費税額,,3800');
 			expect(csv).toContain('納付すべき消費税額,,6200');
 		});
 	});

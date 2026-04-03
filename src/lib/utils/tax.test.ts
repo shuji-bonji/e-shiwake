@@ -119,24 +119,24 @@ describe('calculateTaxExcluded', () => {
 	});
 
 	it('端数は切り捨て（10%の場合）', () => {
-		// 浮動小数点精度の問題で 1100 / 1.10 = 999.999... となる場合がある
-		const result1100 = calculateTaxExcluded(1100, 10);
-		expect(result1100).toBeGreaterThanOrEqual(999);
-		expect(result1100).toBeLessThanOrEqual(1000);
+		// 整数演算により浮動小数点誤差なし: 1100 * 100 / 110 = 1000
+		expect(calculateTaxExcluded(1100, 10)).toBe(1000);
 
 		// 1,234円 → 税抜 1121円（切り捨て）
 		expect(calculateTaxExcluded(1234, 10)).toBe(1121);
 	});
 
 	it('端数は切り捨て（8%の場合）', () => {
-		// 浮動小数点の精度の問題で 1080 / 1.08 = 999.999... となる場合がある
-		// 実際の計算結果を許容
-		const result1080 = calculateTaxExcluded(1080, 8);
-		expect(result1080).toBeGreaterThanOrEqual(999);
-		expect(result1080).toBeLessThanOrEqual(1000);
+		// 整数演算により浮動小数点誤差なし: 1080 * 100 / 108 = 1000
+		expect(calculateTaxExcluded(1080, 8)).toBe(1000);
 
 		// 1,234円 → 税抜 1142円（切り捨て）
 		expect(calculateTaxExcluded(1234, 8)).toBe(1142);
+	});
+
+	it('66,000円（税込10%）の浮動小数点問題が解消されている', () => {
+		// Issue #26: 66000 / 1.1 = 59999.999... だが、整数演算で正しく60000になる
+		expect(calculateTaxExcluded(66000, 10)).toBe(60000);
 	});
 });
 
@@ -217,12 +217,9 @@ describe('calculateTaxSummary', () => {
 		const summary = calculateTaxSummary(lines);
 
 		expect(summary.purchase8TaxIncluded).toBe(2160);
-		// 浮動小数点精度の問題で 2160 / 1.08 = 1999.999... となる場合がある
-		expect(summary.purchase8TaxExcluded).toBeGreaterThanOrEqual(1999);
-		expect(summary.purchase8TaxExcluded).toBeLessThanOrEqual(2000);
-		// 税額も許容範囲で検証
-		expect(summary.purchase8Tax).toBeGreaterThanOrEqual(160);
-		expect(summary.purchase8Tax).toBeLessThanOrEqual(161);
+		// 整数演算により正確: 2160 * 100 / 108 = 2000
+		expect(summary.purchase8TaxExcluded).toBe(2000);
+		expect(summary.purchase8Tax).toBe(160);
 	});
 
 	it('複数行の集計', () => {
@@ -236,12 +233,42 @@ describe('calculateTaxSummary', () => {
 		const summary = calculateTaxSummary(lines);
 
 		expect(summary.totalSalesTax).toBe(1800); // 1000 + 800
-		// 浮動小数点精度の問題で仕入税額が若干ずれる可能性
-		expect(summary.totalPurchaseTax).toBeGreaterThanOrEqual(660);
-		expect(summary.totalPurchaseTax).toBeLessThanOrEqual(661);
-		// 納付税額も許容範囲で検証
-		expect(summary.netTax).toBeGreaterThanOrEqual(1139);
-		expect(summary.netTax).toBeLessThanOrEqual(1140);
+		expect(summary.totalPurchaseTax).toBe(660); // 500 + 160
+		expect(summary.netTax).toBe(1140); // 1800 - 660
+	});
+
+	it('Issue #26: 複数行の売上で消費税が正しく計算される（割戻し計算）', () => {
+		// 売上 99,000 + 66,000 = 165,000（税込10%）
+		// 行ごとに計算すると: 9,000 + 6,001 = 15,001（誤り）
+		// 合計から計算すると: 165,000 - floor(165,000 * 100 / 110) = 15,000（正しい）
+		const lines: JournalLine[] = [
+			createLine('credit', 99000, 'sales_10'),
+			createLine('credit', 66000, 'sales_10')
+		];
+
+		const summary = calculateTaxSummary(lines);
+
+		expect(summary.sales10TaxIncluded).toBe(165000);
+		expect(summary.sales10TaxExcluded).toBe(150000);
+		expect(summary.sales10Tax).toBe(15000); // 15,001ではなく15,000
+		expect(summary.totalSalesTax).toBe(15000);
+	});
+
+	it('多数の行でも端数が蓄積しない', () => {
+		// 33,001円 × 4行 + 32,996円 = 165,000（税込10%）
+		const lines: JournalLine[] = [
+			createLine('debit', 33001, 'purchase_10'),
+			createLine('debit', 33001, 'purchase_10'),
+			createLine('debit', 33001, 'purchase_10'),
+			createLine('debit', 33001, 'purchase_10'),
+			createLine('debit', 32996, 'purchase_10')
+		];
+
+		const summary = calculateTaxSummary(lines);
+
+		expect(summary.purchase10TaxIncluded).toBe(165000);
+		expect(summary.purchase10TaxExcluded).toBe(150000);
+		expect(summary.purchase10Tax).toBe(15000);
 	});
 
 	it('非課税・不課税の集計', () => {
@@ -310,25 +337,19 @@ describe('calculateSimplifiedTax', () => {
 		// 税込売上 1,100,000円
 		const result = calculateSimplifiedTax(1100000, 'services');
 
-		// 浮動小数点精度の問題で若干のずれが発生する可能性
-		expect(result.salesTax).toBeGreaterThanOrEqual(99999);
-		expect(result.salesTax).toBeLessThanOrEqual(100001);
-		expect(result.deemedPurchaseTax).toBeGreaterThanOrEqual(49999);
-		expect(result.deemedPurchaseTax).toBeLessThanOrEqual(50001);
-		expect(result.netTax).toBeGreaterThanOrEqual(49999);
-		expect(result.netTax).toBeLessThanOrEqual(50001);
+		// 整数演算により正確な計算
+		expect(result.salesTax).toBe(100000);
+		expect(result.deemedPurchaseTax).toBe(50000);
+		expect(result.netTax).toBe(50000);
 	});
 
 	it('小売業（みなし仕入率80%）の簡易課税計算', () => {
 		// 税込売上 1,100,000円
 		const result = calculateSimplifiedTax(1100000, 'retail');
 
-		// 浮動小数点精度の問題で若干のずれが発生する可能性
-		expect(result.salesTax).toBeGreaterThanOrEqual(99999);
-		expect(result.salesTax).toBeLessThanOrEqual(100001);
-		expect(result.deemedPurchaseTax).toBeGreaterThanOrEqual(79999);
-		expect(result.deemedPurchaseTax).toBeLessThanOrEqual(80001);
-		expect(result.netTax).toBeGreaterThanOrEqual(19999);
-		expect(result.netTax).toBeLessThanOrEqual(20001);
+		// 整数演算により正確な計算
+		expect(result.salesTax).toBe(100000);
+		expect(result.deemedPurchaseTax).toBe(80000);
+		expect(result.netTax).toBe(20000);
 	});
 });

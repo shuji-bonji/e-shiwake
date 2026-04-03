@@ -56,10 +56,11 @@ export function isPurchaseCategory(category: TaxCategory | undefined): boolean {
 /**
  * 税込金額から税抜金額を計算
  * 端数は切り捨て
+ * 浮動小数点誤差を避けるため整数演算を使用
  */
 export function calculateTaxExcluded(taxIncludedAmount: number, rate: TaxRate): number {
 	if (rate === 0) return taxIncludedAmount;
-	return Math.floor(taxIncludedAmount / (1 + rate / 100));
+	return Math.floor((taxIncludedAmount * 100) / (100 + rate));
 }
 
 /**
@@ -146,6 +147,10 @@ export interface TaxSummary {
 
 /**
  * 仕訳行から税率別の集計を作成
+ *
+ * 割戻し計算方式: 税込合計を先に集計し、合計に対して税額を計算する。
+ * 行ごとに個別計算して合算すると端数（Math.floor）が蓄積して
+ * 誤差が生じるため（Issue #26）。
  */
 export function calculateTaxSummary(lines: JournalLine[]): TaxSummary {
 	const summary: TaxSummary = {
@@ -170,37 +175,26 @@ export function calculateTaxSummary(lines: JournalLine[]): TaxSummary {
 		netTax: 0
 	};
 
+	// Step 1: 税込合計を税区分ごとに集計
 	for (const line of lines) {
 		if (!line.taxCategory) continue;
 
 		const amount = line.amount;
-		const rate = getTaxRateFromCategory(line.taxCategory);
-		const taxExcluded = calculateTaxExcluded(amount, rate);
-		const tax = calculateTaxAmount(amount, rate);
 
 		switch (line.taxCategory) {
 			case 'sales_10':
 				summary.sales10TaxIncluded += amount;
-				summary.sales10TaxExcluded += taxExcluded;
-				summary.sales10Tax += tax;
 				break;
 			case 'sales_8':
 				summary.sales8TaxIncluded += amount;
-				summary.sales8TaxExcluded += taxExcluded;
-				summary.sales8Tax += tax;
 				break;
 			case 'purchase_10':
 				summary.purchase10TaxIncluded += amount;
-				summary.purchase10TaxExcluded += taxExcluded;
-				summary.purchase10Tax += tax;
 				break;
 			case 'purchase_8':
 				summary.purchase8TaxIncluded += amount;
-				summary.purchase8TaxExcluded += taxExcluded;
-				summary.purchase8Tax += tax;
 				break;
 			case 'exempt':
-				// 非課税は借方/貸方で売上/仕入を判断
 				if (line.type === 'credit') {
 					summary.exemptSales += amount;
 				} else {
@@ -208,7 +202,6 @@ export function calculateTaxSummary(lines: JournalLine[]): TaxSummary {
 				}
 				break;
 			case 'out_of_scope':
-				// 不課税も借方/貸方で判断
 				if (line.type === 'credit') {
 					summary.outOfScopeSales += amount;
 				} else {
@@ -217,6 +210,19 @@ export function calculateTaxSummary(lines: JournalLine[]): TaxSummary {
 				break;
 		}
 	}
+
+	// Step 2: 税込合計から税抜・税額を割戻し計算（端数の蓄積を防ぐ）
+	summary.sales10TaxExcluded = calculateTaxExcluded(summary.sales10TaxIncluded, 10);
+	summary.sales10Tax = calculateTaxAmount(summary.sales10TaxIncluded, 10);
+
+	summary.sales8TaxExcluded = calculateTaxExcluded(summary.sales8TaxIncluded, 8);
+	summary.sales8Tax = calculateTaxAmount(summary.sales8TaxIncluded, 8);
+
+	summary.purchase10TaxExcluded = calculateTaxExcluded(summary.purchase10TaxIncluded, 10);
+	summary.purchase10Tax = calculateTaxAmount(summary.purchase10TaxIncluded, 10);
+
+	summary.purchase8TaxExcluded = calculateTaxExcluded(summary.purchase8TaxIncluded, 8);
+	summary.purchase8Tax = calculateTaxAmount(summary.purchase8TaxIncluded, 8);
 
 	// 合計を計算
 	summary.totalSalesTax = summary.sales10Tax + summary.sales8Tax;
