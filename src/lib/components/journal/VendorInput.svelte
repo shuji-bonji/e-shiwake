@@ -38,10 +38,11 @@
 	}
 
 	// フィルタリングされた候補
+	// Command.List が max-h-[300px] + overflow-y-auto でスクロール可能なため全件表示
 	const filteredVendors = $derived.by(() => {
-		if (!value) return vendors.slice(0, 10); // 空の時は最新10件
+		if (!value) return vendors;
 		const query = value.toLowerCase();
-		return vendors.filter((v) => v.name.toLowerCase().includes(query)).slice(0, 10);
+		return vendors.filter((v) => v.name.toLowerCase().includes(query));
 	});
 
 	function handleInput(e: Event) {
