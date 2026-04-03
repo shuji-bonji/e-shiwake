@@ -228,15 +228,15 @@
 	async function syncAttachmentsOnBlur() {
 		if (journal.attachments.length === 0) return;
 
-		const mainDebitAmount =
-			journal.lines.find((l) => l.type === 'debit' && l.accountCode)?.amount ?? 0;
+		const mainDebitLine = journal.lines.find((l) => l.type === 'debit' && l.accountCode);
+		const mainDebitAmount = mainDebitLine?.amount ?? 0;
 
 		const newNames = journal.attachments.map((att) =>
 			generateAttachmentName(
 				journal.date,
 				att.documentType,
 				journal.description,
-				mainDebitAmount || att.amount,
+				mainDebitLine !== undefined ? mainDebitLine.amount : att.amount,
 				journal.vendor
 			)
 		);

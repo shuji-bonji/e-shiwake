@@ -29,7 +29,7 @@ import type { JournalEntry, JournalLine, Vendor } from '$lib/types';
  * };
  * const vendor = { name: 'クライアントA' };
  * const journal = generateSalesJournal(invoice, vendor);
- * // => { date: '2025-04-04', lines: [...], vendor: 'クライアントA', description: '請求書 INV-2025-0001', ... }
+ * // => { date: '2025-04-04', lines: [...], vendor: 'クライアントA', description: '売掛金計上 INV-2025-0001', ... }
  */
 export function generateSalesJournal(
 	invoice: Invoice,
@@ -74,7 +74,7 @@ export function generateSalesJournal(
 		date: invoice.issueDate,
 		lines,
 		vendor: vendor.name,
-		description: `請求書 ${invoice.invoiceNumber}`,
+		description: `売掛金計上 ${invoice.invoiceNumber}`,
 		evidenceStatus: 'digital',
 		attachments: []
 	};
@@ -107,7 +107,7 @@ export function generateSalesJournal(
  * //     { type: 'credit', accountCode: '1005', amount: 11000, ... }
  * //   ],
  * //   vendor: 'クライアントA',
- * //   description: '入金 請求書 INV-2025-0001',
+ * //   description: '入金 INV-2025-0001',
  * //   ...
  * // }
  */
@@ -136,7 +136,7 @@ export function generateDepositJournal(
 			}
 		],
 		vendor: vendor.name,
-		description: `入金 請求書 ${invoice.invoiceNumber}`,
+		description: `入金 ${invoice.invoiceNumber}`,
 		evidenceStatus: 'none',
 		attachments: []
 	};

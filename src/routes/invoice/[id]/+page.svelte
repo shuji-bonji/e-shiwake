@@ -267,7 +267,12 @@
 				</Button>
 			{/if}
 			{#if !isNew}
-				<Button variant="outline" onclick={() => openJournalDialog('sales')} disabled={isSaving}>
+				<Button
+					variant="outline"
+					onclick={() => openJournalDialog('sales')}
+					disabled={isSaving || !selectedVendor}
+					title={!selectedVendor ? '取引先を選択してください' : ''}
+				>
 					<BookOpen class="mr-2 size-4" />
 					売掛金仕訳
 				</Button>
@@ -275,7 +280,8 @@
 					<Button
 						variant="outline"
 						onclick={() => openJournalDialog('deposit')}
-						disabled={isSaving}
+						disabled={isSaving || !selectedVendor}
+						title={!selectedVendor ? '取引先を選択してください' : ''}
 					>
 						<Banknote class="mr-2 size-4" />
 						入金仕訳

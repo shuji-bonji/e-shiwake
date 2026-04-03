@@ -5,6 +5,9 @@ import { db } from './database';
 
 /**
  * 書類の種類の短縮ラベル（ファイル名用）
+ *
+ * invoice（発行）と bill（受領）を明確に区別する。
+ * 電帳法の検索要件上、ファイル名だけで書類の方向が判別できることが望ましい。
  */
 export const DocumentTypeShortLabels: Record<DocumentType, string> = {
 	invoice: '請求書発行',
@@ -15,9 +18,38 @@ export const DocumentTypeShortLabels: Record<DocumentType, string> = {
 	other: 'その他'
 };
 
+/** ファイル名に使えない文字を安全な文字に置換 */
+export function sanitizeFileName(str: string): string {
+	return str.replace(/[\\/:*?"<>|]/g, '_').trim();
+}
+
+/**
+ * ファイル名のバイト長を制限する（ファイルシステムの255バイト制限対応）
+ * UTF-8で計算し、超過分は末尾を切り詰める
+ */
+function truncateToMaxBytes(name: string, maxBytes: number): string {
+	const encoder = new TextEncoder();
+	if (encoder.encode(name).length <= maxBytes) return name;
+
+	// 1文字ずつ削って収まるまで切り詰め
+	let truncated = name;
+	while (encoder.encode(truncated).length > maxBytes && truncated.length > 0) {
+		truncated = truncated.slice(0, -1);
+	}
+	return truncated;
+}
+
+/** ファイル名の最大バイト長（.pdf の4バイト + 重複回避サフィックス分を考慮して余裕を持たせる） */
+const MAX_FILENAME_BYTES = 240;
+
 /**
  * 添付ファイル名を自動生成
  * 形式: {書類の日付}_{種類}_{摘要}_{金額}円_{取引先名}.pdf
+ *
+ * エッジケース対応:
+ * - 摘要が空 → 「未分類」
+ * - 取引先が空 → 「不明」
+ * - ファイル名が255バイトを超える → 摘要を切り詰め
  */
 export function generateAttachmentName(
 	documentDate: string,
@@ -26,18 +58,67 @@ export function generateAttachmentName(
 	amount: number,
 	vendor: string
 ): string {
-	// ファイル名に使えない文字を置換
-	const sanitize = (str: string) => str.replace(/[\\/:*?"<>|]/g, '_').trim();
+	const typeLabel = DocumentTypeShortLabels[documentType];
+	const sanitizedDescription = sanitizeFileName(description) || '未分類';
+	const amountStr = `${amount.toLocaleString('ja-JP')}円`;
+	const sanitizedVendor = sanitizeFileName(vendor) || '不明';
 
-	const parts = [
-		documentDate,
-		DocumentTypeShortLabels[documentType],
-		sanitize(description) || '未分類',
-		`${amount.toLocaleString('ja-JP')}円`,
-		sanitize(vendor) || '不明'
-	];
+	// 摘要以外の固定部分を先に組み立て（切り詰め対象外）
+	const prefix = `${documentDate}_${typeLabel}_`;
+	const suffix = `_${amountStr}_${sanitizedVendor}`;
 
-	return `${parts.join('_')}.pdf`;
+	// 摘要部分をバイト長制限に合わせて切り詰め
+	const availableBytes =
+		MAX_FILENAME_BYTES -
+		new TextEncoder().encode(prefix).length -
+		new TextEncoder().encode(suffix).length;
+	const truncatedDescription =
+		availableBytes > 0
+			? truncateToMaxBytes(sanitizedDescription, availableBytes)
+			: sanitizedDescription;
+
+	return `${prefix}${truncatedDescription}${suffix}.pdf`;
+}
+
+/**
+ * 手動編集されたファイル名をバリデーション
+ * @returns エラーメッセージの配列（空配列なら有効）
+ */
+export function validateManualFileName(fileName: string): string[] {
+	const errors: string[] = [];
+
+	if (!fileName || !fileName.trim()) {
+		errors.push('ファイル名を入力してください');
+		return errors;
+	}
+
+	// パストラバーサル防止
+	if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+		errors.push('ファイル名にパス区切り文字（/ \\ ..）は使用できません');
+	}
+
+	// ファイルシステムの禁止文字チェック
+	if (/[:*?"<>|]/.test(fileName)) {
+		errors.push('ファイル名に使用できない文字が含まれています（: * ? " < > |）');
+	}
+
+	// .pdf 拡張子の重複チェック
+	if (/\.pdf\.pdf$/i.test(fileName)) {
+		errors.push('.pdf 拡張子が重複しています');
+	}
+
+	// .pdf 拡張子の付与確認
+	if (!fileName.toLowerCase().endsWith('.pdf')) {
+		errors.push('ファイル名は .pdf で終わる必要があります');
+	}
+
+	// バイト長チェック
+	const byteLength = new TextEncoder().encode(fileName).length;
+	if (byteLength > 255) {
+		errors.push(`ファイル名が長すぎます（${byteLength}バイト、最大255バイト）`);
+	}
+
+	return errors;
 }
 
 /**
@@ -310,10 +391,14 @@ export async function updateAttachment(
 	const newVendor = updates.vendor ?? attachment.vendor;
 
 	// 新しいファイル名を生成
-	// 手動指定がある場合はそのまま使用（UI側で上書き確認済み）
+	// 手動指定がある場合はバリデーション後に使用
 	// 自動生成の場合のみ重複回避を適用
 	let newGeneratedName: string;
 	if (updates.generatedName) {
+		const errors = validateManualFileName(updates.generatedName);
+		if (errors.length > 0) {
+			throw new Error(`ファイル名が不正です: ${errors.join(', ')}`);
+		}
 		newGeneratedName = updates.generatedName;
 	} else {
 		const baseName = generateAttachmentName(
@@ -427,6 +512,7 @@ export async function syncAttachmentsWithJournal(
 
 		// ファイルシステム保存の場合、実ファイルをリネーム
 		let newFilePath = attachment.filePath;
+		let renameSucceeded = true;
 		if (attachment.storageType === 'filesystem' && attachment.filePath && directoryHandle) {
 			if (newGeneratedName !== attachment.generatedName) {
 				const { renameFileInDirectory } = await import('$lib/utils/filesystem');
@@ -438,23 +524,29 @@ export async function syncAttachmentsWithJournal(
 					);
 				} catch (error) {
 					console.error('ファイルリネームに失敗:', error);
-					// リネーム失敗してもメタデータは更新続行
+					// リネーム失敗時はメタデータも変更しない（不整合防止）
+					renameSucceeded = false;
 				}
 			}
 		}
 
-		// 更新された添付ファイル
-		const updatedAttachment: Attachment = {
-			...attachment,
-			documentDate: newDocumentDate,
-			description: newDescription,
-			amount: newAmount,
-			vendor: newVendor,
-			generatedName: newGeneratedName,
-			filePath: newFilePath
-		};
-
-		updatedAttachments.push(updatedAttachment);
+		if (!renameSucceeded) {
+			// 実ファイルのリネームに失敗した場合、元のメタデータを維持
+			updatedAttachments.push(attachment);
+			usedNames.add(attachment.generatedName);
+		} else {
+			// 更新された添付ファイル
+			const updatedAttachment: Attachment = {
+				...attachment,
+				documentDate: newDocumentDate,
+				description: newDescription,
+				amount: newAmount,
+				vendor: newVendor,
+				generatedName: newGeneratedName,
+				filePath: newFilePath
+			};
+			updatedAttachments.push(updatedAttachment);
+		}
 	}
 
 	return updatedAttachments;

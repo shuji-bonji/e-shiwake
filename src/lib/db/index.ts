@@ -55,6 +55,8 @@ export {
 	DocumentTypeShortLabels,
 	UNPAID_ACCOUNT_CODES,
 	generateAttachmentName,
+	sanitizeFileName,
+	validateManualFileName,
 	suggestDocumentType,
 	isAttachmentBlobPurged,
 	addAttachmentToJournal,

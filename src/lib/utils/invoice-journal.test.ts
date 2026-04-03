@@ -64,7 +64,7 @@ describe('generateSalesJournal', () => {
 		// 共通項目
 		expect(journal.date).toBe('2026-01-15');
 		expect(journal.vendor).toBe('テスト株式会社');
-		expect(journal.description).toBe('請求書 INV-2026-0001');
+		expect(journal.description).toBe('売掛金計上 INV-2026-0001');
 		expect(journal.evidenceStatus).toBe('digital');
 		expect(journal.attachments).toEqual([]);
 	});
@@ -239,7 +239,7 @@ describe('generateDepositJournal', () => {
 		// 共通項目
 		expect(journal.date).toBe('2026-02-15');
 		expect(journal.vendor).toBe('テスト株式会社');
-		expect(journal.description).toBe('入金 請求書 INV-2026-0001');
+		expect(journal.description).toBe('入金 INV-2026-0001');
 		expect(journal.evidenceStatus).toBe('none');
 		expect(journal.attachments).toEqual([]);
 	});

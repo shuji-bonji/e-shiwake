@@ -30,7 +30,11 @@
 	});
 
 	async function createJournal() {
-		if (!invoice || !vendor) return;
+		if (!invoice) return;
+		if (!vendor) {
+			toast.error('取引先を選択してから仕訳を作成してください');
+			return;
+		}
 
 		try {
 			let journalData;
