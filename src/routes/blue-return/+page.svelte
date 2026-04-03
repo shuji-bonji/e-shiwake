@@ -63,6 +63,18 @@
 		if (savedBusinessInfo) {
 			businessInfo = savedBusinessInfo;
 		}
+		const savedDeduction = await getSetting('blueReturnDeduction');
+		if (savedDeduction !== undefined) {
+			blueReturnDeduction = savedDeduction;
+		}
+		const savedInventoryStart = await getSetting('inventoryStart');
+		if (savedInventoryStart !== undefined) {
+			inventoryStart = savedInventoryStart;
+		}
+		const savedInventoryEnd = await getSetting('inventoryEnd');
+		if (savedInventoryEnd !== undefined) {
+			inventoryEnd = savedInventoryEnd;
+		}
 		await loadData();
 	});
 

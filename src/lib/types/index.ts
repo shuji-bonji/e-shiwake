@@ -1,3 +1,42 @@
+// Branded Types（公称型）の再エクスポート
+export type { UUID, AccountCode, DateString, ISODateTimeString } from './branded';
+export {
+	isAccountCode,
+	isDateString,
+	isUUID,
+	asAccountCode,
+	asDateString,
+	asUUID,
+	asISODateTime
+} from './branded';
+
+// 会計ロジック用ユーティリティ型の再エクスポート
+export type {
+	DebitCredit,
+	IncreaseSide,
+	DecreaseSide,
+	DebitBalanceType,
+	CreditBalanceType,
+	SalesTaxCategory,
+	PurchaseTaxCategory,
+	TaxableTaxCategory,
+	NonTaxableCategory,
+	ExpenseTaxCategory,
+	RevenueTaxCategory,
+	AssetTaxCategory,
+	LiabilityEquityTaxCategory,
+	AllowedTaxCategory
+} from './accounting';
+export {
+	isDebitBalanceType,
+	getIncreaseSide,
+	getDecreaseSide,
+	isIncrease,
+	calculateBalance,
+	getAllowedTaxCategories,
+	isValidTaxCategoryForAccount
+} from './accounting';
+
 /**
  * 勘定科目カテゴリ
  */
@@ -204,7 +243,10 @@ export type SettingsKey =
 	| 'autoPurgeBlobAfterExport'
 	| 'blobRetentionDays'
 	| 'businessInfo'
-	| 'suppressRenameConfirm';
+	| 'suppressRenameConfirm'
+	| 'blueReturnDeduction'
+	| 'inventoryStart'
+	| 'inventoryEnd';
 
 // BusinessInfoはblue-return-types.tsで定義（循環参照を避けるため、ここではanyを使用）
 // 実際の型は $lib/types/blue-return-types.ts の BusinessInfo を参照
@@ -215,6 +257,9 @@ export type SettingsValueMap = {
 	blobRetentionDays: number;
 	businessInfo: import('./blue-return-types').BusinessInfo;
 	suppressRenameConfirm: boolean;
+	blueReturnDeduction: 65 | 55 | 10;
+	inventoryStart: number;
+	inventoryEnd: number;
 };
 
 export interface Settings {

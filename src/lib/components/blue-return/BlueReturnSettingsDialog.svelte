@@ -31,10 +31,13 @@
 			const snapshot = $state.snapshot(businessInfo);
 			const plainBusinessInfo = JSON.parse(JSON.stringify(snapshot)) as BusinessInfo;
 			await setSetting('businessInfo', plainBusinessInfo);
+			await setSetting('blueReturnDeduction', blueReturnDeduction);
+			await setSetting('inventoryStart', inventoryStart);
+			await setSetting('inventoryEnd', inventoryEnd);
 			onsave();
 			open = false;
 		} catch (e) {
-			console.error('businessInfo保存エラー:', e);
+			console.error('青色申告設定保存エラー:', e);
 		}
 	}
 </script>
