@@ -5,7 +5,13 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
-	import { purgeAllExportedBlobs, setAutoPurgeBlobSetting } from '$lib/db';
+	import {
+		getJournalsByYear,
+		getUnexportedAttachmentCount,
+		purgeAllExportedBlobs,
+		setAutoPurgeBlobSetting,
+		setLastExportedAt
+	} from '$lib/db';
 	import type { StorageType, StorageUsage } from '$lib/types';
 	import {
 		formatBytes,
@@ -14,7 +20,8 @@
 		RECOMMENDED_QUOTA,
 		WARNING_THRESHOLD
 	} from '$lib/utils/storage';
-	import { AlertTriangle, HardDrive, RotateCcw, Trash2 } from '@lucide/svelte';
+	import { AlertTriangle, Download, HardDrive, RotateCcw, Trash2 } from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
 
 	interface Props {
 		storageMode: StorageType;
@@ -22,6 +29,9 @@
 		storageUsage: StorageUsage;
 		autoPurgeEnabled: boolean;
 		retentionDays: number;
+		availableYears: number[];
+		unexportedCount: number;
+		onunexportedcountchange?: (count: number) => void;
 	}
 
 	let {
@@ -29,7 +39,10 @@
 		isFileSystemSupported,
 		storageUsage = $bindable(),
 		autoPurgeEnabled = $bindable(),
-		retentionDays
+		retentionDays,
+		availableYears = [],
+		unexportedCount = $bindable(),
+		onunexportedcountchange
 	}: Props = $props();
 
 	let isPurging = $state(false);
@@ -71,6 +84,52 @@
 	function handleResetSafariWarning() {
 		localStorage.removeItem('shownStorageWarning');
 		safariDialogOpen = true;
+	}
+
+	// === 証憑PDFダウンロード ===
+	let isDownloading = $state(false);
+
+	function downloadBlob(blob: Blob, filename: string) {
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
+
+	async function handleDownloadAttachments(year: number) {
+		isDownloading = true;
+		try {
+			const journals = await getJournalsByYear(year);
+			let exportedCount = 0;
+
+			for (const journal of journals) {
+				for (const attachment of journal.attachments) {
+					if (attachment.storageType === 'indexeddb' && attachment.blob) {
+						downloadBlob(attachment.blob, attachment.generatedName);
+						exportedCount++;
+						await new Promise((resolve) => setTimeout(resolve, 500));
+					}
+				}
+			}
+
+			if (exportedCount > 0) {
+				await setLastExportedAt(new Date().toISOString());
+				unexportedCount = await getUnexportedAttachmentCount();
+				onunexportedcountchange?.(unexportedCount);
+				toast.success(`${exportedCount}件の証憑をダウンロードしました`);
+			} else {
+				toast.info('ダウンロードする証憑がありません');
+			}
+		} catch (error) {
+			console.error('証憑ダウンロードエラー:', error);
+			toast.error('証憑のダウンロードに失敗しました');
+		} finally {
+			isDownloading = false;
+		}
 	}
 </script>
 
@@ -134,6 +193,31 @@
 					onCheckedChange={handleAutoPurgeChange}
 				/>
 			</div>
+
+			<!-- 証憑PDFのダウンロード -->
+			{#if availableYears.length > 0}
+				<div class="space-y-3 border-t pt-6">
+					<div>
+						<p class="font-medium">証憑PDFのダウンロード</p>
+						<p class="text-sm text-muted-foreground">
+							ブラウザ内に保存されている証憑PDFを個別にダウンロードします
+						</p>
+					</div>
+					<div class="flex flex-wrap gap-2">
+						{#each availableYears as year (year)}
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={() => handleDownloadAttachments(year)}
+								disabled={isDownloading}
+							>
+								<Download class="mr-2 size-4" />
+								{year}年度
+							</Button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 
 			<div class="flex items-center justify-between">
 				<div>

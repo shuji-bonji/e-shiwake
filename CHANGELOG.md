@@ -5,6 +5,22 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-04-04
+
+### Changed
+
+- エクスポートボタンのラベルを用途ベースに変更（[#29](https://github.com/shuji-bonji/e-shiwake/issues/29)）
+  - CSV → `仕訳のエクスポート (.csv)`
+  - JSON → `データのエクスポート (.json)`
+  - ZIP → `データと証憑のエクスポート (.zip)`
+- 証憑PDFのダウンロード機能をエクスポートカードからストレージ使用量セクションに移動（運用向けワークアラウンドとして整理）
+- 「データ形式について」カードをエクスポートボタンと一致する3形式に整理
+- ヘルプ「設定・データ管理」をエクスポートUI変更に合わせて全面更新
+  - エクスポート形式表を3列（.csv / .json / .zip）に再構成
+  - インポートモード（マージ / 上書き）の説明追加
+  - ZIP復元 × 保存モードの関係表を追加
+  - ブラウザ別ストレージ容量の参考情報を追加
+
 ## [0.3.0] - 2026-04-04
 
 ### Added
@@ -136,7 +152,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
-[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.0...v0.2.1

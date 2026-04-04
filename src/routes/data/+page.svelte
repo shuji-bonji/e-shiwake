@@ -147,6 +147,9 @@
 		bind:storageUsage
 		bind:autoPurgeEnabled
 		{retentionDays}
+		{availableYears}
+		bind:unexportedCount
+		onunexportedcountchange={handleUnexportedCountChange}
 	/>
 
 	<!-- エクスポート + 年度削除ダイアログ -->
@@ -172,22 +175,18 @@
 		</Card.Header>
 		<Card.Content class="space-y-3 text-sm text-muted-foreground">
 			<div>
-				<p class="font-medium text-foreground">JSON</p>
+				<p class="font-medium text-foreground">仕訳のエクスポート (.csv)</p>
+				<p>仕訳データのみをフラット形式で出力。Excelでの確認や他の会計ソフトへの連携に。</p>
+			</div>
+			<div>
+				<p class="font-medium text-foreground">データのエクスポート (.json)</p>
 				<p>
-					仕訳・勘定科目・取引先・設定を含む完全なデータ。バックアップや他端末への移行に使用します。
+					仕訳・勘定科目・取引先・固定資産・請求書・事業者情報などの全データを含む（証憑PDF除く）。バックアップや他端末への移行に。
 				</p>
 			</div>
 			<div>
-				<p class="font-medium text-foreground">CSV</p>
-				<p>仕訳データのみをフラット形式で出力。Excel等での確認や他ソフトへの連携に使用します。</p>
-			</div>
-			<div>
-				<p class="font-medium text-foreground">証憑ダウンロード</p>
-				<p>ブラウザに保存されている証憑PDFを個別にダウンロードします（iPad向け）。</p>
-			</div>
-			<div>
-				<p class="font-medium text-foreground">ZIP（完全バックアップ）</p>
-				<p>JSON + 証憑PDFをZIPにまとめてダウンロード。年次アーカイブに最適です。</p>
+				<p class="font-medium text-foreground">データと証憑のエクスポート (.zip)</p>
+				<p>JSON + 証憑PDFをまとめてダウンロード。年次アーカイブや端末間移行に最適。</p>
 			</div>
 		</Card.Content>
 	</Card.Root>

@@ -226,43 +226,6 @@
 		}
 	}
 
-	async function handleExportAttachments(year: number) {
-		exportingYear = year;
-		try {
-			const journals = await getJournalsByYear(year);
-			let exportedCount = 0;
-
-			for (const journal of journals) {
-				for (const attachment of journal.attachments) {
-					if (attachment.storageType === 'indexeddb' && attachment.blob) {
-						downloadBlob(attachment.blob, attachment.generatedName);
-						exportedCount++;
-						await new Promise((resolve) => setTimeout(resolve, 500));
-					}
-				}
-			}
-
-			if (exportedCount > 0) {
-				await setLastExportedAt(new Date().toISOString());
-				unexportedCount = await getUnexportedAttachmentCount();
-				onunexportedcountchange(unexportedCount);
-				toast.success(`${exportedCount}件の証憑をダウンロードしました`);
-			} else {
-				toast.info('ダウンロードする証憑がありません');
-			}
-
-			exportSuccess = year;
-			setTimeout(() => {
-				exportSuccess = null;
-			}, 3000);
-		} catch (error) {
-			console.error('証憑エクスポートエラー:', error);
-			toast.error('証憑エクスポートに失敗しました');
-		} finally {
-			exportingYear = null;
-		}
-	}
-
 	async function handleExportZip(year: number) {
 		zipExportingYear = year;
 		zipProgress = null;
@@ -434,32 +397,21 @@
 							<Button
 								variant="outline"
 								size="sm"
-								onclick={() => handleExportJSON(year)}
-								disabled={exportingYear !== null}
-							>
-								<FileJson class="mr-2 size-4" />
-								JSON
-							</Button>
-							<Button
-								variant="outline"
-								size="sm"
 								onclick={() => handleExportCSV(year)}
 								disabled={exportingYear !== null}
 							>
 								<FileSpreadsheet class="mr-2 size-4" />
-								CSV
+								仕訳のエクスポート (.csv)
 							</Button>
-							{#if storageMode === 'indexeddb' && summary.attachmentCount > 0}
-								<Button
-									variant="outline"
-									size="sm"
-									onclick={() => handleExportAttachments(year)}
-									disabled={exportingYear !== null}
-								>
-									<Download class="mr-2 size-4" />
-									証憑ダウンロード
-								</Button>
-							{/if}
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={() => handleExportJSON(year)}
+								disabled={exportingYear !== null}
+							>
+								<FileJson class="mr-2 size-4" />
+								データのエクスポート (.json)
+							</Button>
 							<Button
 								variant="outline"
 								size="sm"
@@ -475,7 +427,7 @@
 									{/if}
 								{:else}
 									<Archive class="mr-2 size-4" />
-									ZIP
+									データと証憑のエクスポート (.zip)
 								{/if}
 							</Button>
 						</div>
