@@ -116,7 +116,7 @@ describe('zip-export', () => {
 
 		it('証憑付きでZIPを生成できる', async () => {
 			const testBlob = createTestBlob('test pdf content');
-			const attachment = createTestAttachment({ blob: testBlob });
+			const attachment = createTestAttachment();
 			const journal = createTestJournal({ attachments: [attachment] });
 			const journals = [journal];
 			const exportData = createTestExportData(journals);
@@ -165,7 +165,7 @@ describe('zip-export', () => {
 
 		it('進捗コールバックが呼ばれる', async () => {
 			const testBlob = createTestBlob('test');
-			const attachment = createTestAttachment({ blob: testBlob });
+			const attachment = createTestAttachment();
 			const journal = createTestJournal({ attachments: [attachment] });
 			const journals = [journal];
 			const exportData = createTestExportData(journals);
@@ -188,12 +188,10 @@ describe('zip-export', () => {
 
 		it('証憑取得に失敗しても処理を続行し、失敗情報を通知する', async () => {
 			const attachment1 = createTestAttachment({
-				id: 'att-1',
-				blob: createTestBlob('1')
+				id: 'att-1'
 			});
 			const attachment2 = createTestAttachment({
-				id: 'att-2',
-				blob: createTestBlob('2')
+				id: 'att-2'
 			});
 			const journal = createTestJournal({ attachments: [attachment1, attachment2] });
 			const journals = [journal];
@@ -233,9 +231,9 @@ describe('zip-export', () => {
 			expect(completeProgress?.message).toContain('1件の証憑取得に失敗');
 		});
 
-		it('Blobプロパティがdata.jsonから除外される', async () => {
+		it('data.jsonにBlobプロパティが含まれない', async () => {
 			const testBlob = createTestBlob('test');
-			const attachment = createTestAttachment({ blob: testBlob });
+			const attachment = createTestAttachment();
 			const journal = createTestJournal({ attachments: [attachment] });
 			const journals = [journal];
 			const exportData = createTestExportData(journals);
@@ -260,7 +258,6 @@ describe('zip-export', () => {
 
 		it('filePathのみの証憑も収集対象になる', async () => {
 			const attachment = createTestAttachment({
-				blob: undefined,
 				filePath: '2024/test.pdf',
 				storageType: 'filesystem'
 			});
@@ -290,12 +287,10 @@ describe('zip-export', () => {
 		it('複数年度の証憑を年度別フォルダに分類', async () => {
 			const attachment2024 = createTestAttachment({
 				id: 'att-2024',
-				blob: createTestBlob('2024'),
 				generatedName: '2024-06-15_領収書_テスト_1000円_テスト会社.pdf'
 			});
 			const attachment2023 = createTestAttachment({
 				id: 'att-2023',
-				blob: createTestBlob('2023'),
 				generatedName: '2023-12-01_領収書_テスト_1000円_テスト会社.pdf'
 			});
 
@@ -343,8 +338,7 @@ describe('zip-export', () => {
 		});
 
 		it('includeEvidences=false の場合は証憑を含めない', async () => {
-			const testBlob = createTestBlob('test');
-			const attachment = createTestAttachment({ blob: testBlob });
+			const attachment = createTestAttachment();
 			const journal = createTestJournal({ attachments: [attachment] });
 			const journals = [journal];
 			const exportData = createTestExportData(journals);
@@ -367,7 +361,7 @@ describe('zip-export', () => {
 
 		it('不正な日付形式でも現在年度にフォールバックしてエラーにならない', async () => {
 			const testBlob = createTestBlob('test');
-			const attachment = createTestAttachment({ blob: testBlob });
+			const attachment = createTestAttachment();
 			// 不正な日付形式の仕訳
 			const journal = createTestJournal({
 				date: 'invalid-date', // 不正な形式

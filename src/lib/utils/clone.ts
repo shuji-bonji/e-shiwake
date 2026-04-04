@@ -1,12 +1,17 @@
 /**
  * ディープクローンユーティリティ
- * Svelte 5のリアクティブプロキシを解除しつつ、Blobを保持
+ * Svelte 5のリアクティブプロキシを解除する
+ *
+ * Blob は attachmentBlobs テーブルに分離されたため、
+ * 仕訳のクローンでは Blob の保持は不要。
+ * JSON.parse(JSON.stringify()) でも問題ないが、
+ * 明示的なフィールドコピーで安全性を担保する。
  */
 
 import type { JournalEntry, Attachment } from '$lib/types';
 
 /**
- * 添付ファイルをクローン（Blobを保持）
+ * 添付ファイルのメタデータをクローン
  */
 function cloneAttachment(attachment: Attachment): Attachment {
 	return {
@@ -23,20 +28,19 @@ function cloneAttachment(attachment: Attachment): Attachment {
 		vendor: attachment.vendor,
 		storageType: attachment.storageType,
 		filePath: attachment.filePath,
-		blob: attachment.blob, // Blobはそのまま参照を保持
 		exportedAt: attachment.exportedAt,
 		blobPurgedAt: attachment.blobPurgedAt,
+		archived: attachment.archived,
 		createdAt: attachment.createdAt
 	};
 }
 
 /**
- * 仕訳をディープクローン（Blobを保持）
+ * 仕訳をディープクローン
  * Svelte 5のリアクティブプロキシを解除するために使用
- * JSON.parse(JSON.stringify())はBlobを{}に変換してしまうため使用不可
  *
  * @param journal - クローンする仕訳オブジェクト
- * @returns クローンされた仕訳オブジェクト。Blob参照は保持されます
+ * @returns クローンされた仕訳オブジェクト
  */
 export function cloneJournal(journal: JournalEntry): JournalEntry {
 	return {

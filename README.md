@@ -211,7 +211,9 @@ IndexedDB に Blob として保存。定期的なエクスポートを推奨。
 ├── /invoice/[id]           請求書編集
 ├── /vendors                取引先管理
 ├── /accounts               勘定科目管理
-├── /data                   データ管理
+├── /archive                アーカイブ（検索機能付年度保存）
+├── /data                   データ管理（バックアップ/エクスポート/インポート）
+├── /settings               設定（事業者情報・証憑保存・容量）
 └── /help                   ヘルプ
     ├── /getting-started    はじめに
     ├── /journal            仕訳入力
@@ -223,7 +225,10 @@ IndexedDB に Blob として保存。定期的なエクスポートを推奨。
     ├── /fixed-assets       固定資産台帳
     ├── /blue-return        青色申告決算書
     ├── /invoice            請求書
-    ├── /data-management    データ管理
+    ├── /data-management    設定
+    ├── /backup-restore     バックアップ・リストア
+    ├── /import-export      インポート・エクスポート
+    ├── /archive            検索機能付アーカイブ保存
     ├── /pwa                PWA・インストール
     ├── /shortcuts          キーボードショートカット
     ├── /glossary           用語集

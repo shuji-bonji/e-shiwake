@@ -75,6 +75,10 @@ export {
 	setSetting,
 	getStorageMode,
 	setStorageMode,
+	getStorageModeForYear,
+	setStorageModeForYear,
+	getStorageModeByYear,
+	migrateGlobalStorageModeToPerYear,
 	getAllSettingsForExport,
 	restoreAllSettings,
 	getLastExportedAt,
@@ -95,11 +99,22 @@ export {
 // ==================== Import / Export ====================
 export {
 	validateExportData,
+	validateBackupData,
+	detectDataType,
 	importData,
+	importBackupData,
+	importArchiveData,
 	restoreAttachmentBlobs,
-	getImportPreview
+	getImportPreview,
+	getBackupPreview,
+	getArchiveRestorePreview
 } from './import-export';
-export type { ImportMode, ImportResult } from './import-export';
+export type {
+	ImportMode,
+	ImportResult,
+	FullRestoreResult,
+	ArchiveRestoreResult
+} from './import-export';
 
 // ==================== Migration ====================
 export {

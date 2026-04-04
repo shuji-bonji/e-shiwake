@@ -248,13 +248,15 @@ export async function addAttachmentToJournal(
 
 	let attachment: Attachment;
 
+	const attachmentId = crypto.randomUUID();
+
 	if (directoryHandle) {
 		// ファイルシステムに保存
 		const { saveFileToDirectory } = await import('$lib/utils/filesystem');
 		const filePath = await saveFileToDirectory(directoryHandle, year, generatedName, file);
 
 		attachment = {
-			id: crypto.randomUUID(),
+			id: attachmentId,
 			journalEntryId: journalId,
 			documentDate,
 			documentType,
@@ -270,12 +272,15 @@ export async function addAttachmentToJournal(
 			createdAt: new Date().toISOString()
 		};
 	} else {
-		// IndexedDBにBlob保存
+		// IndexedDB に Blob を分離保存
 		const arrayBuffer = await file.arrayBuffer();
 		const blob = new Blob([arrayBuffer], { type: file.type });
 
+		// attachmentBlobs テーブルに Blob を保存
+		await db.attachmentBlobs.put({ id: attachmentId, blob });
+
 		attachment = {
-			id: crypto.randomUUID(),
+			id: attachmentId,
 			journalEntryId: journalId,
 			documentDate,
 			documentType,
@@ -287,7 +292,6 @@ export async function addAttachmentToJournal(
 			amount,
 			vendor,
 			storageType: 'indexeddb',
-			blob,
 			createdAt: new Date().toISOString()
 		};
 	}
@@ -329,6 +333,11 @@ export async function removeAttachmentFromJournal(
 		await deleteFileFromDirectory(directoryHandle, attachmentToRemove.filePath);
 	}
 
+	// attachmentBlobs テーブルから Blob を削除（indexeddb保存の場合）
+	if (attachmentToRemove?.storageType === 'indexeddb') {
+		await db.attachmentBlobs.delete(attachmentToRemove.id);
+	}
+
 	const updatedAttachments = journal.attachments.filter((a) => a.id !== attachmentId);
 	const newEvidenceStatus = updatedAttachments.length > 0 ? 'digital' : 'none';
 
@@ -359,8 +368,9 @@ export async function getAttachmentBlob(
 		return await readFileFromDirectory(directoryHandle, attachment.filePath);
 	}
 
-	// IndexedDBから取得
-	return attachment.blob ?? null;
+	// attachmentBlobs テーブルから取得
+	const blobRecord = await db.attachmentBlobs.get(attachment.id);
+	return blobRecord?.blob ?? null;
 }
 
 /**

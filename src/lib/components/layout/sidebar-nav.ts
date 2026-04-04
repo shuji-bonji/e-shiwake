@@ -1,4 +1,5 @@
 import {
+	Archive,
 	BookOpen,
 	BookText,
 	Scale,
@@ -14,7 +15,8 @@ import {
 	FileSpreadsheet,
 	Users,
 	Settings,
-	List
+	List,
+	Database
 } from '@lucide/svelte';
 import type { Component } from 'svelte';
 
@@ -58,7 +60,10 @@ export const navGroups: NavGroup[] = [
 	{
 		label: '出力',
 		icon: FileOutput,
-		items: [{ label: '帳簿出力', href: '/reports', icon: FileText }]
+		items: [
+			{ label: '帳簿出力', href: '/reports', icon: FileText },
+			{ label: 'アーカイブ', href: '/archive', icon: Archive }
+		]
 	},
 	{
 		label: '請求書',
@@ -69,11 +74,16 @@ export const navGroups: NavGroup[] = [
 		]
 	},
 	{
+		label: 'データ管理',
+		icon: Database,
+		items: [{ label: 'データ管理', href: '/data', icon: Database }]
+	},
+	{
 		label: '設定',
 		icon: Settings,
 		items: [
 			{ label: '勘定科目', href: '/accounts', icon: List },
-			{ label: '設定・データ管理', href: '/data', icon: Settings }
+			{ label: '設定', href: '/settings', icon: Settings }
 		]
 	}
 ];

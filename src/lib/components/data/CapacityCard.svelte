@@ -6,6 +6,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import {
+		getAttachmentBlob,
 		getJournalsByYear,
 		getUnexportedAttachmentCount,
 		purgeAllExportedBlobs,
@@ -108,8 +109,10 @@
 
 			for (const journal of journals) {
 				for (const attachment of journal.attachments) {
-					if (attachment.storageType === 'indexeddb' && attachment.blob) {
-						downloadBlob(attachment.blob, attachment.generatedName);
+					if (attachment.storageType === 'indexeddb' && !attachment.blobPurgedAt) {
+						const blob = await getAttachmentBlob(journal.id, attachment.id);
+						if (!blob) continue;
+						downloadBlob(blob, attachment.generatedName);
 						exportedCount++;
 						await new Promise((resolve) => setTimeout(resolve, 500));
 					}

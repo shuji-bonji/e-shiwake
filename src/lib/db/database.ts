@@ -4,6 +4,7 @@ import type {
 	Vendor,
 	JournalEntry,
 	Attachment,
+	AttachmentBlob,
 	SettingsKey,
 	SettingsValueMap
 } from '$lib/types';
@@ -30,6 +31,7 @@ class EShiwakeDatabase extends Dexie {
 	vendors!: EntityTable<Vendor, 'id'>;
 	journals!: EntityTable<JournalEntry, 'id'>;
 	attachments!: EntityTable<Attachment, 'id'>;
+	attachmentBlobs!: EntityTable<AttachmentBlob, 'id'>;
 	settings!: EntityTable<SettingsRecord, 'key'>;
 	fixedAssets!: EntityTable<FixedAsset, 'id'>;
 	invoices!: EntityTable<Invoice, 'id'>;
@@ -160,6 +162,49 @@ class EShiwakeDatabase extends Dexie {
 							vendor.updatedAt = vendor.createdAt || now;
 						}
 					});
+			});
+
+		// Version 8: Blob 分離 — 仕訳に埋め込まれた証憑 Blob を attachmentBlobs テーブルに移行
+		this.version(8)
+			.stores({
+				accounts: 'code, name, type, isSystem',
+				vendors: 'id, name',
+				journals: 'id, date, vendor, evidenceStatus',
+				attachments: 'id, journalEntryId',
+				attachmentBlobs: '&id',
+				settings: 'key',
+				fixedAssets: '&id, name, category, acquisitionDate, status',
+				invoices: '&id, invoiceNumber, issueDate, vendorId, status'
+			})
+			.upgrade(async (tx) => {
+				// 全仕訳を走査し、IndexedDB 保存の証憑 Blob を新テーブルに移行
+				const journals = await tx.table('journals').toArray();
+				const blobsToInsert: { id: string; blob: Blob }[] = [];
+
+				for (const journal of journals) {
+					if (!journal.attachments || journal.attachments.length === 0) continue;
+
+					let modified = false;
+					for (const attachment of journal.attachments) {
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
+						const att = attachment as any;
+						if (att.storageType === 'indexeddb' && att.blob instanceof Blob) {
+							blobsToInsert.push({ id: att.id, blob: att.blob });
+							delete att.blob;
+							modified = true;
+						}
+					}
+
+					if (modified) {
+						await tx.table('journals').put(journal);
+					}
+				}
+
+				// 新テーブルに Blob を一括挿入
+				if (blobsToInsert.length > 0) {
+					await tx.table('attachmentBlobs').bulkPut(blobsToInsert);
+					console.log(`Migrated ${blobsToInsert.length} attachment blobs to separate table`);
+				}
 			});
 	}
 }

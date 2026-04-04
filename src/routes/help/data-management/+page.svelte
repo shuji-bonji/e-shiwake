@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { HelpSection, HelpNote, HelpTable } from '$lib/components/help';
 
 	const pageDescription =
-		'データのエクスポート・インポート・バックアップ方法。JSON/ZIP対応。 - e-shiwake ヘルプ';
+		'設定とデータ管理の概要。証憑保存設定、ストレージ管理、3層データ管理。 - e-shiwake ヘルプ';
 </script>
 
 <svelte:head>
@@ -15,22 +16,76 @@
 	<h1 class="mb-6 text-2xl font-bold">設定・データ管理</h1>
 
 	<p class="mb-8 text-muted-foreground">
-		アプリの設定とデータ管理はサイドバーの「設定・データ管理」から行えます。
+		e-shiwakeでは「設定」と「データ管理」を別ページに分けています。
 	</p>
 
-	<HelpSection title="証憑保存設定">
-		<p>PDFファイルの保存方法を選択できます。</p>
+	<HelpTable
+		headers={['ページ', '場所', '内容']}
+		rows={[
+			[
+				'設定（/settings）',
+				'サイドバー「設定」→「設定」',
+				'事業者情報・証憑保存先・ストレージ容量'
+			],
+			['データ管理（/data）', 'サイドバー「データ管理」', 'バックアップ・リストア / エクスポート']
+		]}
+	/>
+
+	<h2 class="mt-10 mb-6 text-xl font-bold">設定ページ（/settings）</h2>
+
+	<HelpSection title="事業者情報">
+		<p>青色申告決算書に使用する事業者情報（氏名・屋号・住所等）を登録します。</p>
+	</HelpSection>
+
+	<HelpSection title="証憑保存設定（年度別）">
+		<p>
+			証憑PDFの保存先を<strong>年度ごと</strong
+			>に設定できます。同じ端末内でも年度によって保存先を使い分けられます。
+		</p>
 		<HelpTable
 			headers={['保存先', '対応ブラウザ', '特徴']}
 			rows={[
-				['ローカルフォルダ', 'Chrome, Edge', 'ファイルとして直接保存。フォルダ選択が必要'],
+				['ローカルフォルダ', 'Chrome, Edge', 'ファイルとして直接保存。ブラウザ容量を消費しない'],
 				['ブラウザ内', 'すべて', 'IndexedDBに保存。Safari/Firefox対応。エクスポートで取り出し可能']
 			]}
 		/>
 		<HelpNote type="info">
 			<p>
-				Chrome/Edgeをお使いの場合は「ローカルフォルダ」がおすすめです。
-				Safari/Firefoxでは「ブラウザ内」が自動選択されます。
+				デフォルトの保存先はブラウザの対応状況で自動判定されます。Chrome/Edgeでは「ローカルフォルダ」、Safari/Firefoxでは「ブラウザ内」が既定値です。
+			</p>
+		</HelpNote>
+
+		<h3 class="mt-6 mb-2 text-sm font-semibold">年度別の保存先切替</h3>
+		<p>
+			設定ページの「年度別の証憑保存先」で、各年度の保存先をローカルフォルダ⇔ブラウザ内に切り替えられます。切替時には該当年度の証憑PDFが自動的に移行（マイグレーション）されます。
+		</p>
+		<ul class="mt-2 ml-4 list-disc space-y-1">
+			<li>ローカル→ブラウザ: ファイルをIndexedDBに取り込み、ローカルファイルを削除</li>
+			<li>ブラウザ→ローカル: IndexedDBからファイルとして書き出し、Blobを削除</li>
+		</ul>
+		<p class="mt-2">移行は確認ダイアログの後に実行され、進捗バーで状況を確認できます。</p>
+		<HelpNote type="tip">
+			<p>リストア時に選択した保存先も年度別の設定として自動保存されます。</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="フォルダ設定の注意">
+		<p>
+			ローカル保存モードでは、保存先フォルダの指定が必要です。
+			フォルダが未設定の場合、証憑PDFの参照・保存ができません。
+		</p>
+
+		<p class="mt-4">以下の場合にフォルダ設定が失われることがあります:</p>
+		<ul class="ml-4 list-disc space-y-1">
+			<li>別の端末やブラウザでデータをインポートした場合</li>
+			<li>ブラウザのデータが初期化された場合</li>
+		</ul>
+
+		<p class="mt-4">この場合、同じフォルダを再選択すれば証憑へのアクセスが復活します。</p>
+
+		<HelpNote type="warning">
+			<p>
+				フォルダ設定をクリアすると、ローカルフォルダ内の証憑PDFへのリンクが切れます。証憑ファイル自体はフォルダに残りますが、仕訳との紐付けが失われます。
 			</p>
 		</HelpNote>
 	</HelpSection>
@@ -40,150 +95,27 @@
 			e-shiwakeのデータは、ブラウザ内のIndexedDBに保存されます。
 			サーバーへのデータ送信は行いません。
 		</p>
-		<HelpNote type="warning">
-			<p>
-				ブラウザのデータ消去やシークレットモードでは、データが失われる可能性があります。
-				定期的なバックアップをお勧めします。
-			</p>
-		</HelpNote>
-	</HelpSection>
-
-	<HelpSection title="エクスポート">
-		<p>データを外部ファイルとして保存できます。年度ごとにエクスポートできます。</p>
-
-		<h3 class="mt-4 mb-2 text-sm font-semibold">エクスポート形式と含まれるデータ</h3>
 		<HelpTable
-			headers={['データ', '.csv', '.json', '.zip']}
+			headers={['データ', '保存先']}
 			rows={[
-				['仕訳', '✅', '✅', '✅'],
-				['勘定科目・取引先', '―', '✅', '✅'],
-				['固定資産台帳', '―', '✅', '✅'],
-				['請求書', '―', '✅', '✅'],
-				['事業者情報・青色申告設定', '―', '✅', '✅'],
-				['証憑PDF', '―', '―', '✅']
-			]}
-		/>
-
-		<h3 class="mt-4 mb-2 text-sm font-semibold">各ボタンの用途</h3>
-		<HelpTable
-			headers={['ボタン', '用途']}
-			rows={[
-				[
-					'仕訳のエクスポート (.csv)',
-					'Excelでの確認や他の会計ソフトへの連携。仕訳のみのフラット形式'
-				],
-				[
-					'データのエクスポート (.json)',
-					'バックアップ、他端末への移行。証憑PDF以外の全データを含む'
-				],
-				[
-					'データと証憑のエクスポート (.zip)',
-					'完全バックアップ。JSON + 証憑PDFをまとめてダウンロード。年次アーカイブに最適'
-				]
-			]}
-		/>
-		<HelpNote type="tip">
-			<p>
-				確定申告後の年次アーカイブにはZIP形式がおすすめです。仕訳データと証憑PDFを一つのファイルにまとめて保存できます。
-			</p>
-		</HelpNote>
-		<HelpNote type="info">
-			<p>
-				ブラウザ内保存モードでは、「ストレージ使用量」セクションから証憑PDFを年度別に個別ダウンロードすることもできます。
-			</p>
-		</HelpNote>
-	</HelpSection>
-
-	<HelpSection title="インポート">
-		<p>JSONまたはZIPファイルからデータを復元できます。</p>
-		<ol class="ml-4 list-decimal space-y-2">
-			<li>「設定・データ管理」ページを開く</li>
-			<li>「インポート」セクションで「ファイルを選択」</li>
-			<li>エクスポートしたJSON/ZIPファイルを選択</li>
-			<li>プレビューを確認後、インポートモードを選択して実行</li>
-		</ol>
-
-		<h3 class="mt-4 mb-2 text-sm font-semibold">インポートモード</h3>
-		<HelpTable
-			headers={['モード', '動作']}
-			rows={[
-				['マージ（推奨）', '既存のデータを残し、新規データのみ追加。同じIDの仕訳は上書きしない'],
-				['上書き', '対象年度の既存仕訳を削除して、インポートデータで置き換え']
-			]}
-		/>
-
-		<h3 class="mt-4 mb-2 text-sm font-semibold">ZIPインポート時の証憑復元</h3>
-		<p>ZIPファイルに含まれる証憑PDFは、現在の保存設定に従って復元されます。</p>
-		<HelpTable
-			headers={['保存設定', '証憑の復元先']}
-			rows={[
-				[
-					'ローカルフォルダ（フォルダ選択済み）',
-					'指定フォルダ内の年度別サブフォルダにPDFファイルとして保存'
-				],
-				['ローカルフォルダ（未選択）', 'ブラウザ内（IndexedDB）に一時保存'],
-				['ブラウザ内', 'IndexedDBにBlob形式で保存']
+				['仕訳メタデータ', 'IndexedDB（共通）'],
+				['証憑PDF（実体）', 'IndexedDB または ローカルフォルダ（設定に依存）'],
+				['勘定科目・設定等', 'IndexedDB（共通）']
 			]}
 		/>
 		<HelpNote type="warning">
 			<p>
-				JSONインポートでは証憑PDFは復元されません。証憑も含めて完全に復元するにはZIPファイルを使用してください。
-			</p>
-		</HelpNote>
-		<HelpNote type="info">
-			<p>
-				ブラウザ内保存モードでは、証憑PDFの合計サイズがブラウザの容量制限を超える場合があります。大量の証憑がある場合は「ローカルフォルダ」設定での復元をおすすめします。
-			</p>
-		</HelpNote>
-	</HelpSection>
-
-	<HelpSection title="年度アーカイブ">
-		<p>過去の年度データをZIP形式でアーカイブできます。</p>
-		<ul class="ml-4 list-disc space-y-1">
-			<li>仕訳データ（JSON）</li>
-			<li>紐付けられたPDF証憑</li>
-			<li>勘定科目・取引先マスタ</li>
-			<li>固定資産台帳・請求書</li>
-			<li>事業者情報・青色申告設定</li>
-		</ul>
-		<HelpNote type="info">
-			<p>電帳法により証憑は7年間の保存が必要です。年次アーカイブをお勧めします。</p>
-		</HelpNote>
-	</HelpSection>
-
-	<HelpSection title="帳簿出力">
-		<p>
-			サイドバーの「帳簿出力」から、複数の帳簿をまとめて印刷・CSV出力できます。
-			確定申告時に必要な帳簿を一括で出力する際に便利です。
-		</p>
-		<HelpTable
-			headers={['機能', '内容']}
-			rows={[
-				['一括印刷', '選択した帳簿を新しいウィンドウでまとめて印刷/PDF保存'],
-				['CSV ZIP出力', '選択した帳簿のCSVファイルをZIPにまとめてダウンロード']
-			]}
-		/>
-		<p class="mt-4">対応している帳簿:</p>
-		<ul class="ml-4 list-disc space-y-1">
-			<li>仕訳帳</li>
-			<li>総勘定元帳（全科目 or 取引のある科目のみ）</li>
-			<li>試算表（合計残高試算表）</li>
-			<li>損益計算書</li>
-			<li>貸借対照表</li>
-			<li>消費税集計</li>
-		</ul>
-		<HelpNote type="tip">
-			<p>
-				総勘定元帳は「全ての勘定科目」または「取引のある科目のみ」を選択できます。
-				印刷時間を短縮したい場合は「取引のある科目のみ」がおすすめです。
+				ブラウザのデータ消去やシークレットモードでは、データが失われる可能性があります。定期的なバックアップをお勧めします。
 			</p>
 		</HelpNote>
 	</HelpSection>
 
 	<HelpSection title="ストレージ使用量">
 		<p>
-			IndexedDBの容量は、ブラウザやデバイスによって異なります。
-			現在の使用量は「設定・データ管理」ページで確認できます。
+			ブラウザ内（IndexedDB）に証憑を保存している場合、ストレージ容量を消費します。設定ページでは現在の使用量と推定上限が確認できます。
+		</p>
+		<p class="mt-2">
+			この情報は主に、Safari/Firefoxなど容量上限が厳しい環境で、ブラウザ内保存を使用している場合の容量管理に役立ちます。
 		</p>
 		<HelpTable
 			headers={['ブラウザ', '容量目安']}
@@ -193,10 +125,68 @@
 				['Firefox', 'ディスク空き容量の約50%']
 			]}
 		/>
+
+		<h3 class="mt-6 mb-2 text-sm font-semibold">証憑ダウンロード（Blob Purge）</h3>
+		<p>
+			ブラウザ内保存モードで容量が逼迫した場合に、証憑PDFを個別にダウンロードしてIndexedDB上のBlobを削除する機能です。Safari等の容量制限が厳しい環境での応急措置として用意されています。
+		</p>
+		<p class="mt-2">通常の証憑管理には以下の方法が適しています:</p>
+		<ul class="mt-1 ml-4 list-disc space-y-1">
+			<li>個別のPDF確認: 仕訳のPDFリンクからダウンロード</li>
+			<li>一括保存: バックアップ（ZIP形式で全データ+証憑を保存）</li>
+			<li>年度末: アーカイブ（帳簿レポート+証憑+検索HTMLを一括保存）</li>
+			<li>容量回復: ローカルフォルダ保存への切替（年度別に設定可能）</li>
+		</ul>
 		<HelpNote type="tip">
 			<p>
-				容量を節約するには、古い年度のデータをエクスポート後に削除することを検討してください。ローカルフォルダ保存に切り替えると、ブラウザ容量を消費せずに証憑を保存できます。
+				Chrome/Edgeでは年度別の保存先をローカルフォルダに切り替えることで、ブラウザ容量を消費せずに証憑を保存できます。確定申告後はアーカイブを作成してから年度データを削除する方法もあります。
 			</p>
 		</HelpNote>
+	</HelpSection>
+
+	<h2 class="mt-10 mb-6 text-xl font-bold">データ管理ページ（/data）</h2>
+
+	<HelpSection title="データ管理の2層構造">
+		<p>データ管理は以下の2層で構成されています。</p>
+		<HelpTable
+			headers={['層', '形式', '対象', '用途']}
+			rows={[
+				['バックアップ・リストア', 'ZIP', '全データ＋証憑PDF', '端末移行・事故対策'],
+				[
+					'エクスポート',
+					'JSON / CSV',
+					'仕訳データ（証憑なし）',
+					'Excel確認・他ソフト連携・外部保存'
+				]
+			]}
+		/>
+		<p class="mt-4">これに加えて、年度末の長期保存用にアーカイブ機能（/archive）があります。</p>
+		<HelpTable
+			headers={['機能', '形式', '内容']}
+			rows={[['アーカイブ', 'ZIP', '仕訳＋証憑＋帳簿レポート＋検索HTML']]}
+		/>
+		<HelpNote type="tip">
+			<p>
+				通常のデータ保全にはバックアップを、確定申告後の年度締めにはアーカイブを使い分けてください。詳細は各ヘルプページをご覧ください。
+			</p>
+		</HelpNote>
+	</HelpSection>
+
+	<HelpSection title="関連ヘルプ">
+		<ul class="ml-4 list-disc space-y-1">
+			<li>
+				<a href="{base}/help/backup-restore" class="text-primary hover:underline"
+					>バックアップ・リストア</a
+				> — 全データのZIP保存と復元
+			</li>
+			<li>
+				<a href="{base}/help/import-export" class="text-primary hover:underline">エクスポート</a> — CSV/JSONでのデータ出力
+			</li>
+			<li>
+				<a href="{base}/help/archive" class="text-primary hover:underline"
+					>検索機能付アーカイブ保存</a
+				> — 年度末の帳簿セット保存
+			</li>
+		</ul>
 	</HelpSection>
 </div>

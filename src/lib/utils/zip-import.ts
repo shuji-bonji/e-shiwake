@@ -1,8 +1,8 @@
 import JSZip from 'jszip';
 import { from, of } from 'rxjs';
 import { catchError, finalize, mergeMap } from 'rxjs/operators';
-import type { ExportData, Attachment } from '$lib/types';
-import { validateExportData } from '$lib/db';
+import type { BackupData, ExportData, Attachment } from '$lib/types';
+import { validateExportData, validateBackupData } from '$lib/db';
 
 /**
  * ZIPインポートの進捗情報
@@ -21,14 +21,35 @@ export interface ZipImportProgress {
 }
 
 /**
- * ZIPインポートの結果
- * インポート成功時に返される完全なデータ
- *
- * @property exportData - インポートされた仕訳・勘定科目・取引先・設定データ
- * @property attachmentBlobs - 証憑PDFのBlobマップ（attachmentId -> Blob）
- * @property warnings - インポート時の警告メッセージ配列
+ * ZIPインポートの結果（ExportData 形式）
  */
-export interface ZipImportResult {
+export interface ZipImportExportResult {
+	dataType: 'export';
+	exportData: ExportData;
+	attachmentBlobs: Map<string, Blob>;
+	warnings: string[];
+}
+
+/**
+ * ZIPインポートの結果（BackupData 形式）
+ */
+export interface ZipImportBackupResult {
+	dataType: 'backup';
+	backupData: BackupData;
+	attachmentBlobs: Map<string, Blob>;
+	warnings: string[];
+}
+
+/**
+ * ZIPインポートの結果（判別済み）
+ */
+export type ZipImportResult = ZipImportExportResult | ZipImportBackupResult;
+
+/**
+ * 後方互換: 旧形式の結果型（exportData プロパティで直接アクセス）
+ * @deprecated ZipImportResult を使用してください
+ */
+export interface ZipImportResultLegacy {
 	exportData: ExportData;
 	attachmentBlobs: Map<string, Blob>;
 	warnings: string[];
@@ -112,19 +133,28 @@ export async function importFromZip(
 	}
 
 	const dataJsonText = await dataJsonFile.async('string');
-	let exportData: ExportData;
+	let parsedData: unknown;
 
 	try {
-		exportData = JSON.parse(dataJsonText);
+		parsedData = JSON.parse(dataJsonText);
 	} catch {
 		throw new Error('data.jsonの解析に失敗しました');
 	}
 
-	if (!validateExportData(exportData)) {
+	// BackupData か ExportData かを判別
+	const isBackup = validateBackupData(parsedData);
+	const isExport = !isBackup && validateExportData(parsedData);
+
+	if (!isBackup && !isExport) {
 		throw new Error(
 			'ファイル形式が正しくありません。e-shiwakeからエクスポートしたZIPファイルを選択してください。'
 		);
 	}
+
+	// BackupData / ExportData どちらでも journals を取り出す
+	const journals = isBackup
+		? (parsedData as BackupData).journals
+		: (parsedData as ExportData).journals;
 
 	// Phase 3: 証憑ファイルを抽出
 	const attachmentBlobs = new Map<string, Blob>();
@@ -134,7 +164,7 @@ export async function importFromZip(
 	const attachmentIdToAttachment = new Map<string, { journalId: string; attachment: Attachment }>();
 	const duplicateFileNames = new Set<string>();
 
-	for (const journal of exportData.journals) {
+	for (const journal of journals) {
 		for (const attachment of journal.attachments) {
 			// 同名ファイルの衝突を検知
 			if (fileNameToAttachment.has(attachment.generatedName)) {
@@ -255,8 +285,18 @@ export async function importFromZip(
 		message: `完了（${attachmentBlobs.size}件の証憑を読み込み）`
 	});
 
+	if (isBackup) {
+		return {
+			dataType: 'backup' as const,
+			backupData: parsedData as BackupData,
+			attachmentBlobs,
+			warnings
+		};
+	}
+
 	return {
-		exportData,
+		dataType: 'export' as const,
+		exportData: parsedData as ExportData,
 		attachmentBlobs,
 		warnings
 	};

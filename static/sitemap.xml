@@ -82,6 +82,18 @@
     <priority>0.8</priority>
   </url>
 
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/settings</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/archive</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
   <!-- ヘルプ -->
   <url>
     <loc>https://shuji-bonji.github.io/e-shiwake/help</loc>
@@ -151,6 +163,24 @@
 
   <url>
     <loc>https://shuji-bonji.github.io/e-shiwake/help/data-management</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/backup-restore</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/import-export</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/archive</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>

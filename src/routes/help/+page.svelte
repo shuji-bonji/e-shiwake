@@ -15,7 +15,10 @@
 		BookText,
 		Scale,
 		FileSpreadsheet,
-		Bot
+		Bot,
+		HardDriveDownload,
+		ArrowLeftRight,
+		Archive
 	} from '@lucide/svelte';
 
 	const pageDescription =
@@ -84,9 +87,27 @@
 		},
 		{
 			href: `${base}/help/data-management`,
-			label: '設定・データ管理',
+			label: '設定',
 			icon: Database,
-			description: '証憑保存・エクスポート・インポート・帳簿出力'
+			description: '証憑保存・ストレージ・データ管理の概要'
+		},
+		{
+			href: `${base}/help/backup-restore`,
+			label: 'バックアップ・リストア',
+			icon: HardDriveDownload,
+			description: '全データの保存と復元'
+		},
+		{
+			href: `${base}/help/import-export`,
+			label: 'エクスポート',
+			icon: ArrowLeftRight,
+			description: 'CSV・JSONでのデータ出力'
+		},
+		{
+			href: `${base}/help/archive`,
+			label: '検索機能付アーカイブ保存',
+			icon: Archive,
+			description: '年度末の仕訳・証憑セット保存'
 		},
 		{
 			href: `${base}/help/pwa`,

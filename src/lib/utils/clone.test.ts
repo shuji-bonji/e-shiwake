@@ -74,8 +74,7 @@ describe('cloneJournal', () => {
 		expect(cloned.lines[1]._businessRatioGenerated).toBe(true);
 	});
 
-	it('Blob添付ファイルを保持する', () => {
-		const blob = new Blob(['test'], { type: 'application/pdf' });
+	it('添付ファイルのメタデータを正しくクローンする', () => {
 		const journal: JournalEntry = {
 			id: 'journal-1',
 			date: '2025-01-15',
@@ -100,7 +99,9 @@ describe('cloneJournal', () => {
 					amount: 10000,
 					vendor: 'NTT',
 					storageType: 'indexeddb',
-					blob,
+					exportedAt: '2025-01-20T00:00:00Z',
+					blobPurgedAt: '2025-02-20T00:00:00Z',
+					archived: true,
 					createdAt: '2025-01-15T10:00:00Z'
 				}
 			],
@@ -110,7 +111,13 @@ describe('cloneJournal', () => {
 
 		const cloned = cloneJournal(journal);
 
-		// Blobが保持されていること（参照が同じ）
-		expect(cloned.attachments[0].blob).toBe(blob);
+		// メタデータが保持されていること
+		expect(cloned.attachments[0].id).toBe('att-1');
+		expect(cloned.attachments[0].storageType).toBe('indexeddb');
+		expect(cloned.attachments[0].exportedAt).toBe('2025-01-20T00:00:00Z');
+		expect(cloned.attachments[0].blobPurgedAt).toBe('2025-02-20T00:00:00Z');
+		expect(cloned.attachments[0].archived).toBe(true);
+		// クローンなので参照が異なること
+		expect(cloned.attachments[0]).not.toBe(journal.attachments[0]);
 	});
 });

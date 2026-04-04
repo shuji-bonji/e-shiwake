@@ -11,6 +11,7 @@ import {
 	migrateAttachmentToFilesystem,
 	migrateAttachmentToIndexedDB,
 	setStorageMode,
+	setStorageModeForYear,
 	type MigrationAttachment
 } from '$lib/db';
 
@@ -56,18 +57,24 @@ export function createMigrationStore() {
 
 	/**
 	 * マイグレーション対象の件数を取得
+	 * @param target 移行先のストレージタイプ
+	 * @param year 年度フィルタ（省略時は全年度）
 	 */
-	async function getTargetCount(target: StorageType): Promise<number> {
-		const attachments = await getAttachmentsForMigration(target);
+	async function getTargetCount(target: StorageType, year?: number): Promise<number> {
+		const attachments = await getAttachmentsForMigration(target, year);
 		return attachments.length;
 	}
 
 	/**
 	 * マイグレーションを開始
+	 * @param target 移行先のストレージタイプ
+	 * @param directoryHandle ファイルシステムのディレクトリハンドル
+	 * @param year 年度フィルタ（省略時は全年度、指定時はその年度のみ移行し年度別設定を更新）
 	 */
 	async function startMigration(
 		target: StorageType,
-		directoryHandle: FileSystemDirectoryHandle
+		directoryHandle: FileSystemDirectoryHandle,
+		year?: number
 	): Promise<boolean> {
 		if (isRunning) {
 			console.warn('マイグレーション実行中です');
@@ -84,14 +91,18 @@ export function createMigrationStore() {
 
 		try {
 			// マイグレーション対象を取得
-			const attachments = await getAttachmentsForMigration(target);
+			const attachments = await getAttachmentsForMigration(target, year);
 			total = attachments.length;
 
 			if (total === 0) {
 				// 移行対象がない場合は即完了
 				isRunning = false;
 				progress = 1;
-				await setStorageMode(target);
+				if (year !== undefined) {
+					await setStorageModeForYear(year, target);
+				} else {
+					await setStorageMode(target);
+				}
 				return true;
 			}
 
@@ -139,7 +150,11 @@ export function createMigrationStore() {
 
 							// エラーがなければストレージモードを更新
 							if (!isCanceled && errors.length === 0) {
-								await setStorageMode(target);
+								if (year !== undefined) {
+									await setStorageModeForYear(year, target);
+								} else {
+									await setStorageMode(target);
+								}
 							}
 
 							resolve(!isCanceled && errors.length === 0);

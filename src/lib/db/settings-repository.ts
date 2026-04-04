@@ -1,6 +1,6 @@
 import type { Attachment, SettingsKey, SettingsValueMap, StorageType } from '$lib/types';
-import { omit } from '$lib/utils';
 import { db } from './database';
+import { getAvailableYears } from './journal-repository';
 
 // ==================== 設定関連 ====================
 
@@ -54,6 +54,71 @@ export async function setStorageMode(mode: StorageType): Promise<void> {
 }
 
 /**
+ * 年度別の保存モードを取得
+ * 年度別設定 → デフォルト（File System Access API対応なら filesystem、非対応なら indexeddb）
+ */
+export async function getStorageModeForYear(
+	year: number,
+	supportsFileSystem?: boolean
+): Promise<StorageType> {
+	const byYear = await getSetting('storageModeByYear');
+	const yearKey = String(year);
+	if (byYear && (byYear[yearKey] === 'filesystem' || byYear[yearKey] === 'indexeddb')) {
+		return byYear[yearKey];
+	}
+	// 年度別設定がなければ、ブラウザのAPI対応状況でデフォルトを決定
+	if (supportsFileSystem !== undefined) {
+		return supportsFileSystem ? 'filesystem' : 'indexeddb';
+	}
+	// supportsFileSystem が渡されない場合はグローバル設定にフォールバック
+	return await getStorageMode();
+}
+
+/**
+ * 年度別の保存モードを設定
+ */
+export async function setStorageModeForYear(year: number, mode: StorageType): Promise<void> {
+	const byYear = (await getSetting('storageModeByYear')) ?? {};
+	const updated = { ...byYear, [String(year)]: mode };
+	await setSetting('storageModeByYear', updated);
+}
+
+/**
+ * 全年度の保存モードマップを取得
+ */
+export async function getStorageModeByYear(): Promise<Record<string, StorageType>> {
+	return (await getSetting('storageModeByYear')) ?? {};
+}
+
+/**
+ * グローバル storageMode を年度別設定にマイグレーション（v0.4.0 初回起動時）
+ *
+ * storageModeByYear が未設定で、グローバル storageMode が明示設定済みの場合、
+ * 全年度にグローバル設定を展開する。これにより既存ユーザーの設定が引き継がれる。
+ */
+export async function migrateGlobalStorageModeToPerYear(): Promise<void> {
+	const byYear = await getSetting('storageModeByYear');
+	// 既に年度別設定がある場合はスキップ
+	if (byYear && Object.keys(byYear).length > 0) return;
+
+	const globalMode = await getSetting('storageMode');
+	// グローバル設定が未設定（デフォルトの場合）はスキップ
+	if (!globalMode || (globalMode !== 'filesystem' && globalMode !== 'indexeddb')) return;
+
+	const years = await getAvailableYears();
+	if (years.length === 0) return;
+
+	const perYear: Record<string, StorageType> = {};
+	for (const year of years) {
+		perYear[String(year)] = globalMode;
+	}
+	await setSetting('storageModeByYear', perYear);
+	console.info(
+		`[settings] グローバル保存モード "${globalMode}" を ${years.length} 年度に展開しました`
+	);
+}
+
+/**
  * エクスポート用に全設定をまとめて取得
  * lastExportedAt は動的な値のため除外
  */
@@ -70,11 +135,23 @@ export async function getAllSettingsForExport(): Promise<Partial<SettingsValueMa
 
 /**
  * エクスポートデータから全設定を復元
- * lastExportedAt は復元しない
+ * デフォルトで除外されるキー:
+ * - lastExportedAt: 動的な値のため
+ * - storageMode: リストア先の環境に依存するため（リストア時にユーザーが選択）
  */
-export async function restoreAllSettings(settings: Partial<SettingsValueMap>): Promise<void> {
+export async function restoreAllSettings(
+	settings: Partial<SettingsValueMap>,
+	excludeKeys: (keyof SettingsValueMap)[] = []
+): Promise<void> {
+	const defaultExcludes: (keyof SettingsValueMap)[] = [
+		'lastExportedAt',
+		'storageMode',
+		'storageModeByYear'
+	];
+	const allExcludes = new Set([...defaultExcludes, ...excludeKeys]);
+
 	for (const [key, value] of Object.entries(settings)) {
-		if (key === 'lastExportedAt') continue;
+		if (allExcludes.has(key as keyof SettingsValueMap)) continue;
 		if (value === undefined) continue;
 		// DataCloneError回避: Svelte $stateプロキシをプレーンオブジェクトに変換
 		const plainValue = JSON.parse(JSON.stringify(value));
@@ -227,7 +304,6 @@ export async function getPurgeableBlobCount(): Promise<number> {
 			if (
 				attachment.storageType === 'indexeddb' &&
 				attachment.exportedAt &&
-				attachment.blob &&
 				!attachment.blobPurgedAt &&
 				new Date(attachment.exportedAt).getTime() <= threshold
 			) {
@@ -241,6 +317,7 @@ export async function getPurgeableBlobCount(): Promise<number> {
 
 /**
  * エクスポート済みのBlobを削除（容量節約）
+ * attachmentBlobs テーブルから Blob を削除し、メタデータに blobPurgedAt を設定
  * @returns 削除した件数
  */
 export async function purgeExportedBlobs(): Promise<number> {
@@ -253,6 +330,7 @@ export async function purgeExportedBlobs(): Promise<number> {
 		.filter((j) => j.attachments.length > 0)
 		.toArray();
 	let purgedCount = 0;
+	const blobIdsToDelete: string[] = [];
 
 	for (const journal of journalsWithAttachments) {
 		let modified = false;
@@ -260,13 +338,13 @@ export async function purgeExportedBlobs(): Promise<number> {
 			if (
 				attachment.storageType === 'indexeddb' &&
 				attachment.exportedAt &&
-				attachment.blob &&
 				!attachment.blobPurgedAt &&
 				new Date(attachment.exportedAt).getTime() <= threshold
 			) {
 				modified = true;
 				purgedCount++;
-				return { ...omit(attachment, ['blob']), blobPurgedAt: purgedAt } as Attachment;
+				blobIdsToDelete.push(attachment.id);
+				return { ...attachment, blobPurgedAt: purgedAt } as Attachment;
 			}
 			return attachment;
 		});
@@ -277,6 +355,11 @@ export async function purgeExportedBlobs(): Promise<number> {
 				updatedAt: purgedAt
 			});
 		}
+	}
+
+	// attachmentBlobs テーブルから Blob を一括削除
+	if (blobIdsToDelete.length > 0) {
+		await db.attachmentBlobs.bulkDelete(blobIdsToDelete);
 	}
 
 	return purgedCount;
@@ -295,6 +378,7 @@ export async function purgeAllExportedBlobs(): Promise<number> {
 		.filter((j) => j.attachments.length > 0)
 		.toArray();
 	let purgedCount = 0;
+	const blobIdsToDelete: string[] = [];
 
 	for (const journal of journalsWithAttachments) {
 		let modified = false;
@@ -302,12 +386,12 @@ export async function purgeAllExportedBlobs(): Promise<number> {
 			if (
 				attachment.storageType === 'indexeddb' &&
 				attachment.exportedAt &&
-				attachment.blob &&
 				!attachment.blobPurgedAt
 			) {
 				modified = true;
 				purgedCount++;
-				return { ...omit(attachment, ['blob']), blobPurgedAt: now } as Attachment;
+				blobIdsToDelete.push(attachment.id);
+				return { ...attachment, blobPurgedAt: now } as Attachment;
 			}
 			return attachment;
 		});
@@ -318,6 +402,11 @@ export async function purgeAllExportedBlobs(): Promise<number> {
 				updatedAt: now
 			});
 		}
+	}
+
+	// attachmentBlobs テーブルから Blob を一括削除
+	if (blobIdsToDelete.length > 0) {
+		await db.attachmentBlobs.bulkDelete(blobIdsToDelete);
 	}
 
 	return purgedCount;

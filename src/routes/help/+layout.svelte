@@ -21,7 +21,10 @@
 		BookA,
 		FileCode2,
 		FileSpreadsheet,
-		Bot
+		Bot,
+		HardDriveDownload,
+		ArrowLeftRight,
+		Archive
 	} from '@lucide/svelte';
 	import { cn } from '$lib/utils.js';
 	import type { Snippet } from 'svelte';
@@ -55,7 +58,18 @@
 		{ href: `${base}/help/fixed-assets`, label: '固定資産台帳', icon: Package },
 		{ href: `${base}/help/blue-return`, label: '青色申告決算書', icon: ClipboardList },
 		{ href: `${base}/help/invoice`, label: '請求書', icon: FileSpreadsheet },
-		{ href: `${base}/help/data-management`, label: '設定・データ管理', icon: Database },
+		{ href: `${base}/help/data-management`, label: '設定', icon: Database },
+		{
+			href: `${base}/help/backup-restore`,
+			label: 'バックアップ・リストア',
+			icon: HardDriveDownload
+		},
+		{
+			href: `${base}/help/import-export`,
+			label: 'エクスポート',
+			icon: ArrowLeftRight
+		},
+		{ href: `${base}/help/archive`, label: 'アーカイブ', icon: Archive },
 		{ href: `${base}/help/pwa`, label: 'PWA・オフライン', icon: Smartphone },
 		{ href: `${base}/help/shortcuts`, label: 'ショートカット', icon: Keyboard },
 		{ href: `${base}/help/glossary`, label: '用語集', icon: BookA },

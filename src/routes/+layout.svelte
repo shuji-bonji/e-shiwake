@@ -8,7 +8,9 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Toaster } from '$lib/components/ui/sonner/index.js';
-	import { getStorageMode } from '$lib/db';
+	import { getStorageMode, migrateGlobalStorageModeToPerYear } from '$lib/db';
+	import { getSetting, setSetting } from '$lib/db/settings-repository';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { initializeTheme } from '$lib/stores/theme.svelte.js';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import {
@@ -17,7 +19,7 @@
 		getStorageUsage,
 		WARNING_THRESHOLD
 	} from '$lib/utils/storage';
-	import { AlertTriangle } from '@lucide/svelte';
+	import { AlertTriangle, Info } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { initWebMCP, destroyWebMCP } from '$lib/webmcp';
 	import { useUICommand, clearPendingCommand } from '$lib/stores/uiCommand.svelte';
@@ -34,6 +36,13 @@
 	let showStorageWarning = $state(false);
 	let storageUsedBytes = $state(0);
 
+	// v0.4.0 アップグレード通知ダイアログの状態
+	let showUpgradeNotice = $state(false);
+	let suppressUpgradeNotice = $state(false);
+
+	/** 現在のアプリバージョン */
+	const CURRENT_VERSION = __APP_VERSION__;
+
 	// PWA更新関数を保持
 	let updateSW: ((reloadPage?: boolean) => Promise<void>) | null = null;
 
@@ -47,6 +56,9 @@
 	onMount(() => {
 		// テーマを初期化
 		initializeTheme();
+
+		// v0.4.0: グローバル保存モードを年度別設定にマイグレーション（初回のみ）
+		migrateGlobalStorageModeToPerYear();
 
 		// WebMCP ツールを登録（Chrome 146+ Early Preview）
 		const webmcpToolCount = initWebMCP();
@@ -68,6 +80,25 @@
 
 		// 非同期処理をIIFEで実行（クリーンアップを返すため）
 		(async () => {
+			// v0.4.0 アップグレード通知: 既存ユーザーにバックアップ仕様変更を通知
+			try {
+				const dismissed = await getSetting('dismissedUpgradeNotice');
+				// 未表示、かつ現行バージョン以前の通知が dismiss されていない場合のみ表示
+				if (!dismissed || dismissed < CURRENT_VERSION) {
+					// 新規ユーザー（データがない場合）は通知不要 → 仕訳が1件以上あれば既存ユーザー
+					const { db } = await import('$lib/db/database');
+					const journalCount = await db.journals.count();
+					if (journalCount > 0) {
+						showUpgradeNotice = true;
+					} else {
+						// 新規ユーザーは通知済みとしてマーク
+						await setSetting('dismissedUpgradeNotice', CURRENT_VERSION);
+					}
+				}
+			} catch (e) {
+				console.warn('[layout] アップグレード通知チェックに失敗:', e);
+			}
+
 			// Service Workerを登録（本番ビルド時のみ有効）
 			if (pwaInfo) {
 				const { registerSW } = await import('virtual:pwa-register');
@@ -141,6 +172,22 @@
 		showStorageWarning = false;
 		goto(`${base}/data`);
 	}
+
+	async function handleDismissUpgradeNotice() {
+		showUpgradeNotice = false;
+		if (suppressUpgradeNotice) {
+			await setSetting('dismissedUpgradeNotice', CURRENT_VERSION);
+		}
+	}
+
+	async function handleGoToBackup() {
+		showUpgradeNotice = false;
+		// チェックが入っていれば非表示設定を保存
+		if (suppressUpgradeNotice) {
+			await setSetting('dismissedUpgradeNotice', CURRENT_VERSION);
+		}
+		goto(`${base}/data`);
+	}
 </script>
 
 <svelte:head>
@@ -189,6 +236,46 @@
 		</main>
 	</Sidebar.Inset>
 </Sidebar.Provider>
+
+<!-- v0.4.0 アップグレード通知ダイアログ -->
+<AlertDialog.Root bind:open={showUpgradeNotice}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title class="flex items-center gap-2">
+				<Info class="size-5 text-blue-500" />
+				バックアップ機能が変わりました (v{CURRENT_VERSION})
+			</AlertDialog.Title>
+			<AlertDialog.Description class="space-y-3">
+				<p>
+					バックアップが<strong>全年度一括のフルスナップショット</strong>方式に変わりました。
+				</p>
+				<p>
+					<strong class="text-destructive"
+						>v0.3.x以前のバックアップZIPからは仕訳データのみ復元</strong
+					>されます。 事業者情報・勘定科目などの設定データは復元されません。
+				</p>
+				<p>
+					まず最初に<strong>フルバックアップ</strong
+					>を作成して、設定を含む完全なバックアップを確保してください。
+				</p>
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<div class="flex items-center gap-2 py-2">
+			<Checkbox
+				id="suppress-upgrade-notice"
+				checked={suppressUpgradeNotice}
+				onCheckedChange={(v) => (suppressUpgradeNotice = v === true)}
+			/>
+			<label for="suppress-upgrade-notice" class="cursor-pointer text-sm text-muted-foreground">
+				以降この通知を表示しない
+			</label>
+		</div>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={handleDismissUpgradeNotice}>後で</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={handleGoToBackup}>データ管理へ移動する</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
 
 <!-- ストレージ容量警告ダイアログ -->
 <AlertDialog.Root bind:open={showStorageWarning}>

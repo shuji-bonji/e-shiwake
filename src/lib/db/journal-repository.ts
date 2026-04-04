@@ -195,11 +195,19 @@ export async function updateTaxCategoryByAccountCode(
 
 /**
  * 年度の全データを削除
- * 仕訳とそれに紐づく添付ファイルを削除
+ * 仕訳・添付ファイル・請求書を削除。
+ * ローカルファイルシステムの証憑も削除可能（directoryHandle が必要）。
  */
 export async function deleteYearData(
-	year: number
-): Promise<{ journalCount: number; attachmentCount: number }> {
+	year: number,
+	directoryHandle?: FileSystemDirectoryHandle | null
+): Promise<{
+	journalCount: number;
+	attachmentCount: number;
+	invoiceCount: number;
+	localFilesDeleted: number;
+	localFilesFailed: number;
+}> {
 	// 対象年度の仕訳を取得
 	const startDate = `${year}-01-01`;
 	const endDate = `${year}-12-31`;
@@ -210,12 +218,34 @@ export async function deleteYearData(
 		.toArray();
 
 	let attachmentCount = 0;
+	let localFilesDeleted = 0;
+	let localFilesFailed = 0;
 
 	// 仕訳ごとに添付ファイルを削除
 	for (const journal of journals) {
 		for (const attachment of journal.attachments) {
+			// IndexedDB の Blob を削除
 			await db.attachments.delete(attachment.id);
 			attachmentCount++;
+
+			// ローカルファイルの削除（ハンドルがある場合）
+			if (directoryHandle && attachment.filePath) {
+				try {
+					// filePath は "evidences/YYYY/filename.pdf" 形式
+					const parts = attachment.filePath.split('/');
+					let currentDir = directoryHandle;
+					// ディレクトリを辿る（最後のパーツ以外）
+					for (let i = 0; i < parts.length - 1; i++) {
+						currentDir = await currentDir.getDirectoryHandle(parts[i]);
+					}
+					// ファイルを削除
+					await currentDir.removeEntry(parts[parts.length - 1]);
+					localFilesDeleted++;
+				} catch {
+					// ファイルが存在しない等のエラーは無視
+					localFilesFailed++;
+				}
+			}
 		}
 	}
 
@@ -223,7 +253,21 @@ export async function deleteYearData(
 	const journalIds = journals.map((j) => j.id);
 	await db.journals.bulkDelete(journalIds);
 
-	return { journalCount: journals.length, attachmentCount };
+	// 請求書を削除
+	const invoices = await db.invoices
+		.where('issueDate')
+		.between(startDate, endDate, true, true)
+		.toArray();
+	const invoiceIds = invoices.map((inv) => inv.id);
+	await db.invoices.bulkDelete(invoiceIds);
+
+	return {
+		journalCount: journals.length,
+		attachmentCount,
+		invoiceCount: invoices.length,
+		localFilesDeleted,
+		localFilesFailed
+	};
 }
 
 /**

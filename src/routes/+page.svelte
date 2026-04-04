@@ -19,7 +19,7 @@
 		deleteJournal,
 		createEmptyJournal,
 		getAvailableYears,
-		getStorageMode
+		getStorageModeForYear
 	} from '$lib/db';
 	import { useFiscalYear, setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
 	import { getSavedDirectoryHandle, supportsFileSystemAccess } from '$lib/utils/filesystem';
@@ -95,8 +95,8 @@
 
 		// ディレクトリハンドルを取得（File System Access API対応時）
 		if (supportsFileSystemAccess()) {
-			const storageMode = await getStorageMode();
-			if (storageMode === 'filesystem') {
+			const yearMode = await getStorageModeForYear(fiscalYear.selectedYear, true);
+			if (yearMode === 'filesystem') {
 				directoryHandle = await getSavedDirectoryHandle();
 			}
 		}
@@ -116,6 +116,16 @@
 		if (isInitialized && year && year !== lastLoadedYear) {
 			lastLoadedYear = year;
 			loadData(year);
+			// 年度別の保存モードに応じてdirectoryHandleを更新
+			if (supportsFileSystemAccess()) {
+				getStorageModeForYear(year, true).then(async (mode) => {
+					if (mode === 'filesystem') {
+						directoryHandle = await getSavedDirectoryHandle();
+					} else {
+						directoryHandle = null;
+					}
+				});
+			}
 		}
 	});
 

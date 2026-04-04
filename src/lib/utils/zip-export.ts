@@ -1,15 +1,8 @@
 import JSZip from 'jszip';
 import { from, of } from 'rxjs';
 import { catchError, finalize, mergeMap } from 'rxjs/operators';
-import type {
-	ExportData,
-	ExportDataDTO,
-	JournalEntry,
-	Attachment,
-	ExportAttachment
-} from '$lib/types';
+import type { BackupData, ExportData, ExportDataDTO, JournalEntry, Attachment } from '$lib/types';
 import { getAttachmentBlob } from '$lib/db';
-import { omit } from '$lib/utils';
 
 /**
  * ZIPエクスポート時に取得失敗した証憑情報
@@ -242,17 +235,194 @@ export async function exportToZip(
 }
 
 /**
- * エクスポートデータから Blob を除外
+ * フルバックアップ（全年度スナップショット）をZIPファイルとしてエクスポート
+ *
+ * @param backupData - バックアップデータ（全年度の仕訳・マスタ・設定）
+ * @param options - エクスポートオプション
+ * @returns ZIPファイルのBlob
+ */
+export async function exportBackupToZip(
+	backupData: BackupData,
+	options: ZipExportOptions
+): Promise<Blob> {
+	const { includeEvidences = true, onProgress, directoryHandle } = options;
+	const zip = new JSZip();
+
+	onProgress?.({
+		phase: 'preparing',
+		current: 0,
+		total: 1,
+		message: 'バックアップを準備中...'
+	});
+
+	// data.json を追加（BackupData をそのまま保存）
+	const dataForExport = prepareBackupData(backupData);
+	zip.file('data.json', JSON.stringify(dataForExport, null, 2));
+
+	if (!includeEvidences) {
+		onProgress?.({
+			phase: 'complete',
+			current: 1,
+			total: 1,
+			message: '完了'
+		});
+		return await zip.generateAsync({ type: 'blob' });
+	}
+
+	// 全年度の仕訳から証憑を収集
+	const attachments = collectAttachments(backupData.journals);
+	const total = attachments.length;
+
+	if (total === 0) {
+		onProgress?.({
+			phase: 'complete',
+			current: 1,
+			total: 1,
+			message: '完了（証憑なし）'
+		});
+		return await zip.generateAsync({ type: 'blob' });
+	}
+
+	const evidencesFolder = zip.folder('evidences');
+	if (!evidencesFolder) {
+		throw new Error('ZIP フォルダの作成に失敗しました');
+	}
+
+	const failedAttachments: FailedAttachment[] = [];
+	let completed = 0;
+
+	onProgress?.({
+		phase: 'collecting',
+		current: completed,
+		total,
+		message: `証憑を収集中... (${completed}/${total})`
+	});
+
+	function recordFailure(journalId: string, fileName: string, error: string) {
+		failedAttachments.push({ fileName, journalId, error });
+	}
+
+	await new Promise<void>((resolve) => {
+		from(attachments)
+			.pipe(
+				mergeMap(
+					({ journalId, attachment, year }) =>
+						from(
+							(async () => {
+								const blob = await getAttachmentBlob(journalId, attachment.id, directoryHandle);
+								if (!blob) {
+									recordFailure(journalId, attachment.generatedName, '証憑データが見つかりません');
+									return;
+								}
+
+								const yearFolder = evidencesFolder.folder(year.toString());
+								if (!yearFolder) {
+									recordFailure(
+										journalId,
+										attachment.generatedName,
+										'年度フォルダの作成に失敗しました'
+									);
+									return;
+								}
+
+								const journalFolder = yearFolder.folder(journalId);
+								if (!journalFolder) {
+									recordFailure(
+										journalId,
+										attachment.generatedName,
+										'仕訳フォルダの作成に失敗しました'
+									);
+									return;
+								}
+
+								const attachmentFolder = journalFolder.folder(attachment.id);
+								if (!attachmentFolder) {
+									recordFailure(
+										journalId,
+										attachment.generatedName,
+										'証憑フォルダの作成に失敗しました'
+									);
+									return;
+								}
+
+								const arrayBuffer = await blob.arrayBuffer();
+								attachmentFolder.file(attachment.generatedName, arrayBuffer);
+							})()
+						).pipe(
+							catchError((error) => {
+								console.warn(`証憑の取得に失敗: ${attachment.generatedName}`, error);
+								recordFailure(
+									journalId,
+									attachment.generatedName,
+									error instanceof Error ? error.message : '不明なエラー'
+								);
+								return of(null);
+							}),
+							finalize(() => {
+								completed++;
+								onProgress?.({
+									phase: 'collecting',
+									current: completed,
+									total,
+									message: `証憑を収集中... (${completed}/${total})`
+								});
+							})
+						),
+					CONCURRENCY
+				),
+				finalize(() => {
+					resolve();
+				})
+			)
+			.subscribe();
+	});
+
+	onProgress?.({
+		phase: 'compressing',
+		current: total,
+		total,
+		message: 'ZIP ファイルを生成中...'
+	});
+
+	const zipBlob = await zip.generateAsync({
+		type: 'blob',
+		compression: 'DEFLATE',
+		compressionOptions: { level: 6 }
+	});
+
+	let completeMessage = '完了';
+	if (failedAttachments.length > 0) {
+		completeMessage = `完了（${failedAttachments.length}件の証憑取得に失敗）`;
+	}
+
+	onProgress?.({
+		phase: 'complete',
+		current: total,
+		total,
+		message: completeMessage,
+		failedAttachments: failedAttachments.length > 0 ? failedAttachments : undefined
+	});
+
+	return zipBlob;
+}
+
+/**
+ * BackupData をJSON用に準備
+ */
+function prepareBackupData(data: BackupData): BackupData {
+	// Attachment 内の Blob 参照は attachmentBlobs テーブルに分離されているため、
+	// BackupData のメタデータはそのまま保存可能
+	return { ...data };
+}
+
+/**
+ * エクスポートデータを DTO に変換
+ * Blob は attachmentBlobs テーブルに分離されているため、
+ * Attachment にはメタデータのみが含まれている。
  */
 function prepareExportData(data: ExportData): ExportDataDTO {
 	return {
-		...data,
-		journals: data.journals.map((journal) => ({
-			...journal,
-			attachments: journal.attachments.map(
-				(attachment): ExportAttachment => omit(attachment, ['blob'])
-			)
-		}))
+		...data
 	};
 }
 
@@ -291,8 +461,11 @@ function collectAttachments(journals: JournalEntry[]): AttachmentInfo[] {
 		const year = parseYearFromDate(journal.date);
 
 		for (const attachment of journal.attachments) {
-			// Blob または filePath があるものを対象
-			if (attachment.blob || attachment.filePath) {
+			// indexeddb（purge済みでない）または filesystem のものを対象
+			if (
+				(attachment.storageType === 'indexeddb' && !attachment.blobPurgedAt) ||
+				(attachment.storageType === 'filesystem' && attachment.filePath)
+			) {
 				result.push({
 					journalId: journal.id,
 					attachment,

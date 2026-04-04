@@ -94,7 +94,6 @@ export function getPurgeableAttachmentCount(
 			if (
 				attachment.storageType === 'indexeddb' &&
 				attachment.exportedAt &&
-				attachment.blob &&
 				!attachment.blobPurgedAt
 			) {
 				const exportedAt = new Date(attachment.exportedAt);

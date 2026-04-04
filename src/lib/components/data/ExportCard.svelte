@@ -11,22 +11,17 @@
 		getAvailableYears,
 		getInvoicesByYear,
 		getJournalsByYear,
-		getAllSettingsForExport,
-		getUnexportedAttachmentCount,
-		setLastExportedAt
+		getAllSettingsForExport
 	} from '$lib/db';
 	import { setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
 	import type { ExportData, StorageType } from '$lib/types';
-	import { omit } from '$lib/utils';
-	import { downloadZip, exportToZip, type ZipExportProgress } from '$lib/utils/zip-export';
+
 	import {
 		AlertTriangle,
-		Archive,
 		Check,
 		Download,
 		FileJson,
 		FileSpreadsheet,
-		Loader2,
 		Trash2
 	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
@@ -35,31 +30,23 @@
 		availableYears: number[];
 		isLoading: boolean;
 		storageMode: StorageType;
-		directoryHandle: FileSystemDirectoryHandle | null;
-		unexportedCount: number;
 		autoPurgeEnabled: boolean;
 		retentionDays: number;
 		onyearschange: (years: number[]) => void;
-		onunexportedcountchange: (count: number) => void;
 	}
 
 	let {
 		availableYears,
 		isLoading,
 		storageMode,
-		directoryHandle,
-		unexportedCount = $bindable(),
 		autoPurgeEnabled,
 		retentionDays,
-		onyearschange,
-		onunexportedcountchange
+		onyearschange
 	}: Props = $props();
 
 	// === エクスポート状態 ===
 	let exportingYear = $state<number | null>(null);
 	let exportSuccess = $state<number | null>(null);
-	let zipExportingYear = $state<number | null>(null);
-	let zipProgress = $state<ZipExportProgress | null>(null);
 
 	// === 年度削除状態 ===
 	let deleteDialogOpen = $state(false);
@@ -115,16 +102,11 @@
 			getAllSettingsForExport()
 		]);
 
-		const journalsWithoutBlob = journals.map((journal) => ({
-			...journal,
-			attachments: journal.attachments.map((att) => omit(att, ['blob']))
-		}));
-
 		return {
 			version: '2.0.0',
 			exportedAt: new Date().toISOString(),
 			fiscalYear: year,
-			journals: journalsWithoutBlob,
+			journals,
 			accounts,
 			vendors,
 			settings: {
@@ -226,69 +208,6 @@
 		}
 	}
 
-	async function handleExportZip(year: number) {
-		zipExportingYear = year;
-		zipProgress = null;
-
-		try {
-			const [journals, accounts, vendors, fixedAssets, invoices, allSettings] = await Promise.all([
-				getJournalsByYear(year),
-				getAllAccounts(),
-				getAllVendors(),
-				getAllFixedAssets(),
-				getInvoicesByYear(year),
-				getAllSettingsForExport()
-			]);
-
-			const exportData: ExportData = {
-				version: '2.0.0',
-				exportedAt: new Date().toISOString(),
-				fiscalYear: year,
-				journals: journals.map((journal) => ({
-					...journal,
-					attachments: journal.attachments.map((att) => omit(att, ['blob']))
-				})),
-				accounts,
-				vendors,
-				settings: {
-					fiscalYearStart: 1,
-					defaultCurrency: 'JPY',
-					storageMode,
-					autoPurgeBlobAfterExport: autoPurgeEnabled,
-					blobRetentionDays: retentionDays
-				},
-				fixedAssets,
-				invoices,
-				allSettings
-			};
-
-			const zipBlob = await exportToZip(exportData, journals, {
-				includeEvidences: true,
-				directoryHandle,
-				onProgress: (progress) => {
-					zipProgress = progress;
-				}
-			});
-
-			downloadZip(zipBlob, `e-shiwake_${year}_backup.zip`);
-
-			await setLastExportedAt(new Date().toISOString());
-			unexportedCount = await getUnexportedAttachmentCount();
-			onunexportedcountchange(unexportedCount);
-
-			exportSuccess = year;
-			setTimeout(() => {
-				exportSuccess = null;
-			}, 3000);
-		} catch (error) {
-			console.error('ZIP エクスポートエラー:', error);
-			toast.error('ZIP エクスポートに失敗しました');
-		} finally {
-			zipExportingYear = null;
-			zipProgress = null;
-		}
-	}
-
 	// === 年度削除 ===
 	async function openDeleteDialog(year: number) {
 		deletingYear = year;
@@ -327,7 +246,9 @@
 			<Download class="size-5" />
 			エクスポート
 		</Card.Title>
-		<Card.Description>年度別にデータをエクスポートします</Card.Description>
+		<Card.Description
+			>CSV・JSONで仕訳データをエクスポートします。Excelでの確認や他ソフトへの連携に。</Card.Description
+		>
 	</Card.Header>
 	<Card.Content class="space-y-4">
 		{#if isLoading}
@@ -411,24 +332,6 @@
 							>
 								<FileJson class="mr-2 size-4" />
 								データのエクスポート (.json)
-							</Button>
-							<Button
-								variant="outline"
-								size="sm"
-								onclick={() => handleExportZip(year)}
-								disabled={zipExportingYear !== null || exportingYear !== null}
-							>
-								{#if zipExportingYear === year}
-									<Loader2 class="mr-2 size-4 animate-spin" />
-									{#if zipProgress}
-										{zipProgress.message}
-									{:else}
-										準備中...
-									{/if}
-								{:else}
-									<Archive class="mr-2 size-4" />
-									データと証憑のエクスポート (.zip)
-								{/if}
 							</Button>
 						</div>
 					</div>

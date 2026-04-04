@@ -1,5 +1,4 @@
 import type { Attachment, StorageType } from '$lib/types';
-import { omit } from '$lib/utils';
 import { db } from './database';
 
 // ==================== ストレージマイグレーション ====================
@@ -17,9 +16,11 @@ export interface MigrationAttachment {
 /**
  * マイグレーション対象の添付ファイルを取得
  * @param targetStorageType 移行先のストレージタイプ
+ * @param filterYear 指定した年度のみフィルタ（省略時は全年度）
  */
 export async function getAttachmentsForMigration(
-	targetStorageType: StorageType
+	targetStorageType: StorageType,
+	filterYear?: number
 ): Promise<MigrationAttachment[]> {
 	const journals = await db.journals.toArray();
 	const result: MigrationAttachment[] = [];
@@ -27,11 +28,14 @@ export async function getAttachmentsForMigration(
 	for (const journal of journals) {
 		const year = parseInt(journal.date.substring(0, 4), 10);
 
+		// 年度フィルタ
+		if (filterYear !== undefined && year !== filterYear) continue;
+
 		for (const attachment of journal.attachments) {
 			// 移行先と異なるストレージタイプのものを収集
 			if (targetStorageType === 'filesystem') {
-				// IndexedDB → Filesystem: Blobがあるもの
-				if (attachment.storageType === 'indexeddb' && attachment.blob) {
+				// IndexedDB → Filesystem: Blobが存在するもの（purge済みは除外）
+				if (attachment.storageType === 'indexeddb' && !attachment.blobPurgedAt) {
 					result.push({
 						journalId: journal.id,
 						attachmentId: attachment.id,
@@ -69,23 +73,29 @@ export async function migrateAttachmentToFilesystem(
 	if (!journal) return;
 
 	const attachment = journal.attachments.find((a) => a.id === item.attachmentId);
-	if (!attachment || !attachment.blob) return;
+	if (!attachment) return;
+
+	// attachmentBlobs テーブルから Blob を取得
+	const blobRecord = await db.attachmentBlobs.get(attachment.id);
+	if (!blobRecord?.blob) return;
 
 	// Blobをファイルとして保存
 	const filePath = await saveFileToDirectory(
 		directoryHandle,
 		item.year,
 		attachment.generatedName,
-		attachment.blob
+		blobRecord.blob
 	);
 
-	// 添付ファイルを更新（Blobを削除し、filePathを設定）
+	// 添付ファイルのメタデータを更新（filesystem に切り替え）
 	const updatedAttachments = journal.attachments.map((a) => {
 		if (a.id === item.attachmentId) {
 			return {
-				...omit(a, ['blob', 'exportedAt', 'blobPurgedAt']),
+				...a,
 				storageType: 'filesystem' as StorageType,
-				filePath
+				filePath,
+				exportedAt: undefined,
+				blobPurgedAt: undefined
 			};
 		}
 		return a;
@@ -95,6 +105,9 @@ export async function migrateAttachmentToFilesystem(
 		attachments: updatedAttachments,
 		updatedAt: new Date().toISOString()
 	});
+
+	// attachmentBlobs テーブルから Blob を削除
+	await db.attachmentBlobs.delete(attachment.id);
 }
 
 /**
@@ -118,13 +131,16 @@ export async function migrateAttachmentToIndexedDB(
 		throw new Error(`ファイルが見つかりません: ${attachment.filePath}`);
 	}
 
-	// 添付ファイルを更新（filePathを削除し、Blobを設定）
+	// attachmentBlobs テーブルに Blob を保存
+	await db.attachmentBlobs.put({ id: attachment.id, blob });
+
+	// 添付ファイルのメタデータを更新（indexeddb に切り替え）
 	const updatedAttachments = journal.attachments.map((a) => {
 		if (a.id === item.attachmentId) {
 			return {
-				...omit(a, ['filePath']),
+				...a,
 				storageType: 'indexeddb' as StorageType,
-				blob
+				filePath: undefined
 			};
 		}
 		return a;

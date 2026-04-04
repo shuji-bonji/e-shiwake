@@ -184,6 +184,9 @@ export interface JournalLine {
 
 /**
  * 添付ファイル（証憑）
+ *
+ * Blob は attachmentBlobs テーブルに分離保存。
+ * 仕訳レコード内にはメタデータのみを保持する。
  */
 export interface Attachment {
 	id: string; // UUID
@@ -200,17 +203,27 @@ export interface Attachment {
 	vendor: string; // 取引先
 	// 保存場所による分岐
 	storageType: StorageType; // 保存タイプ
-	blob?: Blob; // IndexedDB保存時のみ
 	filePath?: string; // ファイルシステム保存時のパス（{年度}/{ファイル名}）
 	exportedAt?: string; // エクスポート済み日時（IndexedDB保存時）
 	blobPurgedAt?: string; // Blob削除日時（容量管理用）
+	archived?: boolean; // アーカイブ済みフラグ（Blob削除済み、ZIP復元可能）
 	createdAt: string;
 }
 
 /**
- * エクスポート用証憑（Blobを除外したDTO）
+ * 証憑の Blob データ（attachmentBlobs テーブルに保存）
+ *
+ * 仕訳の Attachment.id と同じ id で紐付く。
  */
-export type ExportAttachment = Omit<Attachment, 'blob'>;
+export interface AttachmentBlob {
+	id: string; // Attachment.id と同一
+	blob: Blob; // PDF 実体
+}
+
+/**
+ * エクスポート用証憑（メタデータのみ）
+ */
+export type ExportAttachment = Attachment;
 
 /**
  * 仕訳
@@ -239,6 +252,7 @@ export interface ExportJournalEntry extends Omit<JournalEntry, 'attachments'> {
  */
 export type SettingsKey =
 	| 'storageMode'
+	| 'storageModeByYear'
 	| 'lastExportedAt'
 	| 'autoPurgeBlobAfterExport'
 	| 'blobRetentionDays'
@@ -246,12 +260,14 @@ export type SettingsKey =
 	| 'suppressRenameConfirm'
 	| 'blueReturnDeduction'
 	| 'inventoryStart'
-	| 'inventoryEnd';
+	| 'inventoryEnd'
+	| 'dismissedUpgradeNotice';
 
 // BusinessInfoはblue-return-types.tsで定義（循環参照を避けるため、ここではanyを使用）
 // 実際の型は $lib/types/blue-return-types.ts の BusinessInfo を参照
 export type SettingsValueMap = {
 	storageMode: StorageType;
+	storageModeByYear: Record<string, StorageType>;
 	lastExportedAt: string;
 	autoPurgeBlobAfterExport: boolean;
 	blobRetentionDays: number;
@@ -260,6 +276,8 @@ export type SettingsValueMap = {
 	blueReturnDeduction: 65 | 55 | 10;
 	inventoryStart: number;
 	inventoryEnd: number;
+	/** 非表示にしたアップグレード通知のバージョン（例: "0.4.0"） */
+	dismissedUpgradeNotice: string;
 };
 
 export interface Settings {
@@ -275,10 +293,13 @@ export interface Settings {
 }
 
 /**
- * エクスポートデータ
+ * エクスポートデータ（年度スコープ）
  *
  * version "1.0.0": 初期フォーマット（journals, accounts, vendors, settings）
  * version "2.0.0": 固定資産・請求書・全設定を追加（後方互換: 追加フィールドはoptional）
+ *
+ * エクスポート（CSV/JSON）およびアーカイブで使用。
+ * 旧バックアップ（v0.3.1以前）もこの型。
  */
 export interface ExportData {
 	version: string; // データフォーマットバージョン
@@ -292,6 +313,24 @@ export interface ExportData {
 	fixedAssets?: import('./blue-return-types').FixedAsset[];
 	invoices?: import('./invoice').Invoice[];
 	allSettings?: Partial<SettingsValueMap>; // IndexedDB の全設定キーバリュー
+}
+
+/**
+ * バックアップデータ（フルスナップショット）
+ *
+ * v0.4.0 で導入。全年度の全データを含むスナップショット。
+ * リストアは上書きのみ（マージなし）。
+ */
+export interface BackupData {
+	type: 'backup'; // ZIP判別用
+	version: '3.0.0';
+	exportedAt: string;
+	journals: JournalEntry[]; // 全年度
+	accounts: Account[]; // 全件
+	vendors: Vendor[]; // 全件
+	fixedAssets: import('./blue-return-types').FixedAsset[]; // 全件
+	invoices: import('./invoice').Invoice[]; // 全年度
+	allSettings: Partial<SettingsValueMap>;
 }
 
 /**
