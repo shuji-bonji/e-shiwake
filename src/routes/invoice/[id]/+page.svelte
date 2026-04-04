@@ -9,7 +9,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import { ArrowLeft, Printer, BookOpen, CheckCircle, Banknote } from '@lucide/svelte';
+	import { ArrowLeft, Printer, BookOpen, CheckCircle, Banknote, Info } from '@lucide/svelte';
 	import type { Invoice, InvoiceStatus } from '$lib/types/invoice';
 	import { InvoiceStatusLabels } from '$lib/types/invoice';
 	import type { Vendor } from '$lib/types';
@@ -26,7 +26,8 @@
 		calculateInvoiceAmounts,
 		createEmptyInvoice,
 		formatCurrency,
-		getNextMonthEndDate
+		getNextMonthEndDate,
+		validateQualifiedInvoice
 	} from '$lib/utils/invoice';
 	import { omit } from '$lib/utils';
 	import { createDebounce } from '$lib/utils/debounce';
@@ -61,6 +62,11 @@
 
 	// 選択中の取引先
 	const selectedVendor = $derived(vendorMap.get(invoice.vendorId));
+
+	// 適格請求書バリデーション警告
+	const qualifiedInvoiceWarnings = $derived(
+		validateQualifiedInvoice(invoice, businessInfo, selectedVendor ?? null)
+	);
 
 	// 印刷用請求書
 	const printableInvoice = $derived<Invoice>(
@@ -223,6 +229,9 @@
 	}
 
 	function handlePrint() {
+		if (qualifiedInvoiceWarnings.length > 0) {
+			toast.warning('適格請求書の記載要件を満たしていない項目があります。内容をご確認ください。');
+		}
 		window.print();
 	}
 
@@ -378,6 +387,29 @@
 					</div>
 				</div>
 			</div>
+
+			<!-- 適格請求書バリデーション警告 -->
+			{#if qualifiedInvoiceWarnings.length > 0}
+				<div
+					class="rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950"
+				>
+					<div class="flex items-start gap-3">
+						<Info class="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+						<div class="space-y-1">
+							<p class="text-sm font-medium text-amber-800 dark:text-amber-200">
+								適格請求書の記載要件を満たしていない項目があります
+							</p>
+							<ul
+								class="list-inside list-disc space-y-0.5 text-sm text-amber-700 dark:text-amber-300"
+							>
+								{#each qualifiedInvoiceWarnings as warning (warning.type)}
+									<li>{warning.message}</li>
+								{/each}
+							</ul>
+						</div>
+					</div>
+				</div>
+			{/if}
 
 			<!-- 備考 -->
 			<div class="space-y-2">

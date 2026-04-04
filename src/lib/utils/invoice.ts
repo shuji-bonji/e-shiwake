@@ -3,6 +3,8 @@
  */
 
 import type { Invoice, InvoiceItem } from '$lib/types/invoice';
+import type { BusinessInfo } from '$lib/types/blue-return-types';
+import type { Vendor } from '$lib/types';
 
 /**
  * 明細行の金額を計算する（小数点以下切り捨て）
@@ -256,4 +258,98 @@ export function formatCurrency(amount: number | null | undefined): string {
  */
 export function validateInvoiceNumber(invoiceNumber: string): boolean {
 	return invoiceNumber.trim().length > 0;
+}
+
+// ============================================================
+// 適格請求書（インボイス）バリデーション
+// ============================================================
+
+/**
+ * 適格請求書の警告項目
+ */
+export interface QualifiedInvoiceWarning {
+	/** 警告の種類 */
+	type: 'registrationNumber' | 'issuerName' | 'vendorName' | 'itemDescription';
+	/** 表示メッセージ */
+	message: string;
+}
+
+/**
+ * 適格請求書（インボイス）の要件を検証する
+ *
+ * 適格請求書発行事業者として登録されている場合に、
+ * 請求書が適格請求書の法的要件を満たしているかチェックする。
+ * 要件を満たさない項目を警告として返す。
+ *
+ * **免税事業者の場合**（登録番号が未設定）は空配列を返し、
+ * 警告を表示しない。
+ *
+ * 適格請求書の記載要件（消費税法57条の4）:
+ * 1. 適格請求書発行事業者の氏名・名称 + 登録番号
+ * 2. 取引年月日
+ * 3. 取引内容（軽減税率対象はその旨）
+ * 4. 税率ごとに区分した対価の額 + 消費税額
+ * 5. 書類の交付を受ける事業者の氏名・名称
+ *
+ * @param invoice 請求書データ
+ * @param businessInfo 事業者情報（null = 未設定）
+ * @param vendor 取引先情報（null = 未選択）
+ * @returns 警告の配列（空 = 適格請求書の要件を満たしている or 免税事業者）
+ *
+ * @example
+ * // 登録番号ありで、事業者名が空の場合
+ * validateQualifiedInvoice(invoice, { ...businessInfo, name: '' }, vendor)
+ * // => [{ type: 'issuerName', message: '...' }]
+ *
+ * // 免税事業者（登録番号なし）の場合
+ * validateQualifiedInvoice(invoice, { ...businessInfo, invoiceRegistrationNumber: '' }, vendor)
+ * // => []
+ */
+export function validateQualifiedInvoice(
+	invoice: Pick<Invoice, 'items'>,
+	businessInfo: BusinessInfo | null,
+	vendor: Vendor | null
+): QualifiedInvoiceWarning[] {
+	// 登録番号が未設定 = 免税事業者とみなし、チェックしない
+	if (!businessInfo?.invoiceRegistrationNumber?.trim()) {
+		return [];
+	}
+
+	const warnings: QualifiedInvoiceWarning[] = [];
+
+	// 1. 発行事業者の氏名・名称
+	if (!businessInfo.name?.trim()) {
+		warnings.push({
+			type: 'issuerName',
+			message: '事業者情報の氏名が未設定です。適格請求書には発行者の氏名・名称が必要です。'
+		});
+	}
+
+	// 2. 登録番号（形式チェック: T + 13桁数字）
+	const regNum = businessInfo.invoiceRegistrationNumber.trim();
+	if (!/^T\d{13}$/.test(regNum)) {
+		warnings.push({
+			type: 'registrationNumber',
+			message: `登録番号「${regNum}」の形式が正しくありません。「T」+ 13桁の数字で入力してください。`
+		});
+	}
+
+	// 3. 取引先（書類の交付を受ける事業者の氏名・名称）
+	if (!vendor) {
+		warnings.push({
+			type: 'vendorName',
+			message: '取引先が未選択です。適格請求書には交付先の氏名・名称が必要です。'
+		});
+	}
+
+	// 4. 明細行の取引内容
+	const emptyDescriptions = invoice.items.filter((item) => !item.description?.trim());
+	if (emptyDescriptions.length > 0) {
+		warnings.push({
+			type: 'itemDescription',
+			message: `品名・サービス名が空の明細行が${emptyDescriptions.length}件あります。適格請求書には取引内容の記載が必要です。`
+		});
+	}
+
+	return warnings;
 }

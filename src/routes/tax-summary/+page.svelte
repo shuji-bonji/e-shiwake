@@ -9,17 +9,41 @@
 		formatTaxAmount,
 		consumptionTaxToCsv,
 		isExemptBusiness,
-		canUseSimplifiedTax
+		canUseSimplifiedTax,
+		getInvoiceRegistrationStatus,
+		findSalesOutsideRegistrationPeriod
 	} from '$lib/utils/consumption-tax';
 	import { useJournalPage } from '$lib/hooks/use-journal-page.svelte';
+	import { getSetting } from '$lib/db';
 	import type { ConsumptionTaxData } from '$lib/types';
+	import type { BusinessInfo } from '$lib/types/blue-return-types';
+	import { onMount } from 'svelte';
 
 	const page = useJournalPage({ loadAccounts: false });
+
+	let businessInfo = $state<BusinessInfo | null>(null);
+
+	onMount(async () => {
+		const saved = await getSetting('businessInfo');
+		if (saved) businessInfo = saved;
+	});
 
 	const taxData = $derived.by<ConsumptionTaxData | null>(() => {
 		if (page.journals.length === 0) return null;
 		return generateConsumptionTax(page.journals, page.fiscalYear.selectedYear);
 	});
+
+	// インボイス登録期間のステータス
+	const invoiceStatus = $derived(
+		getInvoiceRegistrationStatus(page.fiscalYear.selectedYear, businessInfo)
+	);
+
+	// 登録期間外の課税売上仕訳
+	const salesOutsidePeriod = $derived(
+		invoiceStatus === 'partial'
+			? findSalesOutsideRegistrationPeriod(page.journals, businessInfo)
+			: []
+	);
 
 	function exportCSV() {
 		if (!taxData) return;
@@ -123,6 +147,80 @@
 							<p class="text-muted-foreground">
 								※ 前々年度の課税売上高により判定されます。詳しくは税理士にご相談ください。
 							</p>
+						</div>
+					</div>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
+		<!-- インボイス登録期間の情報 -->
+		{#if invoiceStatus !== 'unset'}
+			<Card.Root
+				class={invoiceStatus === 'partial'
+					? 'border-amber-500/50'
+					: invoiceStatus === 'none'
+						? 'border-red-500/50'
+						: 'border-green-500/50'}
+			>
+				<Card.Content class="p-4">
+					<div class="flex items-start gap-2">
+						<Info
+							class="mt-0.5 size-5 {invoiceStatus === 'partial'
+								? 'text-amber-600'
+								: invoiceStatus === 'none'
+									? 'text-red-600'
+									: 'text-green-600'}"
+						/>
+						<div class="space-y-1 text-sm">
+							{#if invoiceStatus === 'full'}
+								<p class="font-medium text-green-600">
+									適格請求書発行事業者（{page.fiscalYear.selectedYear}年度 全期間適用）
+								</p>
+								<p class="text-muted-foreground">
+									登録番号: {businessInfo?.invoiceRegistrationNumber}
+									{#if businessInfo?.invoiceRegistrationStart}
+										（{businessInfo.invoiceRegistrationStart} 〜
+										{businessInfo.invoiceRegistrationEnd || '現在'}）
+									{/if}
+								</p>
+							{:else if invoiceStatus === 'partial'}
+								<p class="font-medium text-amber-600">
+									適格請求書発行事業者（{page.fiscalYear.selectedYear}年度 一部期間のみ適用）
+								</p>
+								<p class="text-muted-foreground">
+									登録番号: {businessInfo?.invoiceRegistrationNumber}（{businessInfo?.invoiceRegistrationStart}
+									〜 {businessInfo?.invoiceRegistrationEnd || '現在'}）
+								</p>
+								{#if salesOutsidePeriod.length > 0}
+									<div class="mt-2 rounded-md bg-amber-50 p-2 dark:bg-amber-950/30">
+										<p class="font-medium text-amber-700 dark:text-amber-400">
+											⚠ 登録期間外に課税売上のある仕訳が {salesOutsidePeriod.length} 件あります
+										</p>
+										<ul class="mt-1 space-y-0.5 text-xs text-amber-600 dark:text-amber-500">
+											{#each salesOutsidePeriod.slice(0, 5) as journal (journal.id)}
+												<li>
+													{journal.date} - {journal.description || '（摘要なし）'}
+													（{journal.vendor || '取引先なし'}）
+												</li>
+											{/each}
+											{#if salesOutsidePeriod.length > 5}
+												<li>...他 {salesOutsidePeriod.length - 5} 件</li>
+											{/if}
+										</ul>
+										<p class="mt-1 text-xs text-muted-foreground">
+											登録期間外の課税売上は、免税事業者としての売上である可能性があります。消費税区分をご確認ください。
+										</p>
+									</div>
+								{/if}
+							{:else if invoiceStatus === 'none'}
+								<p class="font-medium text-red-600">
+									{page.fiscalYear.selectedYear}年度はインボイス登録期間外です
+								</p>
+								<p class="text-muted-foreground">
+									登録番号: {businessInfo?.invoiceRegistrationNumber}（{businessInfo?.invoiceRegistrationStart}
+									〜 {businessInfo?.invoiceRegistrationEnd || '現在'}）
+								</p>
+							{/if}
 						</div>
 					</div>
 				</Card.Content>

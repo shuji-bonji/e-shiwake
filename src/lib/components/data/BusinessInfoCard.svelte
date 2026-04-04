@@ -115,6 +115,29 @@
 					登録番号は「T」+ 13桁の数字です。未登録の場合は空欄のままにしてください。
 				</p>
 			</div>
+			<div class="grid gap-4 sm:grid-cols-2">
+				<div class="space-y-2">
+					<Label for="invoice-start">登録適用開始日</Label>
+					<Input
+						id="invoice-start"
+						type="date"
+						bind:value={businessInfo.invoiceRegistrationStart}
+						oninput={saveBusinessInfoDebounced}
+					/>
+				</div>
+				<div class="space-y-2">
+					<Label for="invoice-end">登録適用終了日（登録の取消し時のみ）</Label>
+					<Input
+						id="invoice-end"
+						type="date"
+						bind:value={businessInfo.invoiceRegistrationEnd}
+						oninput={saveBusinessInfoDebounced}
+					/>
+				</div>
+			</div>
+			<p class="text-xs text-muted-foreground">
+				開始日が空欄の場合、全期間を通じて登録済みとして扱います。年度途中で登録・取消しをした場合のみ設定してください。
+			</p>
 		</div>
 
 		<!-- 振込先情報 -->

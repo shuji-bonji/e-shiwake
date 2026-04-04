@@ -1,6 +1,7 @@
 import type { JournalEntry, ConsumptionTaxData, ConsumptionTaxRow } from '$lib/types';
 import { TaxCategoryLabels } from '$lib/types';
 import { calculateTaxSummary } from './tax';
+import type { BusinessInfo } from '$lib/types/blue-return-types';
 
 /**
  * 仕訳データから消費税集計（/tax-summary ページ用）を生成する。
@@ -166,4 +167,93 @@ export function isExemptBusiness(taxableSalesAmount: number): boolean {
  */
 export function canUseSimplifiedTax(taxableSalesAmount: number): boolean {
 	return taxableSalesAmount <= 50000000;
+}
+
+// ============================================================
+// インボイス登録期間
+// ============================================================
+
+/**
+ * 仕訳の日付がインボイス登録期間内かどうかを判定する。
+ *
+ * @param journalDate - 仕訳の日付（YYYY-MM-DD）
+ * @param startDate - 登録適用開始日（YYYY-MM-DD）
+ * @param endDate - 登録適用終了日（YYYY-MM-DD、省略可）
+ * @returns 登録期間内であれば true
+ */
+export function isWithinInvoiceRegistrationPeriod(
+	journalDate: string,
+	startDate?: string,
+	endDate?: string
+): boolean {
+	// 開始日未設定の場合は常に期間内（登録番号のみ設定のケース）
+	if (!startDate) return true;
+
+	if (journalDate < startDate) return false;
+	if (endDate && journalDate > endDate) return false;
+	return true;
+}
+
+/**
+ * インボイス登録期間と会計年度の重なり状態を判定する。
+ *
+ * @param fiscalYear - 会計年度
+ * @param businessInfo - 事業者情報
+ * @returns 登録状態（'full' | 'partial' | 'none' | 'unset'）
+ */
+export function getInvoiceRegistrationStatus(
+	fiscalYear: number,
+	businessInfo?: BusinessInfo | null
+): 'full' | 'partial' | 'none' | 'unset' {
+	if (!businessInfo?.invoiceRegistrationNumber) return 'unset';
+	if (!businessInfo.invoiceRegistrationStart) return 'full'; // 開始日未設定 → 全期間適用とみなす
+
+	const yearStart = `${fiscalYear}-01-01`;
+	const yearEnd = `${fiscalYear}-12-31`;
+	const regStart = businessInfo.invoiceRegistrationStart;
+	const regEnd = businessInfo.invoiceRegistrationEnd;
+
+	// 登録期間が年度と全く重ならない
+	if (regStart > yearEnd) return 'none';
+	if (regEnd && regEnd < yearStart) return 'none';
+
+	// 年度全体をカバーしている
+	if (regStart <= yearStart && (!regEnd || regEnd >= yearEnd)) return 'full';
+
+	// 部分的に重なる
+	return 'partial';
+}
+
+/**
+ * インボイス登録期間外に課税売上がある仕訳を検出する。
+ *
+ * 年度途中でインボイス登録・脱退した場合に、
+ * 期間外の課税売上仕訳をリストアップして警告表示に使う。
+ *
+ * @param journals - 対象年度の仕訳一覧
+ * @param businessInfo - 事業者情報
+ * @returns 期間外に課税売上がある仕訳の一覧
+ */
+export function findSalesOutsideRegistrationPeriod(
+	journals: JournalEntry[],
+	businessInfo?: BusinessInfo | null
+): JournalEntry[] {
+	if (!businessInfo?.invoiceRegistrationStart) return [];
+
+	return journals.filter((journal) => {
+		// 期間外の仕訳で、課税売上の行があるか
+		if (
+			isWithinInvoiceRegistrationPeriod(
+				journal.date,
+				businessInfo.invoiceRegistrationStart,
+				businessInfo.invoiceRegistrationEnd
+			)
+		) {
+			return false;
+		}
+
+		return journal.lines.some(
+			(line) => line.taxCategory === 'sales_10' || line.taxCategory === 'sales_8'
+		);
+	});
 }

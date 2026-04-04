@@ -106,6 +106,23 @@
 							placeholder="T1234567890123"
 						/>
 					</div>
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-2">
+							<Label for="invoiceStart">登録適用開始日</Label>
+							<Input
+								id="invoiceStart"
+								type="date"
+								bind:value={businessInfo.invoiceRegistrationStart}
+							/>
+						</div>
+						<div class="space-y-2">
+							<Label for="invoiceEnd">適用終了日（登録の取消し時のみ）</Label>
+							<Input id="invoiceEnd" type="date" bind:value={businessInfo.invoiceRegistrationEnd} />
+						</div>
+					</div>
+					<p class="text-xs text-muted-foreground">
+						空欄の場合、全期間を通じて登録済みとして扱います。
+					</p>
 				</div>
 			</div>
 

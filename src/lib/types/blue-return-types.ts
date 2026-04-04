@@ -39,6 +39,8 @@ export interface BusinessInfo {
 	accountHolder?: string; // 口座名義
 	// インボイス制度対応
 	invoiceRegistrationNumber?: string; // 適格請求書発行事業者登録番号（T + 13桁）
+	invoiceRegistrationStart?: string; // 登録適用開始日（YYYY-MM-DD）
+	invoiceRegistrationEnd?: string; // 登録適用終了日（YYYY-MM-DD、登録の取消し時のみ）
 }
 
 // ============================================================

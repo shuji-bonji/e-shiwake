@@ -7,8 +7,26 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [0.3.1] - 2026-04-04
 
+### Added
+
+- **インボイス登録期間の適用月指定** — 年度途中での登録・脱退に対応（[#31](https://github.com/shuji-bonji/e-shiwake/issues/31)）
+  - BusinessInfo に `invoiceRegistrationStart` / `invoiceRegistrationEnd` フィールドを追加
+  - 事業者情報・青色申告設定の両画面で登録適用開始日・終了日を設定可能
+  - 消費税集計ページにインボイス登録期間のステータス表示（全期間適用/一部期間/期間外）
+  - 登録期間外に課税売上がある仕訳の検出・警告表示（最大5件表示）
+  - 請求書編集画面に適格請求書の記載要件チェック機能を追加（登録番号・発行者名・取引先・品名）
+  - 印刷時に要件不備があればトースト通知で注意喚起（非ブロッキング）
+  - 免税事業者（登録番号未設定）の場合はチェックをスキップ
+
 ### Changed
 
+- **llms.txt の全面見直し** — 構成改善・内容最新化（[#36](https://github.com/shuji-bonji/e-shiwake/issues/36)）
+  - ルート `/llms.txt` をテーブル形式で再構成、機能一覧・ヘルプリンクをカテゴリ別に整理
+  - ヘルプリンクにWebMCPを追加、各リンクに概要説明を付与
+  - WebMCPツール一覧をテーブル形式に変更
+  - 消費税区分のヘルプにインボイス登録期間の説明を追加
+  - 青色申告決算書のヘルプ設定項目にインボイス関連を追加
+  - WebMCP の llms.txt サーバーに UTF-8 BOM を追加（他エンドポイントと統一）
 - エクスポートボタンのラベルを用途ベースに変更（[#29](https://github.com/shuji-bonji/e-shiwake/issues/29)）
   - CSV → `仕訳のエクスポート (.csv)`
   - JSON → `データのエクスポート (.json)`
