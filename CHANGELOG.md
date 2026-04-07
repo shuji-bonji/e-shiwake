@@ -5,7 +5,7 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-04-06
+## [0.4.0] - 2026-04-08
 
 ### Added
 

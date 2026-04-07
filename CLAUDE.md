@@ -304,11 +304,26 @@ src/routes/help/{slug}/
 | --- | ------------------ | ------------------------------------------------------------------------------------------------------------ |
 | 1   | **`package.json`** | `version` フィールドを更新（例: `"0.2.2"` → `"0.3.0"`）                                                      |
 | 2   | **`CHANGELOG.md`** | `[Unreleased]` → `[x.y.z] - YYYY-MM-DD` に移動、新しい `[Unreleased]` セクション追加、末尾のリンク参照を更新 |
+| 3   | **`.claude/skills/`** | 機能変更に合わせてスキルファイルを更新（下記「Claude スキル・ルール更新」参照） |
 
 **リリース手順**:
 
-3. **git tag** — `git tag vX.Y.Z` でタグを打つ
-4. **GitHub Pages デプロイ** — `main` にマージ後、GitHub Actions で自動デプロイ
+4. **git tag** — `git tag vX.Y.Z` でタグを打つ
+5. **GitHub Pages デプロイ** — `main` にマージ後、GitHub Actions で自動デプロイ
+
+### Claude スキル・ルール更新
+
+リリース時に機能変更があった場合、以下の `.claude/` 配下ファイルも確認・更新すること：
+
+| ファイル | 確認観点 |
+| --- | --- |
+| **`.claude/skills/e-shiwake-accounting/SKILL.md`** | ヘルプリンク一覧、ページ構成、決算ワークフロー手順が最新か |
+| **`.claude/skills/e-shiwake-accounting/BROWSER-OPERATIONS.md`** | ページ構成テーブル、操作手順（バックアップ/エクスポート/アーカイブ等）が最新か |
+| **`.claude/skills/e-shiwake-accounting/WEBMCP-TOOLS.md`** | WebMCPツールの追加・変更・削除がある場合に更新 |
+| **`.claude/skills/e-shiwake-accounting/ACCOUNT-CODES.md`** | 勘定科目コードの追加・変更がある場合に更新 |
+| **`.claude/rules/route-change.md`** | ルート変更チェックリストの更新が必要な場合 |
+| **`.claude/rules/help-sync.md`** | ドキュメント同期ルールの変更が必要な場合 |
+| **`.claude/rules/indexeddb-proxy.md`** | DB関連の注意事項が変更された場合 |
 
 ### バージョニング方針（Semantic Versioning）
 
