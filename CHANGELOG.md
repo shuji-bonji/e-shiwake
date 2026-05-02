@@ -5,6 +5,15 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-05-03
+
+### Fixed
+
+- 仕訳帳で日付を変更しても証憑PDFのファイル名が更新されない問題を修正
+  - `JournalRow.svelte` の `handleDateBlur` から `syncAttachmentsOnBlur` を呼び出す際、親の `handleUpdateJournal` が `await updateJournal(...)` を含む async 関数のため `journal` prop の伝播が間に合わず、旧日付でファイル名生成が走っていた
+  - `localDate` を「実効日付」として採用し、`effectiveJournal = { ...journal, date: localDate }` をベースにファイル名生成・リネームダイアログ・`syncAttachmentsOnBlurUseCase` 呼び出しを行うよう修正
+  - `executeSyncAttachments(targetJournal, mainDebitAmount)` のシグネチャを変更し、リネームダイアログ確認後も最新日付でリネームされるよう修正
+
 ## [0.4.0] - 2026-04-08
 
 ### Added
@@ -230,7 +239,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
-[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.2.2...v0.3.0

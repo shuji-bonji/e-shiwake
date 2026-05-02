@@ -228,19 +228,30 @@
 	async function syncAttachmentsOnBlur() {
 		if (journal.attachments.length === 0) return;
 
-		const mainDebitLine = journal.lines.find((l) => l.type === 'debit' && l.accountCode);
+		// 日付は localDate を優先して採用する。
+		// handleDateBlur から更新→同期と続けて呼ばれた場合、
+		// 親(+page.svelte)の handleUpdateJournal が async (await updateJournal) のため
+		// journal prop の伝播が間に合わず、journal.date は旧値のままになる。
+		// localDate は子コンポーネントで管理しているため、最新の入力値を持っている。
+		const effectiveDate = localDate || journal.date;
+		const effectiveJournal: JournalEntry =
+			effectiveDate !== journal.date ? { ...journal, date: effectiveDate } : journal;
+
+		const mainDebitLine = effectiveJournal.lines.find(
+			(l) => l.type === 'debit' && l.accountCode
+		);
 		const mainDebitAmount = mainDebitLine?.amount ?? 0;
 
-		const newNames = journal.attachments.map((att) =>
+		const newNames = effectiveJournal.attachments.map((att) =>
 			generateAttachmentName(
-				journal.date,
+				effectiveJournal.date,
 				att.documentType,
-				journal.description,
+				effectiveJournal.description,
 				mainDebitLine !== undefined ? mainDebitLine.amount : att.amount,
-				journal.vendor
+				effectiveJournal.vendor
 			)
 		);
-		const oldNames = journal.attachments.map((att) => att.generatedName);
+		const oldNames = effectiveJournal.attachments.map((att) => att.generatedName);
 		const hasNameChanges = oldNames.some((name, i) => name !== newNames[i]);
 
 		if (!hasNameChanges) return;
@@ -253,14 +264,14 @@
 				info: {
 					oldNames,
 					newNames,
-					syncArgs: { journal, mainDebitAmount, directoryHandle }
+					syncArgs: { journal: effectiveJournal, mainDebitAmount, directoryHandle }
 				},
 				suppressCheck: false
 			};
 			return;
 		}
 
-		await executeSyncAttachments(mainDebitAmount);
+		await executeSyncAttachments(effectiveJournal, mainDebitAmount);
 	}
 
 	// リネーム確認OKの処理
@@ -271,10 +282,10 @@
 			await setSuppressRenameConfirm(true);
 		}
 
-		const { mainDebitAmount } = dialog.info.syncArgs;
+		const { journal: targetJournal, mainDebitAmount } = dialog.info.syncArgs;
 		dialog = DIALOG_NONE;
 
-		await executeSyncAttachments(mainDebitAmount);
+		await executeSyncAttachments(targetJournal, mainDebitAmount);
 	}
 
 	// リネームキャンセル
@@ -283,15 +294,15 @@
 	}
 
 	// リネーム実行
-	async function executeSyncAttachments(mainDebitAmount: number) {
+	async function executeSyncAttachments(targetJournal: JournalEntry, mainDebitAmount: number) {
 		try {
 			const syncedAttachments = await syncAttachmentsOnBlurUseCase({
-				journal,
+				journal: targetJournal,
 				mainDebitAmount,
 				directoryHandle
 			});
 			if (syncedAttachments) {
-				onupdate({ ...journal, attachments: syncedAttachments });
+				onupdate({ ...targetJournal, attachments: syncedAttachments });
 			}
 		} catch (error) {
 			console.error('証憑の同期に失敗:', error);
