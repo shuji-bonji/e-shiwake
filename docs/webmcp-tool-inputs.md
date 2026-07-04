@@ -124,22 +124,22 @@
 | コード | 科目名     | 種別   |
 | ------ | ---------- | ------ |
 | `1001` | 現金       | 資産   |
-| `1002` | 売掛金     | 資産   |
 | `1003` | 普通預金   | 資産   |
+| `1005` | 売掛金     | 資産   |
 | `2001` | 買掛金     | 負債   |
-| `2002` | 未払金     | 負債   |
-| `3001` | 事業主貸   | 純資産 |
-| `3002` | 事業主借   | 純資産 |
+| `2004` | 未払金     | 負債   |
+| `3001` | 元入金     | 純資産 |
+| `3002` | 事業主貸   | 純資産 |
+| `3003` | 事業主借   | 純資産 |
 | `4001` | 売上高     | 収益   |
 | `5001` | 仕入高     | 費用   |
-| `5002` | 外注費     | 費用   |
-| `5003` | 消耗品費   | 費用   |
-| `5004` | 通信費     | 費用   |
+| `5004` | 水道光熱費 | 費用   |
 | `5005` | 旅費交通費 | 費用   |
-| `5006` | 地代家賃   | 費用   |
-| `5010` | 水道光熱費 | 費用   |
-| `5015` | 新聞図書費 | 費用   |
-| `5018` | 情報処理費 | 費用   |
+| `5006` | 通信費     | 費用   |
+| `5011` | 消耗品費   | 費用   |
+| `5015` | 外注工賃   | 費用   |
+| `5017` | 地代家賃   | 費用   |
+| `5021` | 新聞図書費 | 費用   |
 
 ### サンプル
 
@@ -150,7 +150,7 @@
 	"date": "2026-02-23",
 	"description": "USBケーブル購入",
 	"vendor": "Amazon",
-	"debitLines": [{ "accountCode": "5003", "amount": 3980, "taxCategory": "purchase_10" }],
+	"debitLines": [{ "accountCode": "5011", "amount": 3980, "taxCategory": "purchase_10" }],
 	"creditLines": [{ "accountCode": "1001", "amount": 3980, "taxCategory": "na" }]
 }
 ```
@@ -163,7 +163,7 @@
 	"description": "電車代",
 	"vendor": "JR東日本",
 	"debitLines": [{ "accountCode": "5005", "amount": 1200, "taxCategory": "purchase_10" }],
-	"creditLines": [{ "accountCode": "2002", "amount": 1200, "taxCategory": "na" }]
+	"creditLines": [{ "accountCode": "2004", "amount": 1200, "taxCategory": "na" }]
 }
 ```
 
@@ -174,7 +174,7 @@
 	"date": "2026-02-01",
 	"description": "BIMツール開発支援 2月分",
 	"vendor": "株式会社猫山",
-	"debitLines": [{ "accountCode": "1002", "amount": 550000, "taxCategory": "na" }],
+	"debitLines": [{ "accountCode": "1005", "amount": 550000, "taxCategory": "na" }],
 	"creditLines": [{ "accountCode": "4001", "amount": 550000, "taxCategory": "sales_10" }]
 }
 ```
@@ -187,7 +187,7 @@
 	"description": "BIMツール開発支援：入金",
 	"vendor": "株式会社猫山",
 	"debitLines": [{ "accountCode": "1003", "amount": 550000, "taxCategory": "na" }],
-	"creditLines": [{ "accountCode": "1002", "amount": 550000, "taxCategory": "na" }]
+	"creditLines": [{ "accountCode": "1005", "amount": 550000, "taxCategory": "na" }]
 }
 ```
 
@@ -199,10 +199,10 @@
 	"description": "NTTフレッツ光",
 	"vendor": "NTT東日本",
 	"debitLines": [
-		{ "accountCode": "5004", "amount": 2305, "taxCategory": "purchase_10", "memo": "事業分33%" },
-		{ "accountCode": "3001", "amount": 4680, "taxCategory": "na", "memo": "家事分67%" }
+		{ "accountCode": "5006", "amount": 2305, "taxCategory": "purchase_10", "memo": "事業分33%" },
+		{ "accountCode": "3002", "amount": 4680, "taxCategory": "na", "memo": "家事分67%" }
 	],
-	"creditLines": [{ "accountCode": "2002", "amount": 6985, "taxCategory": "na" }]
+	"creditLines": [{ "accountCode": "2004", "amount": 6985, "taxCategory": "na" }]
 }
 ```
 
@@ -213,7 +213,7 @@
 	"date": "2026-02-23",
 	"description": "生活費",
 	"vendor": "",
-	"debitLines": [{ "accountCode": "3001", "amount": 300000, "taxCategory": "na" }],
+	"debitLines": [{ "accountCode": "3002", "amount": 300000, "taxCategory": "na" }],
 	"creditLines": [{ "accountCode": "1003", "amount": 300000, "taxCategory": "na" }]
 }
 ```
@@ -225,8 +225,8 @@
 	"date": "2026-02-12",
 	"description": "DeepL利用料",
 	"vendor": "DeepL",
-	"debitLines": [{ "accountCode": "5018", "amount": 733, "taxCategory": "purchase_10" }],
-	"creditLines": [{ "accountCode": "2002", "amount": 733, "taxCategory": "na" }]
+	"debitLines": [{ "accountCode": "5006", "amount": 733, "taxCategory": "purchase_10" }],
+	"creditLines": [{ "accountCode": "2004", "amount": 733, "taxCategory": "na" }]
 }
 ```
 
@@ -237,8 +237,8 @@
 	"date": "2026-03-31",
 	"description": "オフィス家賃 3月分",
 	"vendor": "不動産管理会社",
-	"debitLines": [{ "accountCode": "5006", "amount": 150000, "taxCategory": "purchase_10" }],
-	"creditLines": [{ "accountCode": "2002", "amount": 150000, "taxCategory": "na" }]
+	"debitLines": [{ "accountCode": "5017", "amount": 150000, "taxCategory": "purchase_10" }],
+	"creditLines": [{ "accountCode": "2004", "amount": 150000, "taxCategory": "na" }]
 }
 ```
 
@@ -342,7 +342,7 @@
 
 ```json
 {
-	"accountCode": "1002",
+	"accountCode": "1005",
 	"fiscalYear": 2026
 }
 ```
@@ -487,7 +487,7 @@
 	"date": "2026-02-23",
 	"description": "USBケーブル購入",
 	"vendor": "Amazon",
-	"debitLines": [{ "accountCode": "5003", "amount": 3980, "taxCategory": "purchase_10" }],
+	"debitLines": [{ "accountCode": "5011", "amount": 3980, "taxCategory": "purchase_10" }],
 	"creditLines": [{ "accountCode": "1001", "amount": 3980, "taxCategory": "na" }]
 }
 ```
@@ -508,10 +508,10 @@
 	"description": "NTTフレッツ光",
 	"vendor": "NTT東日本",
 	"debitLines": [
-		{ "accountCode": "5004", "amount": 2305, "taxCategory": "purchase_10", "memo": "事業分33%" },
-		{ "accountCode": "3001", "amount": 4680, "taxCategory": "na", "memo": "家事分67%" }
+		{ "accountCode": "5006", "amount": 2305, "taxCategory": "purchase_10", "memo": "事業分33%" },
+		{ "accountCode": "3002", "amount": 4680, "taxCategory": "na", "memo": "家事分67%" }
 	],
-	"creditLines": [{ "accountCode": "2002", "amount": 6985, "taxCategory": "na" }]
+	"creditLines": [{ "accountCode": "2004", "amount": 6985, "taxCategory": "na" }]
 }
 ```
 

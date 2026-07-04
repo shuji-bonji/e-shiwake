@@ -237,9 +237,7 @@
 		const effectiveJournal: JournalEntry =
 			effectiveDate !== journal.date ? { ...journal, date: effectiveDate } : journal;
 
-		const mainDebitLine = effectiveJournal.lines.find(
-			(l) => l.type === 'debit' && l.accountCode
-		);
+		const mainDebitLine = effectiveJournal.lines.find((l) => l.type === 'debit' && l.accountCode);
 		const mainDebitAmount = mainDebitLine?.amount ?? 0;
 
 		const newNames = effectiveJournal.attachments.map((att) =>

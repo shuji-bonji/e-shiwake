@@ -10,6 +10,7 @@ import type {
 } from '$lib/types';
 import type { FixedAsset } from '$lib/types/blue-return-types';
 import type { Invoice } from '$lib/types/invoice';
+import type { LLMProviderConfig, ChatSession } from '$lib/llm/types';
 import { defaultAccounts, getDefaultTaxCategory } from './seed';
 
 /**
@@ -35,6 +36,8 @@ class EShiwakeDatabase extends Dexie {
 	settings!: EntityTable<SettingsRecord, 'key'>;
 	fixedAssets!: EntityTable<FixedAsset, 'id'>;
 	invoices!: EntityTable<Invoice, 'id'>;
+	llmProviders!: EntityTable<LLMProviderConfig, 'id'>;
+	chatSessions!: EntityTable<ChatSession, 'id'>;
 
 	constructor() {
 		super('e-shiwake');
@@ -206,6 +209,20 @@ class EShiwakeDatabase extends Dexie {
 					console.log(`Migrated ${blobsToInsert.length} attachment blobs to separate table`);
 				}
 			});
+
+		// Version 9: LLM チャット — プロバイダ設定・会話履歴テーブルを追加
+		this.version(9).stores({
+			accounts: 'code, name, type, isSystem',
+			vendors: 'id, name',
+			journals: 'id, date, vendor, evidenceStatus',
+			attachments: 'id, journalEntryId',
+			attachmentBlobs: '&id',
+			settings: 'key',
+			fixedAssets: '&id, name, category, acquisitionDate, status',
+			invoices: '&id, invoiceNumber, issueDate, vendorId, status',
+			llmProviders: '&id, label',
+			chatSessions: '&id, updatedAt'
+		});
 	}
 }
 

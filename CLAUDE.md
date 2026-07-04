@@ -81,7 +81,8 @@ Svelte MCP server を利用可能。Svelte 5 と SvelteKit のドキュメント
 ├── /vendors                # 取引先管理
 ├── /accounts               # 勘定科目管理
 ├── /data                   # データ管理（バックアップ/エクスポート/インポート）
-├── /settings               # 設定（事業者情報・証憑保存・容量）
+├── /settings               # 設定（事業者情報・証憑保存・容量・LLMプロバイダ）
+├── /chat                   # AI チャット（LLM アシスタント全画面）
 ├── /export                 # エクスポート（レガシー）
 └── /help                   # ヘルプ トップ
     ├── /getting-started    # はじめに
@@ -101,6 +102,7 @@ Svelte MCP server を利用可能。Svelte 5 と SvelteKit のドキュメント
     ├── /pwa                # PWA・インストール
     ├── /shortcuts          # キーボードショートカット
     ├── /glossary           # 用語集
+    ├── /llm-chat           # AI チャット（LLM アシスタント）
     └── /webmcp             # WebMCP（AIエージェント連携）
 ```
 
@@ -126,6 +128,7 @@ Svelte MCP server を利用可能。Svelte 5 と SvelteKit のドキュメント
 - Phase 3: 確定申告対応 ✅
 - Phase 3.5: バックアップ・アーカイブ改善 — 進行中（`docs/design/backup-archive-redesign.md` 参照）
 - Phase 4: 国際展開（i18n・多通貨） — 未着手
+- Phase 5: AI チャット（LLM アシスタント） ✅ v0.5.0（`docs/design/llm-chat.md` 参照）
 
 ## コーディング規約
 
@@ -141,9 +144,11 @@ src/
 │   │   ├── blue-return/ # BlueReturnSettingsDialog 等
 │   │   ├── data/       # ExportCard, ImportCard, CapacityCard, BusinessInfoCard
 │   │   ├── invoice/    # InvoicePrint 等
+│   │   ├── chat/       # ChatDock, ChatPanel, ChatMessages, ApprovalDialog 等
 │   │   └── help/       # HelpSection, HelpTable, HelpNote
 │   ├── hooks/          # useJournalPage 等のカスタムフック
 │   ├── stores/         # Svelte stores（fiscalYear.svelte.ts）
+│   ├── llm/            # AI チャット（ProviderAdapter, agent-loop, chat.svelte.ts）
 │   ├── db/             # IndexedDB 関連（Dexie、リポジトリパターン）
 │   ├── types/          # TypeScript 型定義
 │   └── utils/          # ユーティリティ関数
@@ -300,11 +305,11 @@ src/routes/help/{slug}/
 
 ### リリース時の更新チェックリスト
 
-| #   | ファイル           | 更新内容                                                                                                     |
-| --- | ------------------ | ------------------------------------------------------------------------------------------------------------ |
-| 1   | **`package.json`** | `version` フィールドを更新（例: `"0.2.2"` → `"0.3.0"`）                                                      |
-| 2   | **`CHANGELOG.md`** | `[Unreleased]` → `[x.y.z] - YYYY-MM-DD` に移動、新しい `[Unreleased]` セクション追加、末尾のリンク参照を更新 |
-| 3   | **`.claude/skills/`** | 機能変更に合わせてスキルファイルを更新（下記「Claude スキル・ルール更新」参照） |
+| #   | ファイル              | 更新内容                                                                                                     |
+| --- | --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 1   | **`package.json`**    | `version` フィールドを更新（例: `"0.2.2"` → `"0.3.0"`）                                                      |
+| 2   | **`CHANGELOG.md`**    | `[Unreleased]` → `[x.y.z] - YYYY-MM-DD` に移動、新しい `[Unreleased]` セクション追加、末尾のリンク参照を更新 |
+| 3   | **`.claude/skills/`** | 機能変更に合わせてスキルファイルを更新（下記「Claude スキル・ルール更新」参照）                              |
 
 **リリース手順**:
 
@@ -315,15 +320,15 @@ src/routes/help/{slug}/
 
 リリース時に機能変更があった場合、以下の `.claude/` 配下ファイルも確認・更新すること：
 
-| ファイル | 確認観点 |
-| --- | --- |
-| **`.claude/skills/e-shiwake-accounting/SKILL.md`** | ヘルプリンク一覧、ページ構成、決算ワークフロー手順が最新か |
+| ファイル                                                        | 確認観点                                                                       |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **`.claude/skills/e-shiwake-accounting/SKILL.md`**              | ヘルプリンク一覧、ページ構成、決算ワークフロー手順が最新か                     |
 | **`.claude/skills/e-shiwake-accounting/BROWSER-OPERATIONS.md`** | ページ構成テーブル、操作手順（バックアップ/エクスポート/アーカイブ等）が最新か |
-| **`.claude/skills/e-shiwake-accounting/WEBMCP-TOOLS.md`** | WebMCPツールの追加・変更・削除がある場合に更新 |
-| **`.claude/skills/e-shiwake-accounting/ACCOUNT-CODES.md`** | 勘定科目コードの追加・変更がある場合に更新 |
-| **`.claude/rules/route-change.md`** | ルート変更チェックリストの更新が必要な場合 |
-| **`.claude/rules/help-sync.md`** | ドキュメント同期ルールの変更が必要な場合 |
-| **`.claude/rules/indexeddb-proxy.md`** | DB関連の注意事項が変更された場合 |
+| **`.claude/skills/e-shiwake-accounting/WEBMCP-TOOLS.md`**       | WebMCPツールの追加・変更・削除がある場合に更新                                 |
+| **`.claude/skills/e-shiwake-accounting/ACCOUNT-CODES.md`**      | 勘定科目コードの追加・変更がある場合に更新                                     |
+| **`.claude/rules/route-change.md`**                             | ルート変更チェックリストの更新が必要な場合                                     |
+| **`.claude/rules/help-sync.md`**                                | ドキュメント同期ルールの変更が必要な場合                                       |
+| **`.claude/rules/indexeddb-proxy.md`**                          | DB関連の注意事項が変更された場合                                               |
 
 ### バージョニング方針（Semantic Versioning）
 

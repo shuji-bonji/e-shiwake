@@ -14,10 +14,10 @@
 
 ### スコープの確認（2026-06）
 
-| 項目 | 決定 |
-| --- | --- |
-| 今回の成果物 | 本設計ドキュメント（実装は次フェーズ） |
-| UI 配置 | **兼用設計** — フローティングパネル + 専用ルート `/chat` の両方からロジックを共用 |
+| 項目           | 決定                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------- |
+| 今回の成果物   | 本設計ドキュメント（実装は次フェーズ）                                                  |
+| UI 配置        | **兼用設計** — フローティングパネル + 専用ルート `/chat` の両方からロジックを共用       |
 | 対応プロバイダ | LiteLLM（ローカル Gemma） / OpenAI 互換汎用 / クラウド各社（OpenAI・Anthropic・Gemini） |
 
 ## 2. 設計方針
@@ -72,27 +72,27 @@ flowchart LR
 ```typescript
 // src/lib/llm/types.ts（新規）
 export interface LLMProviderConfig {
-  id: string;                          // 設定の識別子（UUID）
-  label: string;                       // 表示名（例: "neko8 Gemma"）
-  kind: 'local' | 'openai' | 'anthropic' | 'gemini' | 'custom';
-  baseUrl: string;                     // 例: http://neko8:4000/v1
-  apiKey: string;                      // 端末内のみ。空可（ローカル）
-  model: string;                       // 例: gemma-smart / gpt-4o / claude-sonnet-4-6
-  extraHeaders?: Record<string, string>;
-  temperature?: number;
-  isCloud: boolean;                    // 警告表示の判定に使用
+	id: string; // 設定の識別子（UUID）
+	label: string; // 表示名（例: "neko8 Gemma"）
+	kind: 'local' | 'openai' | 'anthropic' | 'gemini' | 'custom';
+	baseUrl: string; // 例: http://neko8:4000/v1
+	apiKey: string; // 端末内のみ。空可（ローカル）
+	model: string; // 例: gemma-smart / gpt-4o / claude-sonnet-4-6
+	extraHeaders?: Record<string, string>;
+	temperature?: number;
+	isCloud: boolean; // 警告表示の判定に使用
 }
 ```
 
 ### 4.2 プリセット
 
-| プリセット | baseUrl 例 | apiKey | CORS | 備考 |
-| --- | --- | --- | --- | --- |
-| ローカル（LiteLLM/Ollama/vLLM/llamafile） | `http://neko8:4000/v1` | 不要 or 任意 | LiteLLM 側で許可設定 | **本命**。データが LAN から出ない |
-| OpenAI | `https://api.openai.com/v1` | 必須 | 許可済み | クラウド警告対象 |
-| Anthropic | `https://api.anthropic.com/v1` | 必須 | `anthropic-dangerous-direct-browser-access: true` を `extraHeaders` で付与 | クラウド警告対象 |
-| Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | 必須 | 許可済み | OpenAI 互換エンドポイント。クラウド警告対象 |
-| カスタム | 任意 | 任意 | 接続先依存 | 企業 VPC 等 |
+| プリセット                                | baseUrl 例                                                | apiKey       | CORS                                                                       | 備考                                        |
+| ----------------------------------------- | --------------------------------------------------------- | ------------ | -------------------------------------------------------------------------- | ------------------------------------------- |
+| ローカル（LiteLLM/Ollama/vLLM/llamafile） | `http://neko8:4000/v1`                                    | 不要 or 任意 | LiteLLM 側で許可設定                                                       | **本命**。データが LAN から出ない           |
+| OpenAI                                    | `https://api.openai.com/v1`                               | 必須         | 許可済み                                                                   | クラウド警告対象                            |
+| Anthropic                                 | `https://api.anthropic.com/v1`                            | 必須         | `anthropic-dangerous-direct-browser-access: true` を `extraHeaders` で付与 | クラウド警告対象                            |
+| Gemini                                    | `https://generativelanguage.googleapis.com/v1beta/openai` | 必須         | 許可済み                                                                   | OpenAI 互換エンドポイント。クラウド警告対象 |
+| カスタム                                  | 任意                                                      | 任意         | 接続先依存                                                                 | 企業 VPC 等                                 |
 
 > **CORS 留意点**: ブラウザから直接叩くため、ローカル LiteLLM 側に CORS 設定が必要。`litellm-langgraph-setup.md`（localllm-construction-practice）側に CORS 設定手順を追記する。
 
@@ -101,9 +101,9 @@ export interface LLMProviderConfig {
 ```typescript
 // すべてのプロバイダを OpenAI 互換 /v1/chat/completions で呼ぶ
 async function chatCompletion(
-  cfg: LLMProviderConfig,
-  messages: ChatMessage[],
-  tools: OpenAIToolSchema[]
+	cfg: LLMProviderConfig,
+	messages: ChatMessage[],
+	tools: OpenAIToolSchema[]
 ): Promise<ChatCompletionResponse>;
 ```
 
@@ -142,14 +142,14 @@ sequenceDiagram
 
 ```typescript
 function toOpenAITool(t: WebMCPToolDefinition): OpenAIToolSchema {
-  return {
-    type: 'function',
-    function: {
-      name: t.name,
-      description: t.description,
-      parameters: t.inputSchema ?? { type: 'object', properties: {} }
-    }
-  };
+	return {
+		type: 'function',
+		function: {
+			name: t.name,
+			description: t.description,
+			parameters: t.inputSchema ?? { type: 'object', properties: {} }
+		}
+	};
 }
 ```
 
@@ -159,27 +159,28 @@ function toOpenAITool(t: WebMCPToolDefinition): OpenAIToolSchema {
 const toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 while (true) {
-  const res = await chatCompletion(cfg, messages, allTools.map(toOpenAITool));
-  const msg = res.choices[0].message;
-  messages.push(msg);
+	const res = await chatCompletion(cfg, messages, allTools.map(toOpenAITool));
+	const msg = res.choices[0].message;
+	messages.push(msg);
 
-  if (!msg.tool_calls?.length) break;       // 通常応答 → 終了
+	if (!msg.tool_calls?.length) break; // 通常応答 → 終了
 
-  for (const call of msg.tool_calls) {
-    const tool = toolMap.get(call.function.name);
-    const args = JSON.parse(call.function.arguments);
+	for (const call of msg.tool_calls) {
+		const tool = toolMap.get(call.function.name);
+		const args = JSON.parse(call.function.arguments);
 
-    if (isDestructive(call.function.name)) {  // delete_* / confirm_delete_*
-      const approved = await requestApproval(call.function.name, args);
-      if (!approved) {
-        messages.push(toolMessage(call.id, 'ユーザーが操作を却下しました'));
-        continue;
-      }
-    }
+		if (isDestructive(call.function.name)) {
+			// delete_* / confirm_delete_*
+			const approved = await requestApproval(call.function.name, args);
+			if (!approved) {
+				messages.push(toolMessage(call.id, 'ユーザーが操作を却下しました'));
+				continue;
+			}
+		}
 
-    const result = await tool.execute(args);  // ← 既存 execute をそのまま呼ぶ
-    messages.push(toolMessage(call.id, resultToText(result)));
-  }
+		const result = await tool.execute(args); // ← 既存 execute をそのまま呼ぶ
+		messages.push(toolMessage(call.id, resultToText(result)));
+	}
 }
 ```
 
@@ -189,30 +190,30 @@ while (true) {
 
 ### 6.1 データ操作ツール（`webmcpTools`）
 
-| ツール名 | 機能 | 破壊的 |
-| --- | --- | --- |
-| `search_journals` | 全年度横断の仕訳検索 | - |
-| `get_journals_by_year` | 年度別仕訳一覧 | - |
-| `create_journal` | 複合仕訳作成（借貸一致検証あり） | - |
-| `delete_journal` | 仕訳削除 | ⚠️ |
-| `list_accounts` | 勘定科目一覧 | - |
-| `list_vendors` | 取引先一覧 | - |
-| `generate_ledger` | 総勘定元帳 | - |
-| `generate_trial_balance` | 試算表 | - |
-| `generate_profit_loss` | 損益計算書 | - |
-| `generate_balance_sheet` | 貸借対照表 | - |
-| `calculate_consumption_tax` | 消費税集計 | - |
-| `get_available_years` | 利用可能年度一覧 | - |
+| ツール名                    | 機能                             | 破壊的 |
+| --------------------------- | -------------------------------- | ------ |
+| `search_journals`           | 全年度横断の仕訳検索             | -      |
+| `get_journals_by_year`      | 年度別仕訳一覧                   | -      |
+| `create_journal`            | 複合仕訳作成（借貸一致検証あり） | -      |
+| `delete_journal`            | 仕訳削除                         | ⚠️     |
+| `list_accounts`             | 勘定科目一覧                     | -      |
+| `list_vendors`              | 取引先一覧                       | -      |
+| `generate_ledger`           | 総勘定元帳                       | -      |
+| `generate_trial_balance`    | 試算表                           | -      |
+| `generate_profit_loss`      | 損益計算書                       | -      |
+| `generate_balance_sheet`    | 貸借対照表                       | -      |
+| `calculate_consumption_tax` | 消費税集計                       | -      |
+| `get_available_years`       | 利用可能年度一覧                 | -      |
 
 ### 6.2 UI 操作ツール（`webmcpUITools`）
 
-| ツール名 | 機能 | 備考 |
-| --- | --- | --- |
-| `navigate_to` | 指定ページへ遷移 | フォーム連携 |
-| `open_journal_editor` | 仕訳エディタを開く（プリフィル可） | HITL（ユーザーが確定） |
-| `set_search_query` | 検索クエリを設定 | - |
-| `confirm_delete_journal` | 削除確認 UI を開く | HITL |
-| `open_invoice_editor` | 請求書エディタを開く（プリフィル可） | HITL |
+| ツール名                 | 機能                                 | 備考                   |
+| ------------------------ | ------------------------------------ | ---------------------- |
+| `navigate_to`            | 指定ページへ遷移                     | フォーム連携           |
+| `open_journal_editor`    | 仕訳エディタを開く（プリフィル可）   | HITL（ユーザーが確定） |
+| `set_search_query`       | 検索クエリを設定                     | -                      |
+| `confirm_delete_journal` | 削除確認 UI を開く                   | HITL                   |
+| `open_invoice_editor`    | 請求書エディタを開く（プリフィル可） | HITL                   |
 
 > UI 操作ツールは元々 Human-in-the-Loop パターン（AI はフォームを開くだけ、確定はユーザー）。チャットでもこの性質をそのまま活かす。
 
@@ -280,10 +281,10 @@ src/routes/settings/      # 既存に LLM プロバイダ設定を追加
 
 ## 9. 永続化・設定
 
-| データ | 保存先 | 備考 |
-| --- | --- | --- |
-| ProviderConfig（複数可・アクティブ 1 つ） | IndexedDB | API キー含む。端末外に出さない |
-| 会話履歴 | メモリ（`$state`）→ 任意で IndexedDB | 既定は揮発。残す場合のみ保存 |
+| データ                                    | 保存先                               | 備考                           |
+| ----------------------------------------- | ------------------------------------ | ------------------------------ |
+| ProviderConfig（複数可・アクティブ 1 つ） | IndexedDB                            | API キー含む。端末外に出さない |
+| 会話履歴                                  | メモリ（`$state`）→ 任意で IndexedDB | 既定は揮発。残す場合のみ保存   |
 
 ## 10. プライバシー・セキュリティ
 
@@ -296,10 +297,10 @@ src/routes/settings/      # 既存に LLM プロバイダ設定を追加
 
 UI 経由チャットは本番データ（IndexedDB）を直接触れるため、SQLite 複製である e-shiwake-ai の役割は縮小する。残る役割は 2 つ。
 
-| 役割 | 理由 |
-| --- | --- |
+| 役割                       | 理由                                                                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | ブラウザ外エージェントの口 | Claude Desktop / Code / Cowork / neko8 の LangGraph.js は stdio MCP でしか繋がらない。ブラウザを開かず操作できるのはこちら |
-| ヘッドレス自動化 | cron での月次レポート生成、CSV 一括投入などバッチ処理 |
+| ヘッドレス自動化           | cron での月次レポート生成、CSV 一括投入などバッチ処理                                                                      |
 
 位置づけ: **UI 経由 = 本命、e-shiwake-ai = ブラウザ外連携・実験場**。
 
@@ -314,13 +315,13 @@ flowchart LR
     P4 --> P5["Phase 5(任意)<br/>LangGraph.js /<br/>バッチ・vision"]
 ```
 
-| Phase | 内容 | 検証ポイント |
-| --- | --- | --- |
-| 1 | `ProviderAdapter` + 設定 UI + 疎通テスト | ローカル/クラウドの両方で chat completion が通る |
-| 2 | tool calling ループ + 読取系ツール（`search_journals` / `generate_*`） | 「今月の経費トップ5は？」が動く。Gemma の tool calling 精度を測る |
-| 3 | 書込（`create_journal`）+ UI 操作 + `delete_journal` 承認 | 「サーバー代 3,300円計上」→ 承認フロー |
-| 4 | フローティング + `/chat` の兼用、会話の継続・永続化 | iPad Safari 実機確認 |
-| 5（任意） | LangGraph.js 化 / 月次バッチ / 証憑 PDF vision ドラフト | 複数ステップ・承認ノードが必要になったら |
+| Phase     | 内容                                                                   | 検証ポイント                                                      |
+| --------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 1         | `ProviderAdapter` + 設定 UI + 疎通テスト                               | ローカル/クラウドの両方で chat completion が通る                  |
+| 2         | tool calling ループ + 読取系ツール（`search_journals` / `generate_*`） | 「今月の経費トップ5は？」が動く。Gemma の tool calling 精度を測る |
+| 3         | 書込（`create_journal`）+ UI 操作 + `delete_journal` 承認              | 「サーバー代 3,300円計上」→ 承認フロー                            |
+| 4         | フローティング + `/chat` の兼用、会話の継続・永続化                    | iPad Safari 実機確認                                              |
+| 5（任意） | LangGraph.js 化 / 月次バッチ / 証憑 PDF vision ドラフト                | 複数ステップ・承認ノードが必要になったら                          |
 
 ## 13. 未決事項
 

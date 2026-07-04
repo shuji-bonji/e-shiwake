@@ -5,6 +5,25 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-04
+
+### Added
+
+- **AI チャット（LLM アシスタント）** — ユーザーが用意した LLM（ローカル/クラウド）で帳簿を自然言語操作できるアプリ内コパイロット（設計: `docs/design/llm-chat.md`）
+  - `ProviderAdapter`（OpenAI 互換 `/v1/chat/completions`）でローカル LLM（LiteLLM/Ollama/vLLM/llamafile）・OpenAI・Anthropic・Gemini・Grok・カスタムを同一コードで切替（`src/lib/llm/`）
+  - 設定ページに LLM プロバイダ設定カードを追加（プリセット選択・疎通テスト・クラウド警告。API キーは端末内 IndexedDB のみ）
+  - ブラウザ内エージェントループで WebMCP と同一のツール定義 17 個を tool calling 実行（iPad Safari でも動作）
+  - `delete_journal` は実行前に承認ダイアログを表示（Human-in-the-Loop）
+  - デスクトップはドッキング型サイドパネル（本体画面が横縮小し、AI が開いたフォームを並行操作可能）、モバイルはオーバーレイ Sheet、+ 専用ルート `/chat` の兼用 UI。会話履歴は IndexedDB に永続化
+  - ユーザーメッセージに「再実行・コピー・編集して再送信」アクション（初回のローカルネットワーク許可等で送信が失敗した際の再送に対応）
+  - AI 回答の Markdown レンダリング（marked + DOMPurify + @tailwindcss/typography。サニタイズ済み HTML のみ表示）
+  - ヘルプページ `/help/llm-chat` を追加
+  - IndexedDB スキーマ v9（`llmProviders` / `chatSessions` テーブル追加）
+
+### Fixed
+
+- WebMCP ツール説明・ルート `llms.txt`・`docs/webmcp-tool-inputs.md`・`.claude/skills` の勘定科目コード一覧/サンプルが実際のマスタ（seed）と不一致だった問題を修正（例: 売掛金は 1005、未払金は 2004、消耗品費は 5011）
+
 ## [0.4.1] - 2026-05-03
 
 ### Fixed
@@ -239,7 +258,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
-[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.3.0...v0.3.1

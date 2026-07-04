@@ -261,7 +261,8 @@ export type SettingsKey =
 	| 'blueReturnDeduction'
 	| 'inventoryStart'
 	| 'inventoryEnd'
-	| 'dismissedUpgradeNotice';
+	| 'dismissedUpgradeNotice'
+	| 'activeLlmProviderId';
 
 // BusinessInfoはblue-return-types.tsで定義（循環参照を避けるため、ここではanyを使用）
 // 実際の型は $lib/types/blue-return-types.ts の BusinessInfo を参照
@@ -278,6 +279,8 @@ export type SettingsValueMap = {
 	inventoryEnd: number;
 	/** 非表示にしたアップグレード通知のバージョン（例: "0.4.0"） */
 	dismissedUpgradeNotice: string;
+	/** アクティブな LLM プロバイダ設定の ID（llmProviders テーブル参照） */
+	activeLlmProviderId: string;
 };
 
 export interface Settings {

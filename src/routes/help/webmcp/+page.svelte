@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { HelpNote, HelpSection, HelpTable } from '$lib/components/help';
 
 	const pageDescription =
@@ -54,6 +55,14 @@
 		<HelpNote type="info">
 			<p>
 				従来のスクリーンショットベースの操作と比べて、トークン使用量が約89%削減され、高速かつ正確な操作が可能です。
+			</p>
+		</HelpNote>
+		<HelpNote type="info">
+			<p>
+				同じツール定義は <a href="{base}/help/llm-chat" class="text-primary underline"
+					>AI チャット</a
+				>（アプリ内 LLM アシスタント）でも使われます。WebMCP はブラウザ側 AI エージェント用、AI
+				チャットはユーザーが設定した LLM に接続するアプリ内機能です。
 			</p>
 		</HelpNote>
 	</HelpSection>

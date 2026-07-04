@@ -22,6 +22,7 @@
 - **青色申告決算書**: 4ページプレビュー、印刷/CSV出力
 - **家事按分**: 按分対象科目の自動検出と金額自動計算
 - **請求書管理**: 請求書の作成・編集・印刷、売掛金/入金仕訳の自動生成
+- **AI チャット**: ユーザーが用意した LLM（ローカル/クラウド）で帳簿を自然言語で参照・操作（v0.5.0）
 
 ## ターゲットユーザー
 
@@ -132,6 +133,14 @@ npm run test:unit
 - 入金仕訳の自動生成（入金日指定）
 - 請求書印刷・PDF保存
 
+**Phase 5: AI チャット（LLM アシスタント）**
+
+- LLM プロバイダ設定（ローカル LLM / OpenAI / Anthropic / Gemini / Grok / OpenAI 互換カスタム、疎通テスト、クラウド警告）
+- ブラウザ内エージェントループ（WebMCP と同一の 17 ツールを tool calling 実行、iPad Safari 対応）
+- 破壊的操作の承認ダイアログ（Human-in-the-Loop）
+- ドッキング型サイドパネル（デスクトップ）/ オーバーレイ（モバイル）+ 専用ルート `/chat`
+- 会話履歴の IndexedDB 永続化、Markdown レンダリング、メッセージの再実行・コピー・編集
+
 ### 今後の予定
 
 - i18n対応（多言語化）
@@ -213,7 +222,8 @@ IndexedDB に Blob として保存。定期的なエクスポートを推奨。
 ├── /accounts               勘定科目管理
 ├── /archive                アーカイブ（検索機能付年度保存）
 ├── /data                   データ管理（バックアップ/エクスポート/インポート）
-├── /settings               設定（事業者情報・証憑保存・容量）
+├── /settings               設定（事業者情報・証憑保存・容量・LLMプロバイダ）
+├── /chat                   AI チャット（LLM アシスタント全画面）
 └── /help                   ヘルプ
     ├── /getting-started    はじめに
     ├── /journal            仕訳入力
@@ -232,6 +242,7 @@ IndexedDB に Blob として保存。定期的なエクスポートを推奨。
     ├── /pwa                PWA・インストール
     ├── /shortcuts          キーボードショートカット
     ├── /glossary           用語集
+    ├── /llm-chat           AI チャット（LLM アシスタント）
     └── /webmcp             WebMCP（AIエージェント連携）
 ```
 
@@ -247,13 +258,15 @@ src/
 │   ├── components/     # 再利用可能なコンポーネント
 │   │   ├── ui/         # shadcn-svelte コンポーネント
 │   │   ├── layout/     # レイアウトコンポーネント
-│   │   └── journal/    # 仕訳関連コンポーネント
+│   │   ├── journal/    # 仕訳関連コンポーネント
+│   │   └── chat/       # AI チャット UI（ドック/パネル/承認ダイアログ）
 │   ├── adapters/       # 外部依存の抽象化層
 │   ├── usecases/       # ビジネスロジック
 │   ├── stores/         # Svelte stores
 │   ├── db/             # IndexedDB 関連（Dexie）
 │   ├── types/          # TypeScript 型定義
 │   ├── utils/          # ユーティリティ関数
+│   ├── llm/            # LLM チャット（ProviderAdapter / エージェントループ）
 │   └── webmcp/         # WebMCP ツール定義（データ操作型 + UI操作型）
 ├── routes/
 │   ├── +layout.svelte        # サイドバーレイアウト
@@ -270,6 +283,7 @@ src/
 │   ├── invoice/[id]/         # 請求書編集
 │   ├── vendors/              # 取引先管理
 │   ├── accounts/             # 勘定科目管理
+│   ├── chat/                 # AI チャット（全画面）
 │   └── data/                 # データ管理（エクスポート/インポート/削除）
 ```
 
@@ -279,6 +293,8 @@ src/
 
 e-shiwake は [WebMCP](https://webmachinelearning.github.io/webmcp/) に対応しています。
 Chrome 拡張「Model Context Tool Inspector」からツールを直接実行し、仕訳操作や帳簿生成が可能です。
+
+> **補足**: 同じツール定義はアプリ内の **AI チャット**（v0.5.0〜）でも使われます。WebMCP はブラウザ側 AI エージェント用の口、AI チャットはユーザーが設定した LLM に接続するアプリ内機能です。詳細は[ヘルプ: AI チャット](https://shuji-bonji.github.io/e-shiwake/help/llm-chat)を参照。
 
 ### 前提条件
 

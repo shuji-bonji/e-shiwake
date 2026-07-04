@@ -94,6 +94,12 @@
     <priority>0.7</priority>
   </url>
 
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/chat</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
   <!-- ヘルプ -->
   <url>
     <loc>https://shuji-bonji.github.io/e-shiwake/help</loc>
@@ -201,6 +207,12 @@
     <loc>https://shuji-bonji.github.io/e-shiwake/help/glossary</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://shuji-bonji.github.io/e-shiwake/help/llm-chat</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 
   <url>

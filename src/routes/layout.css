@@ -2,6 +2,9 @@
 
 @import 'tw-animate-css';
 
+/* チャットの Markdown レンダリング（prose クラス）用 */
+@plugin '@tailwindcss/typography';
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

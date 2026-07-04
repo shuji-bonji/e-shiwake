@@ -32,6 +32,7 @@ GET https://shuji-bonji.github.io/e-shiwake/llms.txt
 - `/help/backup-restore/llms.txt` - バックアップ・リストア
 - `/help/archive/llms.txt` - アーカイブ保存
 - `/help/import-export/llms.txt` - インポート・エクスポート
+- `/help/llm-chat/llms.txt` - AI チャット（LLM プロバイダ設定・アプリ内コパイロット）
 - `/help/data-management/llms.txt` - データ管理
 - `/help/webmcp/llms.txt` - WebMCPツール仕様
 

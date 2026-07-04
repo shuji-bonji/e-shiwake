@@ -32,12 +32,10 @@ export function copyInvoiceForNew(original: Invoice): InvoiceInput {
 		issueDate: today,
 		dueDate: getNextMonthEndDate(today),
 		vendorId: original.vendorId,
-		items: original.items.map(
-			(item): InvoiceItem => ({
-				...item,
-				id: crypto.randomUUID()
-			})
-		),
+		items: original.items.map((item): InvoiceItem => ({
+			...item,
+			id: crypto.randomUUID()
+		})),
 		subtotal: original.subtotal,
 		taxAmount: original.taxAmount,
 		total: original.total,

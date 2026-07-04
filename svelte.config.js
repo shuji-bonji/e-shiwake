@@ -41,6 +41,7 @@ const config = {
 				'/settings',
 				'/archive',
 				'/export',
+				'/chat',
 				// ヘルプ
 				'/help',
 				'/help/getting-started',
@@ -80,7 +81,9 @@ const config = {
 				'/help/shortcuts/llms.txt',
 				'/help/glossary/llms.txt',
 				'/help/webmcp',
-				'/help/webmcp/llms.txt'
+				'/help/webmcp/llms.txt',
+				'/help/llm-chat',
+				'/help/llm-chat/llms.txt'
 			]
 		}
 	}

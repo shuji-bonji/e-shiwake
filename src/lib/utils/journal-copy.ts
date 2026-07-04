@@ -23,12 +23,10 @@ export function copyJournalForNew(
 
 	return {
 		date: today,
-		lines: original.lines.map(
-			(line): JournalLine => ({
-				...line,
-				id: crypto.randomUUID()
-			})
-		),
+		lines: original.lines.map((line): JournalLine => ({
+			...line,
+			id: crypto.randomUUID()
+		})),
 		description: original.description,
 		vendor: original.vendor,
 		evidenceStatus: 'none',

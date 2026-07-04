@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BusinessInfoCard from '$lib/components/data/BusinessInfoCard.svelte';
 	import CapacityCard from '$lib/components/data/CapacityCard.svelte';
+	import LlmProviderCard from '$lib/components/data/LlmProviderCard.svelte';
 	import StorageSettingsCard from '$lib/components/data/StorageSettingsCard.svelte';
 	import {
 		getAutoPurgeBlobSetting,
@@ -75,6 +76,9 @@
 
 	<!-- 事業者情報 -->
 	<BusinessInfoCard />
+
+	<!-- AI アシスタント（LLM プロバイダ） -->
+	<LlmProviderCard />
 
 	<!-- 証憑保存先設定 -->
 	<StorageSettingsCard

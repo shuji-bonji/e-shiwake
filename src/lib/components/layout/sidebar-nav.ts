@@ -1,5 +1,6 @@
 import {
 	Archive,
+	Bot,
 	BookOpen,
 	BookText,
 	Scale,
@@ -77,6 +78,11 @@ export const navGroups: NavGroup[] = [
 		label: 'データ管理',
 		icon: Database,
 		items: [{ label: 'データ管理', href: '/data', icon: Database }]
+	},
+	{
+		label: 'AI アシスタント',
+		icon: Bot,
+		items: [{ label: 'AI チャット', href: '/chat', icon: Bot }]
 	},
 	{
 		label: '設定',

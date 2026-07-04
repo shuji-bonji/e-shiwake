@@ -3,6 +3,8 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import favicon from '$lib/assets/favicon.svg';
+	import ChatDock from '$lib/components/chat/ChatDock.svelte';
+	import ChatPanel from '$lib/components/chat/ChatPanel.svelte';
 	import AppHeader from '$lib/components/layout/AppHeader.svelte';
 	import AppSidebar from '$lib/components/layout/AppSidebar.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
@@ -231,11 +233,18 @@
 	<AppSidebar />
 	<Sidebar.Inset>
 		<AppHeader />
-		<main class="flex-1 p-4">
-			{@render children()}
-		</main>
+		<div class="flex min-h-0 flex-1 items-start">
+			<main class="min-w-0 flex-1 p-4">
+				{@render children()}
+			</main>
+			<!-- デスクトップ用 AI チャット ドッキングパネル（開くと本体が横縮小） -->
+			<ChatDock />
+		</div>
 	</Sidebar.Inset>
 </Sidebar.Provider>
+
+<!-- AI アシスタント（フローティングチャット + 承認ダイアログ） -->
+<ChatPanel />
 
 <!-- v0.4.0 アップグレード通知ダイアログ -->
 <AlertDialog.Root bind:open={showUpgradeNotice}>

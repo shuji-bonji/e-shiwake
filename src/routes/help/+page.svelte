@@ -128,6 +128,12 @@
 			description: '簿記・会計用語の解説'
 		},
 		{
+			href: `${base}/help/llm-chat`,
+			label: 'AI チャット',
+			icon: Bot,
+			description: 'LLM（ローカル/クラウド）による帳簿の参照・操作'
+		},
+		{
 			href: `${base}/help/webmcp`,
 			label: 'WebMCP',
 			icon: Bot,

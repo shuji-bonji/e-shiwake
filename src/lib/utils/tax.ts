@@ -314,12 +314,7 @@ export function calculateAnnualTaxSummary(allLines: JournalLine[]): TaxSummary {
  * 事業区分ごとに異なるみなし仕入率が適用される。
  */
 export type BusinessCategory =
-	| 'wholesale'
-	| 'retail'
-	| 'manufacturing'
-	| 'other'
-	| 'services'
-	| 'realestate';
+	'wholesale' | 'retail' | 'manufacturing' | 'other' | 'services' | 'realestate';
 
 /**
  * 事業区分に応じたみなし仕入率（%）を取得する。
