@@ -300,7 +300,11 @@
 				directoryHandle
 			});
 			if (syncedAttachments) {
-				onupdate({ ...targetJournal, attachments: syncedAttachments });
+				// リネーム結果（attachments）は「最新の」journal prop に適用する。
+				// targetJournal は blur 時点のスナップショットのため、それをベースに
+				// onupdate すると、blur〜ダイアログ確定の間に行われた編集
+				// （家事按分の再計算等）を古いデータで上書きしてしまう。
+				onupdate({ ...journal, attachments: syncedAttachments });
 			}
 		} catch (error) {
 			console.error('証憑の同期に失敗:', error);

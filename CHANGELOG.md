@@ -5,6 +5,17 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-05
+
+### Fixed
+
+- 家事按分適用中の仕訳で、貸方金額の変更が按分再計算に反映されない・証憑PDFのリネームダイアログが開かない問題を修正
+  - 原因: `handleUpdateJournal`（仕訳帳ページ）が IndexedDB への `await updateJournal()` を**先に**実行し、ローカル状態 `journals` の更新が後になるため、change イベント直後に発火する blur / click ハンドラが古い `journal` prop を読む競合ウィンドウが存在した
+  - 症状1: 金額入力直後に「按分適用」ボタンを押すと、旧 prop（金額0）を基に按分され金額が0円になる
+  - 症状2: 貸方変更時、blur の証憑同期が旧 prop で名前差分なしと誤判定 → リネームダイアログが開かない
+  - 症状3: リネームダイアログ確定時、blur 時点の古いスナップショットで `onupdate` するため、直前の按分再計算が古いデータで上書きされる
+  - 対策: ①ローカル状態を同期的に先へ更新し DB 書き込みを後追いに変更、②リネーム確定時は attachments のみを最新の journal prop に適用（`JournalRow.executeSyncAttachments`）
+
 ## [0.5.0] - 2026-07-04
 
 ### Added
@@ -258,7 +269,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
-[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.3.1...v0.4.0

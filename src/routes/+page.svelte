@@ -300,9 +300,11 @@
 		const oldJournal = journals.find((j) => j.id === journal.id);
 		const dateChanged = oldJournal && oldJournal.date !== plainJournal.date;
 
-		await updateJournal(plainJournal.id, plainJournal);
-
-		// ローカル状態を更新
+		// ローカル状態を「先に」同期的に更新する。
+		// DB書き込み（await）を先に行うと、change イベント直後に発火する
+		// blur / click ハンドラ（証憑同期・家事按分ボタン等）が古い journal prop を
+		// 読む競合ウィンドウが生まれ、按分適用が金額0で実行される・
+		// 再計算結果が古いスナップショットで上書きされる等のバグの原因になる。
 		const updated = journals.map((j) => (j.id === journal.id ? plainJournal : j));
 
 		// ソート条件：
@@ -310,6 +312,9 @@
 		// - 日付が有効な形式の場合のみソート（入力途中はソートしない）
 		const shouldSort = editingJournalId === journal.id || isValidDate(plainJournal.date);
 		journals = shouldSort ? sortJournals(updated, editingJournalId) : updated;
+
+		// DB への永続化（ローカル状態反映の後追いで実行）
+		await updateJournal(plainJournal.id, plainJournal);
 
 		// 日付が変更された場合、年度リストを更新（新しい年度が追加される可能性）
 		if (dateChanged && isValidDate(plainJournal.date)) {
