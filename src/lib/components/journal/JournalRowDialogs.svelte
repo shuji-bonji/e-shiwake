@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import SafariStorageDialog from '$lib/components/SafariStorageDialog.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import type { DocumentType, JournalEntry, Vendor } from '$lib/types';
@@ -171,6 +172,13 @@
 						この操作は取り消せません。
 					{/if}
 				{/if}
+				<span class="mt-2 block text-xs">
+					電帳法の事務処理規程では証憑の訂正・削除は原則禁止です。やむを得ず削除する場合は「取引情報訂正・削除申請書」を作成・保存してください（<a
+						href="{base}/help/evidence"
+						target="_blank"
+						class="underline">ヘルプ: 証憑管理</a
+					>）。
+				</span>
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

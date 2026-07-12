@@ -5,6 +5,13 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-07-13
+
+### Added
+
+- 証憑削除確認ダイアログに電帳法（事務処理規程）の注意書きとヘルプリンクを追加（`docs/design/correction-workflow.md` Phase 0）
+- 訂正・削除ワークフロー設計メモ `docs/design/correction-workflow.md` を追加（correctionLogs・請求書発行後ロックの構想）
+
 ### Changed
 
 - ヘルプ（証憑管理・アーカイブ）の電帳法説明を是正
@@ -278,7 +285,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
-[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.0...v0.4.1
