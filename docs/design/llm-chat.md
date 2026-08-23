@@ -94,7 +94,10 @@ export interface LLMProviderConfig {
 | Gemini                                    | `https://generativelanguage.googleapis.com/v1beta/openai` | 必須         | 許可済み                                                                   | OpenAI 互換エンドポイント。クラウド警告対象 |
 | カスタム                                  | 任意                                                      | 任意         | 接続先依存                                                                 | 企業 VPC 等                                 |
 
-> **CORS 留意点**: ブラウザから直接叩くため、ローカル LiteLLM 側に CORS 設定が必要。`litellm-langgraph-setup.md`（localllm-construction-practice）側に CORS 設定手順を追記する。
+> **接続経路の留意点（2026-08-23 実測で更新）**: ブラウザから直接叩くため、次の 2 つは別々に確認する。
+>
+> 1. **混在コンテンツ** — `https://` で配信したページから `http://` の baseUrl は呼べない。ブラウザが送信前に破棄するため、サーバー側の設定では解決しない。`provider.ts` の `detectMixedContentBlock()` で fetch 前に判定し、対処を含むエラーを返す。LLM サーバー側の恒久対応は localllm-construction-practice `macbookprom1pro/litellm-https-setup.md`。
+> 2. **CORS** — LiteLLM は既定で `access-control-allow-origin: *` を返すため、実測では無設定で通った。Ollama 直の場合は `OLLAMA_ORIGINS` の設定が必要。
 
 ### 4.3 共通呼び出し I/F
 
@@ -337,4 +340,5 @@ flowchart LR
 - [Discussion #49 e-shiwake Local LLM活用](https://github.com/shuji-bonji/e-shiwake/discussions/49) — 本設計の一次資料
 - `src/lib/webmcp/tools.ts` / `ui-tools.ts` — 流用するツール定義
 - `src/routes/help/webmcp/content.md` — WebMCP の現状仕様
-- localllm-construction-practice `macbookprom1pro/litellm-langgraph-setup.md` — LiteLLM/CORS 構築手順（CORS 追記予定）
+- localllm-construction-practice `macbookprom1pro/litellm-langgraph-setup.md` — LiteLLM 構築手順
+- localllm-construction-practice `macbookprom1pro/litellm-https-setup.md` — `:4000` の HTTPS 化（混在コンテンツ対策・Tailscale serve / Caddy）

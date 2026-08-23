@@ -5,7 +5,7 @@
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import ChatMessages from '$lib/components/chat/ChatMessages.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { isDesktop, toggleChatPanel, useChat } from '$lib/llm/chat.svelte';
+	import { isDesktop, setChatReturnPath, toggleChatPanel, useChat } from '$lib/llm/chat.svelte';
 	import { Bot, Expand, X } from '@lucide/svelte';
 
 	const chat = useChat();
@@ -14,6 +14,7 @@
 	const isChatRoute = $derived(page.route.id?.startsWith('/chat') ?? false);
 
 	function openFullPage() {
+		setChatReturnPath(page.url.pathname + page.url.search);
 		toggleChatPanel(false);
 		goto(`${base}/chat`);
 	}

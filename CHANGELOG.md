@@ -5,6 +5,25 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- AI チャットのプロバイダ設定に、混在コンテンツの事前判定を追加（`detectMixedContentBlock()`）
+  - HTTPS で表示しているページから `http://` の接続先を指定した場合、fetch する前に原因と対処を示すエラーを返す
+  - 設定画面の接続先 URL 入力欄にも同じ内容を警告表示
+  - 従来は「接続に失敗しました（Failed to fetch）」とだけ表示され、CORS 設定の確認だけを案内していた。実際はブラウザがリクエストを送信前に破棄しており、サーバー側の設定では解決しない
+  - `localhost` / `127.0.0.1` は安全なオリジンとして扱われるため判定から除外
+
+### Fixed
+
+- AI チャットを全画面（`/chat`）で開くと、サイドパネル表示に戻す手段がなかった問題を修正
+  - 全画面ページのヘッダーに「サイドパネルに戻す」ボタンを追加
+  - 全画面で開く直前のパスを記録し（`setChatReturnPath()`）、そのページへ戻ってパネルを開く。サイドバーから直接 `/chat` を開いた場合はホームへ戻る
+
+### Changed
+
+- ヘルプ「AI チャット」に「接続先 URL のプロトコル（混在コンテンツ）」の節とトラブルシューティング行を追加（`content.md` / `+page.svelte`）
+- `docs/design/llm-chat.md` の CORS 留意点を、混在コンテンツと CORS の 2 点に分けて記述（LiteLLM は既定で `access-control-allow-origin: *` を返すことを実測で確認）
+
 ## [0.5.2] - 2026-07-13
 
 ### Added

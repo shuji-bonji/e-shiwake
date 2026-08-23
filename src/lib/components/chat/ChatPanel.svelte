@@ -7,7 +7,13 @@
 	import ChatMessages from '$lib/components/chat/ChatMessages.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { initChat, isDesktop, toggleChatPanel, useChat } from '$lib/llm/chat.svelte';
+	import {
+		initChat,
+		isDesktop,
+		setChatReturnPath,
+		toggleChatPanel,
+		useChat
+	} from '$lib/llm/chat.svelte';
 	import { Bot, Expand } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 
@@ -21,6 +27,7 @@
 	});
 
 	function openFullPage() {
+		setChatReturnPath(page.url.pathname + page.url.search);
 		toggleChatPanel(false);
 		goto(`${base}/chat`);
 	}

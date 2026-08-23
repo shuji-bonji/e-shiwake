@@ -14,7 +14,7 @@
 		setActiveProviderId,
 		updateProvider
 	} from '$lib/llm/config-store';
-	import { testConnection } from '$lib/llm/provider';
+	import { detectMixedContentBlock, testConnection } from '$lib/llm/provider';
 	import {
 		LLM_PROVIDER_PRESETS,
 		type LLMProviderConfig,
@@ -42,6 +42,9 @@
 	let form = $state<FormState | null>(null);
 
 	const activeProvider = $derived(providers.find((p) => p.id === activeId) ?? null);
+
+	/** HTTPS ページから http:// を指定した場合の警告（混在コンテンツ） */
+	const mixedContentWarning = $derived(form ? detectMixedContentBlock(form.baseUrl) : null);
 
 	onMount(async () => {
 		await reload();
@@ -268,6 +271,12 @@
 					<div class="space-y-2 sm:col-span-2">
 						<Label for="llm-baseurl">接続先 URL（OpenAI 互換 /v1）*</Label>
 						<Input id="llm-baseurl" bind:value={form.baseUrl} placeholder="http://neko8:4000/v1" />
+						{#if mixedContentWarning}
+							<p class="flex items-start gap-1 text-xs text-amber-600">
+								<AlertTriangle class="mt-0.5 size-3.5 shrink-0" />
+								<span class="whitespace-pre-line">{mixedContentWarning}</span>
+							</p>
+						{/if}
 					</div>
 					<div class="space-y-2 sm:col-span-2">
 						<Label for="llm-apikey"
@@ -285,7 +294,8 @@
 
 		<p class="text-xs text-muted-foreground">
 			ローカル LLM（LiteLLM / Ollama 等）を使う場合は、サーバー側でこのアプリのオリジンからの CORS
-			を許可してください。ブラウザ保存の API キーは XSS
+			を許可してください。また、このページを HTTPS で開いている場合、接続先も HTTPS
+			である必要があります。ブラウザ保存の API キーは XSS
 			に弱い性質がありますが、本アプリはサードパーティスクリプトを含まない静的 PWA です。
 		</p>
 	</Card.Content>

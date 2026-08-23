@@ -43,6 +43,8 @@ let errorMessage = $state<string | null>(null);
 let pendingApproval = $state<PendingApproval | null>(null);
 let activeProvider = $state<LLMProviderConfig | null>(null);
 let isPanelOpen = $state(false);
+/** /chat を全画面で開く直前にいたページのパス（サイドパネルに戻すときの遷移先） */
+let fullPageReturnPath = $state<string | null>(null);
 let initialized = false;
 let abortController: AbortController | null = null;
 
@@ -192,6 +194,16 @@ export function toggleChatPanel(open?: boolean): void {
 }
 
 /**
+ * /chat を全画面で開く直前のパスを記録する
+ *
+ * 全画面からサイドパネル表示に戻すとき、この位置に遷移して復帰する。
+ * サイドバーから直接 /chat を開いた場合は未設定のままで、戻り先はホームになる。
+ */
+export function setChatReturnPath(path: string | null): void {
+	fullPageReturnPath = path;
+}
+
+/**
  * 過去のユーザーメッセージを再実行する
  * （初回のローカルネットワーク許可等で送信が失敗した場合の再送に使う）
  */
@@ -224,6 +236,9 @@ export function useChat() {
 		},
 		get isPanelOpen() {
 			return isPanelOpen;
+		},
+		get returnPath() {
+			return fullPageReturnPath;
 		},
 		get draft() {
 			return draft;

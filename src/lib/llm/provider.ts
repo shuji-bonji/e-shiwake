@@ -19,15 +19,42 @@ function normalizeBaseUrl(baseUrl: string): string {
 	return baseUrl.replace(/\/+$/, '');
 }
 
-/** 認証・追加ヘッダーを構築 */
-function buildHeaders(cfg: LLMProviderConfig): Record<string, string> {
-	const headers: Record<string, string> = {
-		'Content-Type': 'application/json'
-	};
-	if (cfg.apiKey) {
-		headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+/**
+ * ブラウザが「安全なオリジン」として扱うホスト名。
+ * これらへの http:// は HTTPS ページからでもブロックされない（Safari を除く）。
+ */
+const TRUSTWORTHY_HOST = /^(localhost|.+\.localhost|127(?:\.\d+){1,3}|\[::1\]|::1)$/i;
+
+/**
+ * 混在コンテンツでブロックされる組み合わせを検出する
+ *
+ * HTTPS で配信されているページ（例: GitHub Pages）から http:// の接続先を
+ * fetch すると、ブラウザはリクエストを送信せずに破棄する。
+ * この場合サーバーには何も届かないため、CORS 設定を変えても解決しない。
+ *
+ * @returns ブロックされる場合は説明文、問題なければ null
+ */
+export function detectMixedContentBlock(baseUrl: string): string | null {
+	if (typeof location === 'undefined') return null;
+	if (location.protocol !== 'https:') return null;
+
+	let url: URL;
+	try {
+		url = new URL(baseUrl);
+	} catch {
+		return null; // URL 形式の不備は別途バリデーションする
 	}
-	return { ...headers, ...cfg.extraHeaders };
+	if (url.protocol !== 'http:') return null;
+	if (TRUSTWORTHY_HOST.test(url.hostname)) return null;
+
+	return (
+		`HTTPS で表示しているページから http:// の接続先は呼び出せません（混在コンテンツ）。\n` +
+		`接続先: ${baseUrl}\n` +
+		`ブラウザがリクエストを送信前に破棄するため、サーバー側の CORS 設定では解決しません。\n` +
+		`対処: (1) LLM サーバーを HTTPS 化して https:// の URL を指定する / ` +
+		`(2) http://localhost で起動したアプリから使う / ` +
+		`(3) Chrome のサイト設定で「安全でないコンテンツ」を許可する（Chrome のみ）`
+	);
 }
 
 /**
@@ -39,6 +66,11 @@ export async function chatCompletion(
 	tools: OpenAIToolSchema[],
 	signal?: AbortSignal
 ): Promise<ChatCompletionResponse> {
+	const mixedContent = detectMixedContentBlock(cfg.baseUrl);
+	if (mixedContent) {
+		throw new Error(mixedContent);
+	}
+
 	const url = `${normalizeBaseUrl(cfg.baseUrl)}/chat/completions`;
 
 	const body: Record<string, unknown> = {
@@ -84,10 +116,16 @@ export async function chatCompletion(
 /**
  * 疎通テスト
  *
+ * 0. 混在コンテンツでブロックされる構成かを先に判定する
  * 1. GET /v1/models でモデル一覧取得を試みる
  * 2. 失敗した場合は最小の chat completion で確認する
  */
 export async function testConnection(cfg: LLMProviderConfig): Promise<ConnectionTestResult> {
+	const mixedContent = detectMixedContentBlock(cfg.baseUrl);
+	if (mixedContent) {
+		return { ok: false, message: mixedContent };
+	}
+
 	const base = normalizeBaseUrl(cfg.baseUrl);
 
 	// 1. /models
@@ -116,6 +154,17 @@ export async function testConnection(cfg: LLMProviderConfig): Promise<Connection
 			message: e instanceof Error ? e.message : String(e)
 		};
 	}
+}
+
+/** 認証・追加ヘッダーを構築 */
+function buildHeaders(cfg: LLMProviderConfig): Record<string, string> {
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json'
+	};
+	if (cfg.apiKey) {
+		headers['Authorization'] = `Bearer ${cfg.apiKey}`;
+	}
+	return { ...headers, ...cfg.extraHeaders };
 }
 
 function truncate(text: string, max: number): string {
