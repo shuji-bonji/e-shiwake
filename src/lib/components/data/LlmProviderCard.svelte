@@ -262,7 +262,7 @@
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div class="space-y-2">
 						<Label for="llm-label">表示名</Label>
-						<Input id="llm-label" bind:value={form.label} placeholder="例: neko8 Gemma" />
+						<Input id="llm-label" bind:value={form.label} placeholder="例: 自宅サーバーの Gemma" />
 					</div>
 					<div class="space-y-2">
 						<Label for="llm-model">モデル名 *</Label>
@@ -270,7 +270,11 @@
 					</div>
 					<div class="space-y-2 sm:col-span-2">
 						<Label for="llm-baseurl">接続先 URL（OpenAI 互換 /v1）*</Label>
-						<Input id="llm-baseurl" bind:value={form.baseUrl} placeholder="http://neko8:4000/v1" />
+						<Input
+							id="llm-baseurl"
+							bind:value={form.baseUrl}
+							placeholder="http://localhost:4000/v1"
+						/>
 						{#if mixedContentWarning}
 							<p class="flex items-start gap-1 text-xs text-amber-600">
 								<AlertTriangle class="mt-0.5 size-3.5 shrink-0" />

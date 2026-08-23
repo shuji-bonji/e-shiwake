@@ -41,13 +41,13 @@ AI の回答は Markdown（見出し・リスト・表・コードブロック�
 
 `https://` で表示しているページから `http://` の接続先を呼ぶと、ブラウザ側の制限を受けます。制限の内容は**接続先がローカルネットワークかどうか**で変わります。
 
-| アプリを開いている URL                     | 接続先                                 | 結果                                                                                                 |
-| ------------------------------------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `https://shuji-bonji.github.io/e-shiwake/` | `https://...`                          | 呼び出せる                                                                                           |
-| `https://shuji-bonji.github.io/e-shiwake/` | `http://neko8.local:4000/v1`（LAN 内） | Chrome 142 以降は「ローカルネットワークへのアクセス」の許可を求められる / Safari・Firefox はブロック |
-| `https://shuji-bonji.github.io/e-shiwake/` | `http://`（LAN 外）                    | ブロックされる（混在コンテンツ）                                                                     |
-| `https://shuji-bonji.github.io/e-shiwake/` | `http://localhost:4000/v1`             | Chrome・Firefox は呼び出せる / Safari は不可                                                         |
-| `http://localhost:5173/`                   | `http://...`                           | 呼び出せる                                                                                           |
+| アプリを開いている URL                     | 接続先                                  | 結果                                                                                                 |
+| ------------------------------------------ | --------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `https://shuji-bonji.github.io/e-shiwake/` | `https://...`                           | 呼び出せる                                                                                           |
+| `https://shuji-bonji.github.io/e-shiwake/` | `http://192.168.1.10:4000/v1`（LAN 内） | Chrome 142 以降は「ローカルネットワークへのアクセス」の許可を求められる / Safari・Firefox はブロック |
+| `https://shuji-bonji.github.io/e-shiwake/` | `http://`（LAN 外）                     | ブロックされる（混在コンテンツ）                                                                     |
+| `https://shuji-bonji.github.io/e-shiwake/` | `http://localhost:4000/v1`              | Chrome・Firefox は呼び出せる / Safari は不可                                                         |
+| `http://localhost:5173/`                   | `http://...`                            | 呼び出せる                                                                                           |
 
 Chrome 142 以降は、`.local` や `192.168.x.x` などローカルネットワーク宛の `http://` を混在コンテンツの対象から外し、代わりに許可を求める方式に変わりました。そのため Chrome では許可すれば通りますが、Safari と Firefox は従来どおりブロックします。
 

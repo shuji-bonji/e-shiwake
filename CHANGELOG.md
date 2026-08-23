@@ -22,6 +22,7 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ### Changed
 
+- LLM プロバイダ設定と型定義の例示を、開発者の環境固有のホスト名から一般的な例に差し替え（接続先 URL の入力例を `http://localhost:4000/v1`、表示名の入力例を「自宅サーバーの Gemma」、ヘルプの LAN 内の例を `http://192.168.1.10:4000/v1` に変更）
 - ヘルプ「AI チャット」に「接続先 URL のプロトコル」の節とトラブルシューティング行を追加（`content.md` / `+page.svelte`）
 - `docs/design/llm-chat.md` の CORS 留意点を、混在コンテンツと CORS の 2 点に分けて記述（LiteLLM は既定で `access-control-allow-origin: *` を返すことを実測で確認）
 

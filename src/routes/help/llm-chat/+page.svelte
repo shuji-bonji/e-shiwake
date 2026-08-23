@@ -109,7 +109,7 @@
 				['https://shuji-bonji.github.io/e-shiwake/', 'https://...', '呼び出せる'],
 				[
 					'https://shuji-bonji.github.io/e-shiwake/',
-					'http://neko8.local:4000/v1（LAN 内）',
+					'http://192.168.1.10:4000/v1（LAN 内）',
 					'Chrome 142 以降は「ローカルネットワークへのアクセス」の許可を求められる / Safari・Firefox はブロック'
 				],
 				[

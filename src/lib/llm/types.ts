@@ -18,11 +18,11 @@ export type LLMProviderKind = 'local' | 'openai' | 'anthropic' | 'gemini' | 'gro
 export interface LLMProviderConfig {
 	/** 設定の識別子（UUID） */
 	id: string;
-	/** 表示名（例: "neko8 Gemma"） */
+	/** 表示名（例: "自宅サーバーの Gemma"） */
 	label: string;
 	/** プロバイダ種別 */
 	kind: LLMProviderKind;
-	/** 例: http://neko8:4000/v1 */
+	/** 例: http://localhost:4000/v1 */
 	baseUrl: string;
 	/** 端末内のみ。ローカルは空可 */
 	apiKey: string;
