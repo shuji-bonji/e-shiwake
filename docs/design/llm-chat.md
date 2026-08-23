@@ -96,8 +96,11 @@ export interface LLMProviderConfig {
 
 > **接続経路の留意点（2026-08-23 実測で更新）**: ブラウザから直接叩くため、次の 2 つは別々に確認する。
 >
-> 1. **混在コンテンツ** — `https://` で配信したページから `http://` の baseUrl は呼べない。ブラウザが送信前に破棄するため、サーバー側の設定では解決しない。`provider.ts` の `detectMixedContentBlock()` で fetch 前に判定し、対処を含むエラーを返す。LLM サーバー側の恒久対応は localllm-construction-practice `macbookprom1pro/litellm-https-setup.md`。
-> 2. **CORS** — LiteLLM は既定で `access-control-allow-origin: *` を返すため、実測では無設定で通った。Ollama 直の場合は `OLLAMA_ORIGINS` の設定が必要。
+> 1. **混在コンテンツ** — `https://` で配信したページから `http://` の baseUrl は、ブラウザが送信前に破棄する。サーバー側の設定では解決しない。
+> 2. **ローカルネットワークへのアクセス許可** — Chrome 142 以降は `.local` / RFC1918 宛を 1 の対象外とし、代わりに許可プロンプトを出す（Safari / Firefox にこの緩和はない）。つまり Chrome だけ挙動が違う。
+> 3. **CORS** — LiteLLM は既定で `access-control-allow-origin: *` を返すため、実測では無設定で通った。Ollama 直の場合は `OLLAMA_ORIGINS` の設定が必要。
+>
+> `provider.ts` の `detectMixedContentRisk()` が 1 / 2 を判定し、設定画面の警告と失敗時のエラー説明に使う（**送信自体は止めない**。Chrome の許可状況によっては通るため）。LLM サーバー側の恒久対応は localllm-construction-practice `macbookprom1pro/litellm-https-setup.md`。
 
 ### 4.3 共通呼び出し I/F
 

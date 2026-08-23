@@ -14,7 +14,7 @@
 		setActiveProviderId,
 		updateProvider
 	} from '$lib/llm/config-store';
-	import { detectMixedContentBlock, testConnection } from '$lib/llm/provider';
+	import { detectMixedContentRisk, testConnection } from '$lib/llm/provider';
 	import {
 		LLM_PROVIDER_PRESETS,
 		type LLMProviderConfig,
@@ -44,7 +44,7 @@
 	const activeProvider = $derived(providers.find((p) => p.id === activeId) ?? null);
 
 	/** HTTPS ページから http:// を指定した場合の警告（混在コンテンツ） */
-	const mixedContentWarning = $derived(form ? detectMixedContentBlock(form.baseUrl) : null);
+	const mixedContentWarning = $derived(form ? detectMixedContentRisk(form.baseUrl) : null);
 
 	onMount(async () => {
 		await reload();

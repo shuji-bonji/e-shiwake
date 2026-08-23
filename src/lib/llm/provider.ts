@@ -21,20 +21,34 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 /**
  * ブラウザが「安全なオリジン」として扱うホスト名。
- * これらへの http:// は HTTPS ページからでもブロックされない（Safari を除く）。
+ * これらへの http:// は HTTPS ページからでも制限を受けない。
  */
 const TRUSTWORTHY_HOST = /^(localhost|.+\.localhost|127(?:\.\d+){1,3}|\[::1\]|::1)$/i;
 
 /**
- * 混在コンテンツでブロックされる組み合わせを検出する
- *
- * HTTPS で配信されているページ（例: GitHub Pages）から http:// の接続先を
- * fetch すると、ブラウザはリクエストを送信せずに破棄する。
- * この場合サーバーには何も届かないため、CORS 設定を変えても解決しない。
- *
- * @returns ブロックされる場合は説明文、問題なければ null
+ * ローカルネットワーク宛と判定されるホスト名（mDNS 名・RFC1918・リンクローカル）。
+ * Chrome 142 以降はこれらを混在コンテンツの対象外とし、
+ * 代わりに「ローカルネットワークへのアクセス」の許可を求める。
  */
-export function detectMixedContentBlock(baseUrl: string): string | null {
+const LOCAL_NETWORK_HOST =
+	/\.local\.?$|^10\.|^192\.168\.|^172\.(?:1[6-9]|2\d|3[01])\.|^169\.254\./i;
+
+/**
+ * HTTPS ページから http:// を呼ぶ構成を検出し、ブラウザ側の制限を説明する
+ *
+ * 制限の内容は接続先によって 2 種類に分かれる。
+ *
+ * - **ローカルネットワーク宛**（`.local` / RFC1918 / リンクローカル）:
+ *   Chrome 142 以降は混在コンテンツの対象外で、代わりに
+ *   「ローカルネットワークへのアクセス」の許可を求める。Safari / Firefox はブロックする。
+ * - **それ以外**: 混在コンテンツとしてブロックされる。サーバー側の設定では解決しない。
+ *
+ * いずれも**判定のみ**で送信の可否は決めない。呼び出し側は事前の警告表示と、
+ * 失敗したときのエラー説明に使う。
+ *
+ * @returns 該当する場合は説明文、問題なければ null
+ */
+export function detectMixedContentRisk(baseUrl: string): string | null {
 	if (typeof location === 'undefined') return null;
 	if (location.protocol !== 'https:') return null;
 
@@ -47,11 +61,20 @@ export function detectMixedContentBlock(baseUrl: string): string | null {
 	if (url.protocol !== 'http:') return null;
 	if (TRUSTWORTHY_HOST.test(url.hostname)) return null;
 
+	if (LOCAL_NETWORK_HOST.test(url.hostname)) {
+		return (
+			`HTTPS で表示しているページから、ローカルネットワーク宛の http:// を呼ぶ構成です。ブラウザによって扱いが変わります。\n` +
+			`・Chrome 142 以降: 混在コンテンツの対象外。代わりに「ローカルネットワークへのアクセス」の許可を求められます（拒否すると失敗します）\n` +
+			`・Safari / Firefox: 混在コンテンツとしてブロックされます\n` +
+			`・Chrome が .local の名前を解決できないこともあります（アドレスバーで ${url.origin}/v1/models を開いて確認してください）\n` +
+			`どの環境でも動かすには、LLM サーバーを HTTPS 化して https:// の URL を指定してください。`
+		);
+	}
+
 	return (
-		`HTTPS で表示しているページから http:// の接続先は呼び出せません（混在コンテンツ）。\n` +
-		`接続先: ${baseUrl}\n` +
-		`ブラウザがリクエストを送信前に破棄するため、サーバー側の CORS 設定では解決しません。\n` +
-		`対処: (1) LLM サーバーを HTTPS 化して https:// の URL を指定する / ` +
+		`HTTPS で表示しているページから http:// の接続先を呼ぶと、ブラウザがリクエストを送信前に破棄します（混在コンテンツ）。\n` +
+		`サーバー側の CORS 設定では解決しません。\n` +
+		`対処: (1) LLM サーバーを HTTPS 化して https:// の URL を指定する（推奨） / ` +
 		`(2) http://localhost で起動したアプリから使う / ` +
 		`(3) Chrome のサイト設定で「安全でないコンテンツ」を許可する（Chrome のみ）`
 	);
@@ -66,11 +89,6 @@ export async function chatCompletion(
 	tools: OpenAIToolSchema[],
 	signal?: AbortSignal
 ): Promise<ChatCompletionResponse> {
-	const mixedContent = detectMixedContentBlock(cfg.baseUrl);
-	if (mixedContent) {
-		throw new Error(mixedContent);
-	}
-
 	const url = `${normalizeBaseUrl(cfg.baseUrl)}/chat/completions`;
 
 	const body: Record<string, unknown> = {
@@ -94,10 +112,11 @@ export async function chatCompletion(
 		});
 	} catch (e) {
 		if (e instanceof DOMException && e.name === 'AbortError') throw e;
+		const detail = e instanceof Error ? e.message : String(e);
+		const mixedContent = detectMixedContentRisk(cfg.baseUrl);
 		throw new Error(
-			`接続に失敗しました: ${cfg.baseUrl}\n` +
-				`ネットワーク到達性と、サーバー側の CORS 設定を確認してください。` +
-				`（${e instanceof Error ? e.message : String(e)}）`
+			`接続に失敗しました: ${cfg.baseUrl}（${detail}）\n` +
+				(mixedContent ?? `ネットワーク到達性と、サーバー側の CORS 設定を確認してください。`)
 		);
 	}
 
@@ -116,16 +135,13 @@ export async function chatCompletion(
 /**
  * 疎通テスト
  *
- * 0. 混在コンテンツでブロックされる構成かを先に判定する
  * 1. GET /v1/models でモデル一覧取得を試みる
  * 2. 失敗した場合は最小の chat completion で確認する
+ *
+ * 混在コンテンツの可能性は事前にブロックせず、実際に失敗したときの説明に含める
+ * （Chrome の「安全でないコンテンツ」許可済みなら送信は通るため）。
  */
 export async function testConnection(cfg: LLMProviderConfig): Promise<ConnectionTestResult> {
-	const mixedContent = detectMixedContentBlock(cfg.baseUrl);
-	if (mixedContent) {
-		return { ok: false, message: mixedContent };
-	}
-
 	const base = normalizeBaseUrl(cfg.baseUrl);
 
 	// 1. /models

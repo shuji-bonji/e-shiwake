@@ -96,11 +96,12 @@
 				>。データを外部に出したくない場合はローカル LLM を利用してください。
 			</p>
 		</HelpNote>
-		<h3 class="mt-4 mb-2 font-medium">接続先 URL のプロトコル（混在コンテンツ）</h3>
+		<h3 class="mt-4 mb-2 font-medium">接続先 URL のプロトコル</h3>
 		<p>
 			<code>https://</code> で表示しているページから <code>http://</code>
-			の接続先は呼び出せません。ブラウザがリクエストを送信する前に破棄するため、サーバー側の CORS
-			設定を変えても解決しません（混在コンテンツ）。
+			の接続先を呼ぶと、ブラウザ側の制限を受けます。制限の内容は<strong
+				>接続先がローカルネットワークかどうか</strong
+			>で変わります。
 		</p>
 		<HelpTable
 			headers={['アプリを開いている URL', '接続先', '結果']}
@@ -108,8 +109,13 @@
 				['https://shuji-bonji.github.io/e-shiwake/', 'https://...', '呼び出せる'],
 				[
 					'https://shuji-bonji.github.io/e-shiwake/',
-					'http://neko8.local:4000/v1',
-					'ブロックされる'
+					'http://neko8.local:4000/v1（LAN 内）',
+					'Chrome 142 以降は「ローカルネットワークへのアクセス」の許可を求められる / Safari・Firefox はブロック'
+				],
+				[
+					'https://shuji-bonji.github.io/e-shiwake/',
+					'http://（LAN 外）',
+					'ブロックされる（混在コンテンツ）'
 				],
 				[
 					'https://shuji-bonji.github.io/e-shiwake/',
@@ -119,28 +125,27 @@
 				['http://localhost:5173/', 'http://...', '呼び出せる']
 			]}
 		/>
-		<p class="mt-2">対処は次の 3 つです。</p>
-		<ol class="mt-2 ml-4 list-decimal space-y-2">
-			<li>
-				<strong>LLM サーバーを HTTPS 化する</strong>（恒久対応。iPad の Safari
-				からも使えるようになる）。Tailscale の <code>tailscale serve</code> を使うと
-				<code>*.ts.net</code> の正式な証明書が付くため、<code>https://&lt;ホスト名&gt;.ts.net/v1</code
-				> を接続先に指定できます。
-			</li>
-			<li>
-				<strong>ローカルで起動したアプリから使う</strong>。<code>npm run dev</code> の
-				<code>http://localhost:5173</code> はページ自体が http のため制限を受けません。
-			</li>
-			<li>
-				<strong>Chrome のサイト設定で「安全でないコンテンツ」を許可する</strong>。Chrome
-				のみで、Safari に同等の設定はありません。
-			</li>
-		</ol>
+		<p class="mt-2">
+			Chrome 142 以降は、<code>.local</code> や <code>192.168.x.x</code>
+			などローカルネットワーク宛の
+			<code>http://</code>
+			を混在コンテンツの対象から外し、代わりに許可を求める方式に変わりました。そのため Chrome では許可すれば通りますが、Safari
+			と Firefox は従来どおりブロックします。
+		</p>
 		<HelpNote type="info">
 			<p>
-				設定画面で接続先 URL を入力した時点で、この組み合わせに該当する場合は警告が表示されます。
+				Chrome が <code>.local</code> の名前を解決できず <code>DNS_PROBE_FINISHED_NXDOMAIN</code>
+				になることがあります。アドレスバーで <code>http://&lt;ホスト名&gt;:4000/v1/models</code>
+				を直接開くと切り分けられます。この場合は Chrome の「セキュア DNS を使用する」をオフにするか、IP
+				アドレスを直接指定してください。
 			</p>
 		</HelpNote>
+		<p class="mt-2">
+			どのブラウザでも同じように動かすには、<strong>LLM サーバーを HTTPS 化する</strong
+			>のが確実です。Tailscale の <code>tailscale serve</code> を使うと <code>*.ts.net</code>
+			の正式な証明書が付くため、<code>https://&lt;ホスト名&gt;.ts.net/v1</code>
+			を接続先に指定できます。
+		</p>
 		<h3 class="mt-4 mb-2 font-medium">ローカル LLM の CORS 設定</h3>
 		<p>
 			ブラウザから直接 LLM サーバーを呼び出すため、ローカル LLM 側で e-shiwake のオリジン（<code
@@ -313,9 +318,10 @@
 			headers={['症状', '対処']}
 			rows={[
 				[
-					'「HTTPS で表示しているページから http:// の接続先は呼び出せません」',
-					'混在コンテンツです。「接続先 URL のプロトコル」を参照'
+					'「ローカルネットワーク宛の http:// を呼ぶ構成です」',
+					'「接続先 URL のプロトコル」を参照。Chrome の許可プロンプト、または LLM サーバーの HTTPS 化'
 				],
+				['「混在コンテンツ」と表示される', '同上。接続先を https:// にする'],
 				['「接続に失敗しました」', '接続先 URL の到達性と、LLM サーバー側の CORS 設定を確認'],
 				['「HTTP 401」', 'API キーが正しいか確認'],
 				[
