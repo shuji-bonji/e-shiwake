@@ -73,6 +73,7 @@
 		{ href: `${base}/help/pwa`, label: 'PWA・オフライン', icon: Smartphone },
 		{ href: `${base}/help/shortcuts`, label: 'ショートカット', icon: Keyboard },
 		{ href: `${base}/help/glossary`, label: '用語集', icon: BookA },
+		{ href: `${base}/help/llm-chat`, label: 'AI チャット', icon: Bot },
 		{ href: `${base}/help/webmcp`, label: 'WebMCP', icon: Bot }
 	];
 </script>
