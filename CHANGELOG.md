@@ -3,7 +3,16 @@
 e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に準拠。
 [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
-## [Unreleased]
+## [0.6.3] - 2026-09-05
+
+### Changed
+
+- 請求書の印刷・PDF 出力で、明細の表に確保する最低行数を 10 行から 8 行に変更（`InvoicePrint.svelte` の `MIN_PRINT_ROWS`）
+
+### Fixed
+
+- ヘルプ「請求書」の「請求書画面から取引先を直接追加することはできません」の記述を、v0.6.0 で追加した「取引先を追加」リンクに合わせて修正
+- ヘルプ「請求書」の印刷の節に、明細の表の最低行数（8 行）の説明を追加
 
 ## [0.6.2] - 2026-09-05
 

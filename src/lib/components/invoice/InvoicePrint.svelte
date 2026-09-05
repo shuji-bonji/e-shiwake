@@ -13,9 +13,12 @@
 
 	const { invoice, vendor, businessInfo }: Props = $props();
 
-	// 空行のインデックス配列（最低10行表示用）
+	// 印刷時に表示する明細行の最低数（明細が少なくても表の高さを揃えるための空行）
+	const MIN_PRINT_ROWS = 8;
+
+	// 空行のインデックス配列
 	const emptyRowIndices = $derived(
-		Array.from({ length: Math.max(0, 10 - invoice.items.length) }, (_, i) => i)
+		Array.from({ length: Math.max(0, MIN_PRINT_ROWS - invoice.items.length) }, (_, i) => i)
 	);
 </script>
 
@@ -100,7 +103,7 @@
 					<td class="col-amount">¥{formatCurrency(item.amount)}</td>
 				</tr>
 			{/each}
-			<!-- 空行で埋める（最低10行表示） -->
+			<!-- 空行で埋める（最低 MIN_PRINT_ROWS 行表示） -->
 			{#each emptyRowIndices as i (i)}
 				<tr class="empty-row">
 					<td class="col-date">&nbsp;</td>
