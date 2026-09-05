@@ -3,7 +3,20 @@
 e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に準拠。
 [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
-## [0.6.1]
+## [Unreleased]
+
+## [0.6.2] - 2026-09-05
+
+### Fixed
+
+- 請求書の印刷・PDF 出力のレイアウトを修正（`layout.css` の `@media print`）
+  - Safari で請求書タイトルの左に縦線が印刷されていた問題を修正。サイドバーの枠（`[data-slot='sidebar-container']`、`position: fixed` で右辺に `border-e` を持つ）が印刷時に非表示になっておらず、右辺の罫線だけが残っていた。`[data-slot='sidebar']` / `[data-slot='sidebar-container']` も非表示にする
+  - 印刷内容が左に寄っていた問題を修正。`main` の余白を左だけ 0 にしていたため右の `padding` が残っていた。左右とも 0 にして対称にする
+  - 表の右端の縦罫線が Safari で切れる（ビューアによっては灰色の半線になる）問題を修正。`border-collapse` の外周罫線は表の外側に半分はみ出すため、`.invoice-print` に `padding: 0 1mm` を持たせて印刷領域の内側に収める
+  - ブラウザがダーク配色で印刷した場合に `@page` の余白が `#121212` で塗られる問題を修正（`html, body` に `color-scheme: light` を指定）
+  - アプリのダークテーマのまま印刷した場合に、請求書の下端に黒い帯が出る問題を修正（`.group/sidebar-wrapper` / `[data-slot='sidebar-inset']` / `main` の背景を白に固定）
+
+## [0.6.1] - 2026-09-05
 
 ### Added
 
@@ -335,7 +348,9 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
-[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.0...v0.5.1

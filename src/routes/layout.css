@@ -162,7 +162,27 @@ input[type='date']::-webkit-calendar-picker-indicator {
 
 /* 印刷用スタイル: サイドバーとヘッダーを非表示 */
 @media print {
-	/* サイドバーを非表示 */
+	/*
+	 * 印刷面の地色を固定（ダークテーマでも白地・黒文字で出す）
+	 * color-scheme: light は @page の余白部分の色を決める。
+	 * ブラウザ側がダーク配色で印刷すると、余白が #121212 で塗られるため明示する
+	 */
+	html,
+	body {
+		color-scheme: light !important;
+		background: #fff !important;
+		color: #000 !important;
+	}
+
+	/*
+	 * サイドバーを非表示
+	 * - [data-slot='sidebar']: デスクトップ用サイドバーの外枠（幅確保用の gap 要素を含む）
+	 * - [data-slot='sidebar-container']: position: fixed の枠。border-e を持つため、
+	 *   内側だけ隠すと右辺の縦線だけが印刷面に残る（Safari で発生していた縦線の原因）
+	 * - [data-sidebar='sidebar'] / [data-sidebar='rail']: 内側の本体とレール
+	 */
+	[data-slot='sidebar'],
+	[data-slot='sidebar-container'],
 	[data-sidebar='sidebar'],
 	[data-sidebar='rail'] {
 		display: none !important;
@@ -178,13 +198,28 @@ input[type='date']::-webkit-calendar-picker-indicator {
 		position: static !important;
 	}
 
-	/* メインコンテンツを全幅に */
+	/*
+	 * メインコンテンツを全幅に
+	 * 左右とも余白を 0 にする（左だけ 0 にすると右の padding が残り、左に寄って見える）
+	 */
 	[data-slot='sidebar-inset'],
 	main {
-		margin-left: 0 !important;
-		padding-left: 0 !important;
+		margin: 0 !important;
+		padding: 0 !important;
 		width: 100% !important;
 		max-width: 100% !important;
+	}
+
+	/*
+	 * ダークテーマ時の下地（bg-background / bg-sidebar）を白に固定
+	 * .invoice-print の白い領域より外側の下地が暗色だと、
+	 * 末尾の margin 分だけ黒い帯として印刷される
+	 */
+	.group\/sidebar-wrapper,
+	[data-slot='sidebar-inset'],
+	main {
+		background: #fff !important;
+		color: #000 !important;
 	}
 
 	/* Sidebar.Providerのラッパーをリセット */
@@ -206,6 +241,12 @@ input[type='date']::-webkit-calendar-picker-indicator {
 		line-height: 1.5;
 		color: #000;
 		background: #fff;
+		/*
+		 * border-collapse の表は外周の罫線が表の箱の外側に半分はみ出す。
+		 * 幅 100% の表では右端の罫線が印刷領域の外に出て Safari で切り落とされるため、
+		 * 左右に余裕を持たせる
+		 */
+		padding: 0 1mm;
 	}
 
 	.invoice-title {
