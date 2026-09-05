@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { base } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { Plus, Pencil, Trash2, Building2 } from '@lucide/svelte';
+	import { Plus, Pencil, Trash2, Building2, ArrowLeft } from '@lucide/svelte';
 	import type { Vendor } from '$lib/types';
 	import {
 		initializeDatabase,
@@ -34,9 +37,19 @@
 	let formNote = $state('');
 	let formError = $state('');
 
+	// 他画面（請求書編集など）から呼ばれたときの戻り先（?returnTo=/invoice/xxx）
+	let returnTo = $state<string | null>(null);
+
 	onMount(async () => {
 		await initializeDatabase();
 		await loadVendors();
+
+		// ?new=1 で追加ダイアログを開いた状態で始める
+		const params = page.url.searchParams;
+		returnTo = params.get('returnTo');
+		if (params.get('new') === '1') {
+			openAddDialog();
+		}
 	});
 
 	async function loadVendors() {
@@ -122,12 +135,18 @@
 				});
 			} else {
 				// 新規追加
-				await addVendorWithDetails({
+				const newId = await addVendorWithDetails({
 					name: formName.trim(),
 					address: formAddress.trim() || undefined,
 					paymentTerms: formPaymentTerms.trim() || undefined,
 					note: formNote.trim() || undefined
 				});
+				// 呼び出し元の画面に戻り、作成した取引先を渡す
+				if (returnTo && returnTo.startsWith('/')) {
+					dialogOpen = false;
+					goto(`${base}${returnTo}?vendorId=${newId}`);
+					return;
+				}
 			}
 			dialogOpen = false;
 			await loadVendors();
@@ -162,10 +181,18 @@
 			<h1 class="text-2xl font-bold">取引先管理</h1>
 			<p class="text-sm text-muted-foreground">請求書で使用する取引先を管理します</p>
 		</div>
-		<Button onclick={openAddDialog}>
-			<Plus class="mr-2 size-4" />
-			取引先を追加
-		</Button>
+		<div class="flex gap-2">
+			{#if returnTo}
+				<Button variant="outline" onclick={() => goto(`${base}${returnTo}`)}>
+					<ArrowLeft class="mr-2 size-4" />
+					請求書に戻る
+				</Button>
+			{/if}
+			<Button onclick={openAddDialog}>
+				<Plus class="mr-2 size-4" />
+				取引先を追加
+			</Button>
+		</div>
 	</div>
 
 	{#if isLoading}

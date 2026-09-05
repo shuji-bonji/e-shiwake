@@ -117,6 +117,7 @@
 	}
 
 	function getVendorName(vendorId: string): string {
+		if (!vendorId) return '(取引先未設定)';
 		return vendorMap.get(vendorId) || '(削除された取引先)';
 	}
 </script>

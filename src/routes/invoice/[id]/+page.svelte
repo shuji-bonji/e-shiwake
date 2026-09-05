@@ -9,7 +9,17 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import { ArrowLeft, Printer, BookOpen, CheckCircle, Banknote, Info } from '@lucide/svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import {
+		ArrowLeft,
+		Printer,
+		BookOpen,
+		CheckCircle,
+		Banknote,
+		Info,
+		Undo2,
+		Plus
+	} from '@lucide/svelte';
 	import type { Invoice, InvoiceStatus } from '$lib/types/invoice';
 	import { InvoiceStatusLabels } from '$lib/types/invoice';
 	import type { Vendor } from '$lib/types';
@@ -54,6 +64,14 @@
 	let journalDialogOpen = $state(false);
 	let journalType = $state<'sales' | 'deposit'>('sales');
 
+	// ステータスを戻す確認ダイアログ
+	let revertDialogOpen = $state(false);
+
+	// ステータスを 1 段階戻したときの遷移先（下書きの場合は戻せないので null）
+	const previousStatus = $derived<InvoiceStatus | null>(
+		invoice.status === 'paid' ? 'issued' : invoice.status === 'issued' ? 'draft' : null
+	);
+
 	// 事業者情報（印刷用）
 	let businessInfo = $state<BusinessInfo | null>(null);
 
@@ -84,7 +102,11 @@
 	// UICommand ストア（WebMCP UI操作型ツールからのコマンドを受信）
 	const uiCommand = useUICommand();
 
+	// 読み込み済み（または読み込み中）の請求書ID。同じIDの二重読み込みを防ぐ
+	let loadedInvoiceId = $state<string | null>(null);
+
 	async function loadInvoice(id: string) {
+		loadedInvoiceId = id;
 		isLoading = true;
 		const existing = await getInvoiceById(id);
 		if (existing) {
@@ -112,11 +134,50 @@
 			goto(`${base}/invoice/${id}`, { replaceState: true });
 		} else {
 			await loadInvoice(invoiceId!);
+			await applyVendorFromQuery();
 		}
 	});
 
+	// 取引先管理から戻ってきたとき（?vendorId=...）にその取引先を選択する
+	async function applyVendorFromQuery() {
+		const vendorId = page.url.searchParams.get('vendorId');
+		if (!vendorId) return;
+		const vendor = vendorMap.get(vendorId);
+		if (vendor) {
+			invoice.vendorId = vendorId;
+			if (vendor.paymentTerms) {
+				invoice.dueDate = getNextMonthEndDate(invoice.issueDate);
+			}
+			// URL を書き換えると loadInvoice() が再実行されて DB の内容で上書きされるため、
+			// デバウンス付きの autoSave ではなく、先に保存を完了させる
+			await updateInvoice(invoiceId!, $state.snapshot(invoice));
+			toast.success(`取引先「${vendor.name}」を設定しました`);
+		}
+		// クエリを消して URL を元に戻す（リロード時の再適用を防ぐ）
+		await goto(`${base}/invoice/${invoiceId}`, { replaceState: true, noScroll: true });
+	}
+
+	// 取引先管理へ移動して取引先を追加し、この請求書に戻る
+	function goToCreateVendor() {
+		const returnTo = `/invoice/${invoiceId}`;
+		goto(`${base}/vendors?new=1&returnTo=${encodeURIComponent(returnTo)}`);
+	}
+
+	// 取引先未設定のまま仕訳ボタンを押したときの案内
+	function notifyVendorRequired() {
+		toast.warning('取引先が指定されていません', {
+			description:
+				'取引先が未設定のため仕訳を作成できません。取引先を作成して、この請求書に指定してください。',
+			action: {
+				label: '取引先を追加',
+				onClick: goToCreateVendor
+			}
+		});
+	}
+
 	$effect(() => {
-		if (initialized && !isNew && invoiceId) {
+		// onMount の初回読み込みと重複しないよう、別の請求書へ移動したときだけ読み込む
+		if (initialized && !isNew && invoiceId && invoiceId !== loadedInvoiceId) {
 			loadInvoice(invoiceId);
 		}
 	});
@@ -217,6 +278,17 @@
 		}
 	}
 
+	// ステータスを 1 段階戻す（入金済み → 発行済み、発行済み → 下書き）
+	async function revertStatus() {
+		if (!previousStatus) return;
+		const target = previousStatus;
+		revertDialogOpen = false;
+		await changeStatus(target);
+		if (!error) {
+			toast.success(`ステータスを「${InvoiceStatusLabels[target]}」に戻しました`);
+		}
+	}
+
 	function openJournalDialog(type: 'sales' | 'deposit') {
 		journalType = type;
 		journalDialogOpen = true;
@@ -275,11 +347,23 @@
 					入金済みにする
 				</Button>
 			{/if}
+			{#if !isNew && previousStatus}
+				<Button
+					variant="ghost"
+					onclick={() => (revertDialogOpen = true)}
+					disabled={isSaving}
+					title={`「${InvoiceStatusLabels[previousStatus]}」に戻す`}
+				>
+					<Undo2 class="mr-2 size-4" />
+					ステータスを戻す
+				</Button>
+			{/if}
 			{#if !isNew}
 				<Button
 					variant="outline"
-					onclick={() => openJournalDialog('sales')}
-					disabled={isSaving || !selectedVendor}
+					onclick={() => (selectedVendor ? openJournalDialog('sales') : notifyVendorRequired())}
+					disabled={isSaving}
+					class={!selectedVendor ? 'opacity-60' : ''}
 					title={!selectedVendor ? '取引先を選択してください' : ''}
 				>
 					<BookOpen class="mr-2 size-4" />
@@ -288,8 +372,9 @@
 				{#if invoice.status === 'paid'}
 					<Button
 						variant="outline"
-						onclick={() => openJournalDialog('deposit')}
-						disabled={isSaving || !selectedVendor}
+						onclick={() => (selectedVendor ? openJournalDialog('deposit') : notifyVendorRequired())}
+						disabled={isSaving}
+						class={!selectedVendor ? 'opacity-60' : ''}
 						title={!selectedVendor ? '取引先を選択してください' : ''}
 					>
 						<Banknote class="mr-2 size-4" />
@@ -337,10 +422,23 @@
 					<Input id="dueDate" type="date" bind:value={invoice.dueDate} onchange={autoSave} />
 				</div>
 				<div class="space-y-2">
-					<Label>取引先 *</Label>
+					<div class="flex items-center justify-between">
+						<Label>取引先 *</Label>
+						{#if !isNew}
+							<button
+								type="button"
+								class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+								onclick={goToCreateVendor}
+							>
+								<Plus class="size-3" />
+								取引先を追加
+							</button>
+						{/if}
+					</div>
 					<Select.Root type="single" value={invoice.vendorId} onValueChange={onVendorChange}>
 						<Select.Trigger>
-							{selectedVendor?.name || '選択してください'}
+							{selectedVendor?.name ||
+								(vendors.length === 0 ? '取引先が未登録です' : '選択してください')}
 						</Select.Trigger>
 						<Select.Content>
 							{#each vendors as vendor (vendor.id)}
@@ -348,6 +446,11 @@
 							{/each}
 						</Select.Content>
 					</Select.Root>
+					{#if vendors.length === 0}
+						<p class="text-xs text-muted-foreground">
+							取引先がまだ登録されていません。「取引先を追加」から作成すると、この請求書に戻って設定できます。
+						</p>
+					{/if}
 				</div>
 			</div>
 
@@ -435,6 +538,30 @@
 	vendor={selectedVendor ?? null}
 	onsave={handleJournalSave}
 />
+
+<!-- ステータスを戻す確認ダイアログ -->
+<AlertDialog.Root bind:open={revertDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>
+				ステータスを「{previousStatus ? InvoiceStatusLabels[previousStatus] : ''}」に戻しますか？
+			</AlertDialog.Title>
+			<AlertDialog.Description>
+				<span class="block">
+					現在のステータス「{InvoiceStatusLabels[invoice.status]}」を 1 段階前に戻します。
+				</span>
+				<span class="mt-2 block">
+					この請求書から作成した仕訳（売掛金仕訳・入金仕訳）は削除されません。
+					仕訳も取り消す場合は、仕訳帳で該当の仕訳を削除してください。
+				</span>
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={isSaving}>キャンセル</AlertDialog.Cancel>
+			<AlertDialog.Action disabled={isSaving} onclick={revertStatus}>戻す</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
 
 <!-- 印刷用コンポーネント -->
 <div class="hidden print:block">

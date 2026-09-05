@@ -5,8 +5,18 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-05
+
 ### Added
 
+- 請求書のステータスを 1 段階前に戻せるようにした（入金済み → 発行済み、発行済み → 下書き）（#54）
+  - 請求書編集画面のヘッダーに「ステータスを戻す」ボタンを追加。確認ダイアログを経て反映する
+  - 戻しても、その請求書から作成した仕訳（売掛金仕訳・入金仕訳）は削除しない。ダイアログとヘルプ「請求書」にその旨を明記
+- 請求書編集画面から取引先を追加できる導線を追加
+  - 取引先欄に「取引先を追加」リンクを追加。取引先管理を `?new=1&returnTo=/invoice/{id}` で開き、追加ダイアログを最初から表示する
+  - 取引先を保存すると元の請求書に戻り（`?vendorId=`）、作成した取引先を自動で選択する。取引先管理のヘッダーには「請求書に戻る」ボタンを表示する
+  - 取引先未設定のまま「売掛金仕訳」「入金仕訳」を押した場合、ボタンを無効にする代わりに案内トースト（「取引先を追加」アクション付き）を表示する
+  - 取引先が 1 件も登録されていない場合、取引先欄に案内文を表示する
 - AI チャットのプロバイダ設定に、HTTPS ページから `http://` を呼ぶ構成の判定を追加（`detectMixedContentRisk()`）
   - 設定画面の接続先 URL 入力欄に、ブラウザ側の制限と対処を警告表示
   - 接続に失敗したときのエラーメッセージにも同じ説明を含める（従来は CORS 設定の確認だけを案内していたが、実際には別の制限で止まっている場合がある）
@@ -16,6 +26,7 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- 請求書一覧で、取引先を一度も設定していない請求書が「(削除された取引先)」と表示されていた問題を修正（「(取引先未設定)」と表示する）
 - AI チャットを全画面（`/chat`）で開くと、サイドパネル表示に戻す手段がなかった問題を修正
   - 全画面ページのヘッダーに「サイドパネルに戻す」ボタンを追加
   - 全画面で開く直前のパスを記録し（`setChatReturnPath()`）、そのページへ戻ってパネルを開く。サイドバーから直接 `/chat` を開いた場合はホームへ戻る
@@ -306,7 +317,8 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
-[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.4.1...v0.5.0
