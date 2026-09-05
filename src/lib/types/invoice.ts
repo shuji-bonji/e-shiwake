@@ -18,15 +18,28 @@ export interface InvoiceItem {
 /**
  * 請求書ステータス
  */
-export type InvoiceStatus = 'draft' | 'issued' | 'paid';
+export type InvoiceStatus = 'draft' | 'issued';
 
 /**
  * 請求書ステータスのラベル
  */
 export const InvoiceStatusLabels: Record<InvoiceStatus, string> = {
 	draft: '下書き',
-	issued: '発行済み',
-	paid: '入金済み'
+	issued: '発行済み'
+};
+
+/**
+ * 請求書の入金状態（紐づく仕訳から導出する。請求書には保存しない）
+ */
+export type InvoicePaymentStatus = 'unpaid' | 'partial' | 'paid';
+
+/**
+ * 入金状態のラベル
+ */
+export const InvoicePaymentStatusLabels: Record<InvoicePaymentStatus, string> = {
+	unpaid: '未入金',
+	partial: '一部入金',
+	paid: '入金済'
 };
 
 /**
@@ -48,10 +61,9 @@ export interface Invoice {
 		taxable8: number; // 8%対象（税抜）
 		tax8: number; // 8%消費税
 	};
-	status: InvoiceStatus; // ステータス
+	status: InvoiceStatus; // ステータス（書類上の状態。入金状態は仕訳から導出する）
 	note?: string; // 備考
-	journalId?: string; // 紐付く仕訳ID（売掛金計上時）
-	depositJournalIds?: string[]; // 紐付く入金仕訳ID（分割入金で複数になり得る）
+	settledManually?: boolean; // 旧「入金済み」ステータスからの移行専用。紐づく入金仕訳がないときだけ「入金済」表示に使う
 	createdAt: string; // 作成日時 ISO8601
 	updatedAt: string; // 更新日時 ISO8601
 }

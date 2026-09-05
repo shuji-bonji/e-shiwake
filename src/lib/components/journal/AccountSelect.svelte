@@ -12,6 +12,7 @@
 		onchange: (code: string) => void;
 		placeholder?: string;
 		class?: string;
+		disabled?: boolean;
 	}
 
 	let {
@@ -19,7 +20,8 @@
 		value,
 		onchange,
 		placeholder = '勘定科目を選択',
-		class: className
+		class: className,
+		disabled = false
 	}: Props = $props();
 
 	let open = $state(false);
@@ -72,6 +74,7 @@
 				variant="outline"
 				role="combobox"
 				aria-expanded={open}
+				{disabled}
 				class={cn('w-full justify-between font-normal', className)}
 			>
 				{#if selectedAccount}

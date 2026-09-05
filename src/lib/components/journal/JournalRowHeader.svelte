@@ -19,6 +19,8 @@
 		localDate: string;
 		validation: ValidationResult;
 		isEditing: boolean;
+		/** 請求書から生成した仕訳: 日付・摘要・取引先を編集不可にする */
+		locked?: boolean;
 		// ハンドラー
 		onupdatefield: <K extends keyof JournalEntry>(field: K, value: JournalEntry[K]) => void;
 		ondatechange: (value: string) => void;
@@ -41,6 +43,7 @@
 		localDate,
 		validation,
 		isEditing,
+		locked = false,
 		onupdatefield,
 		ondatechange,
 		ondateblur,
@@ -93,6 +96,7 @@
 			oninput={(e) => ondatechange(e.currentTarget.value)}
 			onblur={ondateblur}
 			class="w-32 shrink-0"
+			disabled={locked}
 		/>
 
 		<!-- 摘要 -->
@@ -103,6 +107,7 @@
 			onblur={onsyncblur}
 			placeholder="摘要"
 			class="min-w-0 flex-1"
+			disabled={locked}
 		/>
 	</div>
 
@@ -118,6 +123,7 @@
 			placeholder="取引先"
 			class="w-40 shrink-0"
 			tabindex={-1}
+			disabled={locked}
 		/>
 
 		<!-- 確定ボタン（編集中のみ表示） -->

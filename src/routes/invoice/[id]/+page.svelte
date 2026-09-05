@@ -21,7 +21,7 @@
 		Plus
 	} from '@lucide/svelte';
 	import type { Invoice, InvoiceStatus } from '$lib/types/invoice';
-	import { InvoiceStatusLabels } from '$lib/types/invoice';
+	import { InvoiceStatusLabels, InvoicePaymentStatusLabels } from '$lib/types/invoice';
 	import type { Vendor, JournalEntry } from '$lib/types';
 	import {
 		initializeDatabase,
@@ -41,7 +41,9 @@
 	} from '$lib/utils/invoice';
 	import { omit } from '$lib/utils';
 	import { compareSalesJournal } from '$lib/utils/invoice-journal';
-	import { getLinkedJournals, syncSalesJournal } from '$lib/utils/invoice-journal-sync';
+	import { loadInvoiceSettlement, syncSalesJournal } from '$lib/utils/invoice-journal-sync';
+	import { deriveInvoiceSettlement } from '$lib/utils/invoice-settlement';
+	import { dispatchUICommand } from '$lib/stores/uiCommand.svelte';
 	import { createDebounce } from '$lib/utils/debounce';
 	import type { BusinessInfo } from '$lib/types/blue-return-types';
 	import InvoicePrint from '$lib/components/invoice/InvoicePrint.svelte';
@@ -58,8 +60,8 @@
 	let invoice = $state<Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>>(createEmptyInvoice());
 	let originalInvoice = $state<Invoice | null>(null);
 
-	// 作成済みの売掛金仕訳（invoice.journalId の仕訳。仕訳帳で削除済みなら null）
-	let salesJournal = $state<JournalEntry | null>(null);
+	// 請求書に紐づく仕訳（invoiceId が一致する仕訳。仕訳帳の状態が真実で、ここでは集計するだけ）
+	let linkedJournals = $state<JournalEntry[]>([]);
 	let vendors = $state<Vendor[]>([]);
 	let isLoading = $state(true);
 	let isSaving = $state(false);
@@ -74,7 +76,7 @@
 
 	// ステータスを 1 段階戻したときの遷移先（下書きの場合は戻せないので null）
 	const previousStatus = $derived<InvoiceStatus | null>(
-		invoice.status === 'paid' ? 'issued' : invoice.status === 'issued' ? 'draft' : null
+		invoice.status === 'issued' ? 'draft' : null
 	);
 
 	// 事業者情報（印刷用）
@@ -86,13 +88,44 @@
 	// 選択中の取引先
 	const selectedVendor = $derived(vendorMap.get(invoice.vendorId));
 
-	// 売掛金仕訳と請求書の不一致（自動保存のあとに仕訳へ反映する）
+	// 決済状態（売掛金仕訳の有無・入金状態）を紐づく仕訳から導出
+	const settlement = $derived(
+		originalInvoice
+			? deriveInvoiceSettlement({ ...originalInvoice, ...invoice }, linkedJournals)
+			: null
+	);
+
+	// 請求書から生成した売掛金仕訳（請求書の変更に追従する対象）
+	const generatedSalesJournal = $derived(
+		settlement?.generatedSalesJournalId
+			? (linkedJournals.find((j) => j.id === settlement.generatedSalesJournalId) ?? null)
+			: null
+	);
+
+	// 生成した売掛金仕訳と請求書の不一致（自動保存のあとに仕訳へ反映する）
 	const salesJournalDiffs = $derived(
-		salesJournal && selectedVendor && originalInvoice
+		generatedSalesJournal && selectedVendor && originalInvoice
 			? // $state.snapshot() は依存関係を追跡しないため、プロキシのまま渡す（読み取りのみ）
-				compareSalesJournal({ ...originalInvoice, ...invoice }, selectedVendor, salesJournal)
+				compareSalesJournal(
+					{ ...originalInvoice, ...invoice },
+					selectedVendor,
+					generatedSalesJournal
+				)
 			: []
 	);
+
+	// 手で切って紐づけた売掛金仕訳のうち、請求書と内容が異なるもの（上書きはしない。表示だけ）
+	const manualSalesJournalDiffs = $derived.by(() => {
+		const vendor = selectedVendor;
+		const original = originalInvoice;
+		const current = settlement;
+		if (!vendor || !original || !current) return [];
+		const merged: Invoice = { ...original, ...invoice };
+		return linkedJournals
+			.filter((j) => current.salesJournalIds.includes(j.id) && j.generatedFrom !== 'invoice')
+			.map((j) => ({ journal: j, diffs: compareSalesJournal(merged, vendor, j) }))
+			.filter((entry) => entry.diffs.length > 0);
+	});
 
 	// 適格請求書バリデーション警告
 	const qualifiedInvoiceWarnings = $derived(
@@ -125,7 +158,7 @@
 		if (existing) {
 			originalInvoice = existing;
 			invoice = omit(existing, ['id', 'createdAt', 'updatedAt']);
-			await reloadSalesJournal();
+			await reloadLinkedJournals();
 		} else {
 			error = '請求書が見つかりません';
 		}
@@ -264,10 +297,11 @@
 			}
 			error = '';
 
-			// 売掛金仕訳が作成済みで内容が食い違っていれば、請求書に合わせて上書きする
-			if (updated && salesJournal && selectedVendor && salesJournalDiffs.length > 0) {
-				await syncSalesJournal(salesJournal.id, updated, selectedVendor);
-				await reloadSalesJournal();
+			// 請求書から生成した売掛金仕訳が内容と食い違っていれば、請求書に合わせて上書きする
+			// （手で切って紐づけた仕訳は上書きしない）
+			if (updated && generatedSalesJournal && selectedVendor && salesJournalDiffs.length > 0) {
+				await syncSalesJournal(generatedSalesJournal.id, updated, selectedVendor);
+				await reloadLinkedJournals();
 				toast.info('売掛金仕訳が作成済みのため、仕訳の内容を請求書に合わせて更新しました', {
 					id: 'sales-journal-sync'
 				});
@@ -279,14 +313,20 @@
 		}
 	}, 500);
 
-	// 作成済みの売掛金仕訳を DB から読み直す
-	async function reloadSalesJournal() {
+	// 請求書に紐づく仕訳を DB から読み直す
+	async function reloadLinkedJournals() {
 		if (!originalInvoice) {
-			salesJournal = null;
+			linkedJournals = [];
 			return;
 		}
-		const { sales } = await getLinkedJournals(originalInvoice);
-		salesJournal = sales;
+		const { journals } = await loadInvoiceSettlement(originalInvoice);
+		linkedJournals = journals;
+	}
+
+	// 仕訳帳でこの請求書番号を検索した状態に移動する
+	function openJournalSearch() {
+		dispatchUICommand({ type: 'set_search_query', data: { query: invoice.invoiceNumber } });
+		goto(`${base}/`);
 	}
 
 	// ステータス変更
@@ -311,7 +351,7 @@
 		}
 	}
 
-	// ステータスを 1 段階戻す（入金済み → 発行済み、発行済み → 下書き）
+	// ステータスを 1 段階戻す（発行済み → 下書き）
 	async function revertStatus() {
 		if (!previousStatus) return;
 		const target = previousStatus;
@@ -327,20 +367,9 @@
 		journalDialogOpen = true;
 	}
 
-	async function handleJournalSave(
-		result: { type: 'sales'; journalId: string } | { type: 'deposit'; depositJournalIds: string[] }
-	) {
-		if (result.type === 'sales') {
-			invoice.journalId = result.journalId;
-		} else {
-			invoice.depositJournalIds = result.depositJournalIds;
-		}
-		// ダイアログは originalInvoice の紐付けを見て「作成済み」を判定するため、DB から読み直す
-		const updated = await getInvoiceById(invoiceId!);
-		if (updated) {
-			originalInvoice = updated;
-		}
-		await reloadSalesJournal();
+	async function handleJournalSave() {
+		// 紐づけは仕訳側にあるので、仕訳を読み直すだけでよい
+		await reloadLinkedJournals();
 	}
 
 	function handlePrint() {
@@ -371,9 +400,22 @@
 			<div>
 				<h1 class="text-2xl font-bold">請求書</h1>
 				<div class="flex items-center gap-2">
-					<Badge variant={invoice.status === 'paid' ? 'outline' : 'default'}>
+					<Badge variant="default">
 						{InvoiceStatusLabels[invoice.status]}
 					</Badge>
+					{#if !isNew && invoice.status === 'issued' && settlement}
+						<Badge
+							variant={settlement.paymentStatus === 'paid' ? 'outline' : 'secondary'}
+							title={settlement.paymentStatus === 'paid' && settlement.depositedTotal === 0
+								? '旧バージョンで「入金済み」にした請求書です（入金仕訳は紐づいていません）'
+								: `入金 ¥${formatCurrency(settlement.depositedTotal)} / ¥${formatCurrency(invoice.total)}`}
+						>
+							{InvoicePaymentStatusLabels[settlement.paymentStatus]}
+							{#if settlement.paymentStatus === 'partial'}
+								¥{formatCurrency(settlement.depositedTotal)} / ¥{formatCurrency(invoice.total)}
+							{/if}
+						</Badge>
+					{/if}
 				</div>
 			</div>
 		</div>
@@ -382,12 +424,6 @@
 				<Button variant="outline" onclick={() => changeStatus('issued')} disabled={isSaving}>
 					<CheckCircle class="mr-2 size-4" />
 					発行済みにする
-				</Button>
-			{/if}
-			{#if !isNew && invoice.status === 'issued'}
-				<Button variant="outline" onclick={() => changeStatus('paid')} disabled={isSaving}>
-					<Banknote class="mr-2 size-4" />
-					入金済みにする
 				</Button>
 			{/if}
 			{#if !isNew && previousStatus}
@@ -402,35 +438,50 @@
 				</Button>
 			{/if}
 			{#if !isNew}
+				<!-- 仕訳の順序（発行 → 売掛計上 → 入金）に合わせ、売掛金仕訳は発行済みのときだけ作れる -->
 				<Button
 					variant="outline"
 					onclick={() => (selectedVendor ? openJournalDialog('sales') : notifyVendorRequired())}
-					disabled={isSaving || salesJournal !== null}
+					disabled={isSaving || invoice.status !== 'issued' || settlement?.salesJournalCreated}
 					class={!selectedVendor ? 'opacity-60' : ''}
-					title={salesJournal
-						? '売掛金仕訳は作成済みです。請求書を変更すると仕訳も自動で更新されます'
-						: !selectedVendor
-							? '取引先を選択してください'
-							: ''}
+					title={settlement?.salesJournalCreated
+						? generatedSalesJournal
+							? '売掛金仕訳は作成済みです。請求書を変更すると仕訳も自動で更新されます'
+							: '仕訳帳で作成した売掛金仕訳が紐づいています'
+						: invoice.status !== 'issued'
+							? '請求書を発行済みにしてから作成してください'
+							: !selectedVendor
+								? '取引先を選択してください'
+								: ''}
 				>
 					<BookOpen class="mr-2 size-4" />
 					売掛金仕訳
-					{#if salesJournal}
-						<Badge variant="secondary" class="ml-1">作成済み</Badge>
+					{#if settlement?.salesJournalCreated}
+						<Badge variant="secondary" class="ml-1">作成済</Badge>
 					{/if}
 				</Button>
-				{#if invoice.status === 'paid'}
+				{#if invoice.status === 'issued'}
 					<Button
 						variant="outline"
 						onclick={() => (selectedVendor ? openJournalDialog('deposit') : notifyVendorRequired())}
-						disabled={isSaving}
+						disabled={isSaving ||
+							!settlement?.salesJournalCreated ||
+							settlement?.paymentStatus === 'paid'}
 						class={!selectedVendor ? 'opacity-60' : ''}
-						title={!selectedVendor ? '取引先を選択してください' : ''}
+						title={!settlement?.salesJournalCreated
+							? '先に売掛金仕訳を作成してください'
+							: settlement?.paymentStatus === 'paid'
+								? 'この請求書は入金済です'
+								: !selectedVendor
+									? '取引先を選択してください'
+									: ''}
 					>
 						<Banknote class="mr-2 size-4" />
-						入金仕訳
-						{#if invoice.depositJournalIds && invoice.depositJournalIds.length > 0}
-							<Badge variant="secondary" class="ml-1">{invoice.depositJournalIds.length} 件</Badge>
+						売掛金入金仕訳
+						{#if settlement && settlement.depositJournalIds.length > 0}
+							<Badge variant="secondary" class="ml-1">
+								{settlement.depositJournalIds.length} 件
+							</Badge>
 						{/if}
 					</Button>
 				{/if}
@@ -445,6 +496,32 @@
 	{#if error}
 		<div class="rounded-md border border-destructive bg-destructive/10 p-4 text-destructive">
 			{error}
+		</div>
+	{/if}
+
+	{#if manualSalesJournalDiffs.length > 0}
+		<!-- 手で切って紐づけた売掛金仕訳との食い違い（上書きはしない） -->
+		<div
+			class="rounded-md border border-amber-500/50 bg-amber-50 p-4 text-sm dark:bg-amber-950/30"
+			role="status"
+		>
+			<p class="font-medium text-amber-800 dark:text-amber-200">
+				紐づく売掛金仕訳は請求書と内容が異なります（手動作成のため自動更新していません）
+			</p>
+			{#each manualSalesJournalDiffs as entry (entry.journal.id)}
+				<ul class="mt-1 space-y-0.5 text-amber-700 dark:text-amber-300">
+					{#each entry.diffs as diff (diff.field)}
+						<li>{diff.label}: 仕訳 {diff.journalValue} ／ 請求書 {diff.invoiceValue}</li>
+					{/each}
+				</ul>
+			{/each}
+			<button
+				type="button"
+				class="mt-2 text-amber-800 underline hover:no-underline dark:text-amber-200"
+				onclick={openJournalSearch}
+			>
+				仕訳帳で「{invoice.invoiceNumber}」を検索
+			</button>
 		</div>
 	{/if}
 
@@ -587,8 +664,8 @@
 	bind:open={journalDialogOpen}
 	{journalType}
 	invoice={originalInvoice}
-	invoiceId={invoiceId!}
 	vendor={selectedVendor ?? null}
+	{settlement}
 	onsave={handleJournalSave}
 />
 
@@ -604,7 +681,7 @@
 					現在のステータス「{InvoiceStatusLabels[invoice.status]}」を 1 段階前に戻します。
 				</span>
 				<span class="mt-2 block">
-					この請求書から作成した仕訳（売掛金仕訳・入金仕訳）は削除されません。
+					この請求書に紐づく仕訳（売掛金仕訳・入金仕訳）は削除されません。
 					仕訳も取り消す場合は、仕訳帳で該当の仕訳を削除してください。
 				</span>
 			</AlertDialog.Description>

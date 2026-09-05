@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import { migrateLegacyInvoices } from './invoice-link-migration';
 import type {
 	Account,
 	Vendor,
@@ -223,6 +224,34 @@ class EShiwakeDatabase extends Dexie {
 			llmProviders: '&id, label',
 			chatSessions: '&id, updatedAt'
 		});
+
+		// Version 10: 請求書と仕訳の紐づけを仕訳側（invoiceId）に移す
+		// - journals に invoiceId の索引を追加
+		// - 請求書の journalId / depositJournalIds を仕訳側の invoiceId / generatedFrom に写す
+		// - 請求書ステータス 'paid' を 'issued' + settledManually に写す
+		this.version(10)
+			.stores({
+				accounts: 'code, name, type, isSystem',
+				vendors: 'id, name',
+				journals: 'id, date, vendor, evidenceStatus, invoiceId',
+				attachments: 'id, journalEntryId',
+				attachmentBlobs: '&id',
+				settings: 'key',
+				fixedAssets: '&id, name, category, acquisitionDate, status',
+				invoices: '&id, invoiceNumber, issueDate, vendorId, status',
+				llmProviders: '&id, label',
+				chatSessions: '&id, updatedAt'
+			})
+			.upgrade(async (tx) => {
+				// 注意: upgrade の中で動的 import などトランザクション外の待ちを挟むと、
+				// IndexedDB のトランザクションが先に閉じて後続の読み書きが失敗する
+				const result = await migrateLegacyInvoices(tx.table('invoices'), tx.table('journals'));
+				if (result.invoices > 0) {
+					console.log(
+						`Migrated ${result.invoices} invoices to journal-side links (${result.links} links)`
+					);
+				}
+			});
 	}
 }
 

@@ -127,7 +127,8 @@ const searchJournalsTool: WebMCPToolDefinition = {
 						amount: l.amount,
 						taxCategory: l.taxCategory
 					})),
-					evidenceStatus: j.evidenceStatus
+					evidenceStatus: j.evidenceStatus,
+					invoiceId: j.invoiceId
 				}))
 			});
 		} catch (e) {

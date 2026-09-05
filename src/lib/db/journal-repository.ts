@@ -75,6 +75,38 @@ export async function getJournalById(id: string): Promise<JournalEntry | undefin
 }
 
 /**
+ * 請求書に紐づく仕訳の取得（invoiceId が一致する仕訳）
+ */
+export async function getJournalsByInvoiceId(invoiceId: string): Promise<JournalEntry[]> {
+	return db.journals.where('invoiceId').equals(invoiceId).toArray();
+}
+
+/**
+ * 請求書に紐づく仕訳をすべて取得（invoiceId を持つ仕訳。請求書一覧の集計用）
+ */
+export async function getJournalsWithInvoiceId(): Promise<JournalEntry[]> {
+	return db.journals.where('invoiceId').notEqual('').toArray();
+}
+
+/**
+ * 請求書との紐づけを外す（仕訳は残す）
+ *
+ * @returns 外した仕訳の数
+ */
+export async function unlinkJournalsFromInvoice(invoiceId: string): Promise<number> {
+	const journals = await getJournalsByInvoiceId(invoiceId);
+	const now = new Date().toISOString();
+	for (const journal of journals) {
+		await db.journals.update(journal.id, {
+			invoiceId: undefined,
+			generatedFrom: undefined,
+			updatedAt: now
+		});
+	}
+	return journals.length;
+}
+
+/**
  * 仕訳の追加
  */
 export async function addJournal(

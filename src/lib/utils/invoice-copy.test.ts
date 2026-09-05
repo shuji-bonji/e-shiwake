@@ -40,7 +40,7 @@ describe('copyInvoiceForNew', () => {
 		},
 		status: 'issued',
 		note: '振込手数料はご負担ください。',
-		journalId: 'journal-abc',
+		settledManually: true,
 		createdAt: '2025-01-10T10:00:00Z',
 		updatedAt: '2025-01-15T14:00:00Z'
 	};
@@ -79,9 +79,9 @@ describe('copyInvoiceForNew', () => {
 		expect(copied.status).toBe('draft');
 	});
 
-	it('仕訳紐付けをクリアする', () => {
+	it('旧「入金済み」の移行フラグ（settledManually）を引き継がない', () => {
 		const copied = copyInvoiceForNew(originalInvoice);
-		expect(copied.journalId).toBeUndefined();
+		expect(copied.settledManually).toBeUndefined();
 	});
 
 	it('取引先IDを引き継ぐ', () => {
@@ -133,13 +133,13 @@ describe('copyInvoiceForNew', () => {
 
 	it('元の請求書を変更しない', () => {
 		const originalStatus = originalInvoice.status;
-		const originalJournalId = originalInvoice.journalId;
+		const originalSettled = originalInvoice.settledManually;
 		const originalItemId = originalInvoice.items[0].id;
 
 		copyInvoiceForNew(originalInvoice);
 
 		expect(originalInvoice.status).toBe(originalStatus);
-		expect(originalInvoice.journalId).toBe(originalJournalId);
+		expect(originalInvoice.settledManually).toBe(originalSettled);
 		expect(originalInvoice.items[0].id).toBe(originalItemId);
 	});
 

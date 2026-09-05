@@ -21,6 +21,8 @@
 		canRemove: boolean;
 		isEditing: boolean;
 		isValid: boolean;
+		/** 請求書から生成した仕訳: 科目・税区分・金額・行削除を不可にする */
+		locked?: boolean;
 		onaccountchange: (lineId: string, code: string) => void;
 		onupdateline: (lineId: string, field: string, value: unknown) => void;
 		onremoveline: (lineId: string) => void;
@@ -35,6 +37,7 @@
 		canRemove,
 		isEditing,
 		isValid,
+		locked = false,
 		onaccountchange,
 		onupdateline,
 		onremoveline,
@@ -71,6 +74,7 @@
 			value={line.accountCode}
 			onchange={(code) => onaccountchange(line.id, code)}
 			class="min-w-0 flex-1"
+			disabled={locked}
 		/>
 	</div>
 	<!-- 税区分 + 金額 + 削除ボタン -->
@@ -79,6 +83,7 @@
 			value={line.taxCategory}
 			onchange={(cat) => onupdateline(line.id, 'taxCategory', cat)}
 			tabindex={-1}
+			disabled={locked}
 		/>
 		<Input
 			type="number"
@@ -93,8 +98,9 @@
 				!isEditing && line.amount === 0 && !isValid && 'border-destructive'
 			)}
 			min="0"
+			disabled={locked}
 		/>
-		{#if canRemove}
+		{#if canRemove && !locked}
 			<Button
 				variant="ghost"
 				size="icon"

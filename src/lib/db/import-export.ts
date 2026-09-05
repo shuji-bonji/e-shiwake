@@ -9,6 +9,11 @@ import type {
 import type { FixedAsset } from '$lib/types/blue-return-types';
 import type { Invoice } from '$lib/types/invoice';
 import { db } from './database';
+import {
+	normalizeLegacyInvoice,
+	applyInvoiceJournalLinks,
+	type LegacyInvoice
+} from './invoice-link-migration';
 import { restoreAllSettings } from './settings-repository';
 
 // ==================== インポート関連 ====================
@@ -221,6 +226,8 @@ export async function importData(
 					vendor: journal.vendor,
 					description: journal.description,
 					evidenceStatus: journal.evidenceStatus,
+					invoiceId: journal.invoiceId,
+					generatedFrom: journal.generatedFrom,
 					attachments: (journal.attachments || []).map((att) => ({
 						id: att.id,
 						journalEntryId: att.journalEntryId,
@@ -265,6 +272,8 @@ export async function importData(
 					vendor: journal.vendor,
 					description: journal.description,
 					evidenceStatus: journal.evidenceStatus,
+					invoiceId: journal.invoiceId,
+					generatedFrom: journal.generatedFrom,
 					attachments: (journal.attachments || []).map((att) => ({
 						id: att.id,
 						journalEntryId: att.journalEntryId,
@@ -335,8 +344,10 @@ export async function importData(
 		}
 
 		// 請求書のインポート（v2.0.0 以降）
+		// 旧形式（status 'paid' / journalId / depositJournalIds）は仕訳側の紐づけに写す
 		if (data.invoices && Array.isArray(data.invoices)) {
-			for (const invoice of data.invoices as Invoice[]) {
+			for (const raw of data.invoices as LegacyInvoice[]) {
+				const { invoice, links } = normalizeLegacyInvoice(raw);
 				const existing = await db.invoices.get(invoice.id);
 				// DataCloneError回避: ネストした配列/オブジェクトをプレーン化
 				const cleanItems = JSON.parse(JSON.stringify(invoice.items || []));
@@ -355,11 +366,11 @@ export async function importData(
 						taxBreakdown: cleanTaxBreakdown,
 						status: invoice.status,
 						note: invoice.note,
-						journalId: invoice.journalId,
-						depositJournalIds: invoice.depositJournalIds,
+						settledManually: invoice.settledManually,
 						createdAt: invoice.createdAt,
 						updatedAt: invoice.updatedAt
 					});
+					await applyInvoiceJournalLinks(db.journals, links);
 					result.invoicesImported++;
 				} else if (mode === 'overwrite') {
 					await db.invoices.update(invoice.id, {
@@ -374,10 +385,10 @@ export async function importData(
 						taxBreakdown: cleanTaxBreakdown,
 						status: invoice.status,
 						note: invoice.note,
-						journalId: invoice.journalId,
-						depositJournalIds: invoice.depositJournalIds,
+						settledManually: invoice.settledManually,
 						updatedAt: invoice.updatedAt
 					});
+					await applyInvoiceJournalLinks(db.journals, links);
 					result.invoicesImported++;
 				}
 			}
@@ -657,6 +668,8 @@ export async function importBackupData(data: BackupData): Promise<FullRestoreRes
 					vendor: journal.vendor,
 					description: journal.description,
 					evidenceStatus: journal.evidenceStatus,
+					invoiceId: journal.invoiceId,
+					generatedFrom: journal.generatedFrom,
 					attachments: (journal.attachments || []).map((att) => ({
 						id: att.id,
 						journalEntryId: att.journalEntryId,
@@ -717,9 +730,10 @@ export async function importBackupData(data: BackupData): Promise<FullRestoreRes
 			}
 		}
 
-		// 請求書の復元
+		// 請求書の復元（旧形式は仕訳側の紐づけに写す）
 		if (data.invoices && Array.isArray(data.invoices)) {
-			for (const invoice of data.invoices as Invoice[]) {
+			for (const raw of data.invoices as LegacyInvoice[]) {
+				const { invoice, links } = normalizeLegacyInvoice(raw);
 				try {
 					const cleanItems = JSON.parse(JSON.stringify(invoice.items || []));
 					const cleanTaxBreakdown = JSON.parse(JSON.stringify(invoice.taxBreakdown));
@@ -736,11 +750,11 @@ export async function importBackupData(data: BackupData): Promise<FullRestoreRes
 						taxBreakdown: cleanTaxBreakdown,
 						status: invoice.status,
 						note: invoice.note,
-						journalId: invoice.journalId,
-						depositJournalIds: invoice.depositJournalIds,
+						settledManually: invoice.settledManually,
 						createdAt: invoice.createdAt,
 						updatedAt: invoice.updatedAt
 					});
+					await applyInvoiceJournalLinks(db.journals, links);
 					result.invoicesRestored++;
 				} catch (error) {
 					result.errors.push(
@@ -853,6 +867,8 @@ export async function importArchiveData(data: ExportData): Promise<ArchiveRestor
 					vendor: journal.vendor,
 					description: journal.description,
 					evidenceStatus: journal.evidenceStatus,
+					invoiceId: journal.invoiceId,
+					generatedFrom: journal.generatedFrom,
 					attachments: (journal.attachments || []).map((att) => ({
 						id: att.id,
 						journalEntryId: att.journalEntryId,

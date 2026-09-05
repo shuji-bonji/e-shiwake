@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
 	generateSalesJournal,
 	generateDepositJournal,
-	getJournalAmount,
-	calculateDepositSummary,
 	compareSalesJournal,
 	buildSalesJournalUpdate
 } from './invoice-journal';
@@ -74,6 +72,9 @@ describe('generateSalesJournal', () => {
 		expect(journal.description).toBe('売掛金計上 INV-2026-0001');
 		expect(journal.evidenceStatus).toBe('digital');
 		expect(journal.attachments).toEqual([]);
+		// 請求書との紐づけ（仕訳側が請求書を指す）
+		expect(journal.invoiceId).toBe('inv-1');
+		expect(journal.generatedFrom).toBe('invoice');
 	});
 
 	it('8%税率のみの請求書から売掛金仕訳を生成する', () => {
@@ -211,7 +212,7 @@ describe('generateDepositJournal', () => {
 			taxable8: 0,
 			tax8: 0
 		},
-		status: 'paid',
+		status: 'issued',
 		createdAt: '2026-01-15T00:00:00Z',
 		updatedAt: '2026-01-15T00:00:00Z'
 	};
@@ -249,6 +250,9 @@ describe('generateDepositJournal', () => {
 		expect(journal.description).toBe('入金 INV-2026-0001');
 		expect(journal.evidenceStatus).toBe('none');
 		expect(journal.attachments).toEqual([]);
+		// 請求書との紐づけはあるが、生成印（generatedFrom）は付けない
+		expect(journal.invoiceId).toBe('inv-1');
+		expect(journal.generatedFrom).toBeUndefined();
 	});
 
 	it('入金先の勘定科目を指定できる', () => {
@@ -276,61 +280,6 @@ describe('generateDepositJournal', () => {
 
 		expect(journal.lines[0].amount).toBe(50000);
 		expect(journal.lines[1].amount).toBe(50000);
-	});
-});
-
-describe('getJournalAmount', () => {
-	it('借方行の合計を返す', () => {
-		const amount = getJournalAmount({
-			lines: [
-				{ id: 'l1', type: 'debit', accountCode: '1003', amount: 30000, taxCategory: 'na' },
-				{ id: 'l2', type: 'debit', accountCode: '5001', amount: 500, taxCategory: 'na' },
-				{ id: 'l3', type: 'credit', accountCode: '1005', amount: 30500, taxCategory: 'na' }
-			]
-		});
-
-		expect(amount).toBe(30500);
-	});
-});
-
-describe('calculateDepositSummary', () => {
-	const invoice = { total: 110000 };
-	const deposit = (amount: number) => ({
-		lines: [
-			{ id: 'd', type: 'debit' as const, accountCode: '1003', amount, taxCategory: 'na' as const },
-			{ id: 'c', type: 'credit' as const, accountCode: '1005', amount, taxCategory: 'na' as const }
-		]
-	});
-
-	it('入金仕訳がなければ残額は税込合計', () => {
-		expect(calculateDepositSummary(invoice, [])).toEqual({
-			depositedTotal: 0,
-			remaining: 110000,
-			isFullyDeposited: false
-		});
-	});
-
-	it('分割入金の合計と残額を計算する', () => {
-		expect(calculateDepositSummary(invoice, [deposit(50000), deposit(30000)])).toEqual({
-			depositedTotal: 80000,
-			remaining: 30000,
-			isFullyDeposited: false
-		});
-	});
-
-	it('全額入金済みなら残額 0 で isFullyDeposited が true', () => {
-		expect(calculateDepositSummary(invoice, [deposit(110000)])).toEqual({
-			depositedTotal: 110000,
-			remaining: 0,
-			isFullyDeposited: true
-		});
-	});
-
-	it('入金が税込合計を超えても残額はマイナスにならない', () => {
-		const summary = calculateDepositSummary(invoice, [deposit(120000)]);
-
-		expect(summary.remaining).toBe(0);
-		expect(summary.isFullyDeposited).toBe(true);
 	});
 });
 
@@ -401,6 +350,15 @@ describe('compareSalesJournal / buildSalesJournalUpdate', () => {
 		expect(diffs.map((d) => d.field)).toEqual(['date', 'vendor', 'description']);
 		expect(diffs[0]).toMatchObject({ journalValue: '2026-01-15', invoiceValue: '2026-02-01' });
 		expect(diffs[2].invoiceValue).toBe('売掛金計上 INV-2026-0002');
+	});
+
+	it('摘要に請求書番号が含まれていれば、末尾に補足を足していても不一致にしない', () => {
+		const journal = {
+			...generateSalesJournal(invoice, vendor),
+			description: '売掛金計上 INV-2026-0001 9月分'
+		};
+
+		expect(compareSalesJournal(invoice, vendor, journal)).toEqual([]);
 	});
 
 	it('仕訳帳側で行の順序が入れ替わっていても不一致にしない', () => {

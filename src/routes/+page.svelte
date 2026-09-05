@@ -19,8 +19,11 @@
 		deleteJournal,
 		createEmptyJournal,
 		getAvailableYears,
-		getStorageModeForYear
+		getStorageModeForYear,
+		getAllInvoices
 	} from '$lib/db';
+	import type { Invoice } from '$lib/types/invoice';
+	import { buildInvoiceLinkOptions } from '$lib/utils/invoice-link-options';
 	import { useFiscalYear, setAvailableYears } from '$lib/stores/fiscalYear.svelte.js';
 	import { getSavedDirectoryHandle, supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { cloneJournal } from '$lib/utils/clone';
@@ -44,6 +47,7 @@
 	// 状態
 	let journals = $state<JournalEntry[]>([]); // 選択中年度の仕訳
 	let allJournals = $state<JournalEntry[]>([]); // 全年度の仕訳（検索用）
+	let invoices = $state<Invoice[]>([]); // 全請求書（仕訳の「対応する請求書」候補用）
 	let accounts = $state<Account[]>([]);
 	let vendors = $state<Vendor[]>([]);
 	let directoryHandle = $state<FileSystemDirectoryHandle | null>(null);
@@ -88,6 +92,15 @@
 	let lastLoadedYear = $state<number | null>(null);
 
 	// 初期化
+	// 仕訳の「対応する請求書」候補（発行済みの請求書。紐づく仕訳の状況は allJournals から導出）
+	const invoiceOptions = $derived(
+		buildInvoiceLinkOptions(
+			invoices,
+			vendors,
+			allJournals.filter((j) => j.invoiceId)
+		)
+	);
+
 	onMount(async () => {
 		await initializeDatabase();
 		const years = await getAvailableYears();
@@ -239,16 +252,18 @@
 		editingJournalId = null; // 年度変更時は編集中状態をリセット
 		try {
 			// 全年度の仕訳も同時に読み込み（検索用）
-			const [accts, vends, yearJournals, all] = await Promise.all([
+			const [accts, vends, yearJournals, all, invs] = await Promise.all([
 				getAllAccounts(),
 				getAllVendors(),
 				getJournalsByYear(year),
-				getAllJournals()
+				getAllJournals(),
+				getAllInvoices()
 			]);
 			accounts = accts;
 			vendors = vends;
 			journals = yearJournals;
 			allJournals = all;
+			invoices = invs;
 		} finally {
 			isLoading = false;
 		}
@@ -564,6 +579,7 @@
 					{directoryHandle}
 					isEditing={editingJournalId === journal.id}
 					isFlashing={flashingJournalId === journal.id}
+					{invoiceOptions}
 					onupdate={handleUpdateJournal}
 					ondelete={openDeleteDialog}
 					onconfirm={handleConfirmJournal}

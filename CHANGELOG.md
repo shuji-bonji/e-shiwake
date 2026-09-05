@@ -3,6 +3,32 @@
 e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に準拠。
 [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [Unreleased]
+
+## [0.7.0] - 2026-09-05
+
+### Added
+
+- 請求書と仕訳の紐づけを仕訳側に移し、請求書の入金状態を仕訳から導出するようにした（#55、設計: `docs/design/invoice-settlement.md`）
+  - `JournalEntry` に `invoiceId`（対応する請求書）と `generatedFrom: 'invoice'`（請求書の「売掛金仕訳」ボタンが生成した印）を追加。Dexie `version(10)` で `journals` に `invoiceId` の索引を追加
+  - 請求書の入金状態（未入金／一部入金／入金済）を、`invoiceId` が一致する仕訳の貸方 1005 売掛金 の合計から導出（`deriveInvoiceSettlement()`、厳密一致）。請求書一覧に「入金」列と絞り込みを追加し、編集画面にバッジを表示
+  - 請求書編集画面の「売掛金仕訳」は発行済みのときだけ、「売掛金入金仕訳」は売掛金仕訳が紐づいてから押せる（仕訳の順序「発行 → 売掛計上 → 入金」に合わせる）。入金仕訳は入金額（初期値は未入金残額）を指定して生成し、入金済になると押せなくなる
+  - 仕訳帳の編集に「対応する請求書」の選択欄を追加（1005 売掛金 の行があるとき）。紐づけると摘要を「売掛金計上 INV-…」「入金 INV-…」に自動設定する（請求書番号を含む摘要はそのまま）。取引先名が一致する発行済み請求書から任意で紐づけられ、既に売掛金仕訳が紐づく請求書や金額・取引先の食い違いは警告する（保存は止めない）
+  - 請求書から生成した売掛金仕訳は、仕訳帳で日付・取引先・摘要・明細行を編集不可（証憑・行メモ・証跡ステータスは可）。「請求書との紐づけを解除」で確認のうえ通常の仕訳に戻せる
+  - 仕訳帳で作成して紐づけた売掛金仕訳は自動更新しない。請求書と内容が異なる場合は請求書編集画面に表示する
+  - 旧データの移行: `status: 'paid'` は `issued` + `settledManually`（紐づく入金仕訳がないときだけ「入金済」表示）、`journalId` / `depositJournalIds` は仕訳側の `invoiceId` に写す。バックアップ・インポート（JSON / ZIP）の旧形式も同じ変換を通す
+  - `invoice-settlement.ts` / `invoice-link-options.ts` / `invoice-link-migration.ts` を追加（単体テスト付き）。WebMCP の `list_journals` 出力に `invoiceId` を追加
+
+### Changed
+
+- 請求書のステータスを下書き／発行済みの 2 値にし、「入金済みにする」ボタンを廃止（入金状態は仕訳から導出）
+- 請求書一覧から請求書を削除するとき、生成した売掛金仕訳は一緒に削除し、それ以外の紐づく仕訳（仕訳帳で作成した売掛金仕訳・入金仕訳）は紐づけを外して残す
+- ヘルプ「請求書」「仕訳入力」を上記に合わせて書き換え。請求書の控え（PDF）を売掛金仕訳の証憑として添付する手順（PDF 保存 → 必要なら署名 → 仕訳帳でドラッグ＆ドロップ）を追加
+
+### Removed
+
+- `Invoice.journalId` / `Invoice.depositJournalIds`（v0.6.1 で追加した入金仕訳の紐づけ・残額計算・作成済み警告を含む）。仕訳側の `invoiceId` に置き換え
+
 ## [0.6.3] - 2026-09-05
 
 ### Changed
@@ -357,7 +383,9 @@ e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepacha
   - 証憑ダウンロード（IndexedDB モード向け）
   - File System Access API 対応（デスクトップ向け）
 
-[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/shuji-bonji/e-shiwake/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.3...v0.7.0
+[0.6.3]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/shuji-bonji/e-shiwake/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/shuji-bonji/e-shiwake/compare/v0.5.2...v0.6.0

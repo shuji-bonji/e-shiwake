@@ -63,6 +63,8 @@ export function cloneJournal(journal: JournalEntry): JournalEntry {
 		description: journal.description,
 		evidenceStatus: journal.evidenceStatus,
 		attachments: journal.attachments.map(cloneAttachment),
+		invoiceId: journal.invoiceId,
+		generatedFrom: journal.generatedFrom,
 		createdAt: journal.createdAt,
 		updatedAt: journal.updatedAt
 	};

@@ -167,16 +167,13 @@ describe('請求書管理', () => {
 			await addInvoice(
 				createTestInvoiceInput({ invoiceNumber: 'INV-2026-0003', status: 'issued' })
 			);
-			await addInvoice(createTestInvoiceInput({ invoiceNumber: 'INV-2026-0004', status: 'paid' }));
+			await addInvoice(createTestInvoiceInput({ invoiceNumber: 'INV-2026-0004', status: 'draft' }));
 
 			const drafts = await getInvoicesByStatus('draft');
-			expect(drafts).toHaveLength(1);
+			expect(drafts).toHaveLength(2);
 
 			const issued = await getInvoicesByStatus('issued');
 			expect(issued).toHaveLength(2);
-
-			const paid = await getInvoicesByStatus('paid');
-			expect(paid).toHaveLength(1);
 		});
 	});
 

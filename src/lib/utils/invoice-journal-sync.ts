@@ -1,34 +1,38 @@
 /**
- * 請求書に紐付く仕訳の更新・削除
+ * 請求書に紐づく仕訳の取得・更新・削除
  *
- * invoice-journal.ts が純粋関数（生成・比較）なのに対し、
+ * invoice-journal.ts が純粋関数（生成・比較）、invoice-settlement.ts が導出（純粋関数）なのに対し、
  * ここは DB とファイルシステムに触る処理をまとめる。
+ * 紐づけは仕訳側の invoiceId で表す（設計: docs/design/invoice-settlement.md）。
  */
 
 import type { Invoice } from '$lib/types/invoice';
 import type { JournalEntry, Vendor } from '$lib/types';
-import { getJournalById, updateJournal, deleteJournal, getStorageModeForYear } from '$lib/db';
+import {
+	getJournalById,
+	getJournalsByInvoiceId,
+	updateJournal,
+	deleteJournal,
+	getStorageModeForYear
+} from '$lib/db';
 import { getSavedDirectoryHandle, supportsFileSystemAccess } from '$lib/utils/filesystem';
 import { buildSalesJournalUpdate } from '$lib/utils/invoice-journal';
+import { deriveInvoiceSettlement, type InvoiceSettlement } from '$lib/utils/invoice-settlement';
 
 /**
- * 請求書に紐付く仕訳のうち、DB に存在するものを返す
+ * 請求書に紐づく仕訳を読み、決済状態を導出して返す
  */
-export async function getLinkedJournals(
-	invoice: Pick<Invoice, 'journalId' | 'depositJournalIds'>
-): Promise<{ sales: JournalEntry | null; deposits: JournalEntry[] }> {
-	const sales = invoice.journalId ? ((await getJournalById(invoice.journalId)) ?? null) : null;
-	const found = await Promise.all(
-		(invoice.depositJournalIds ?? []).map((id) => getJournalById(id))
-	);
-	const deposits = found.filter((j): j is JournalEntry => j !== undefined);
-	return { sales, deposits };
+export async function loadInvoiceSettlement(
+	invoice: Pick<Invoice, 'id' | 'total' | 'settledManually'>
+): Promise<{ journals: JournalEntry[]; settlement: InvoiceSettlement }> {
+	const journals = await getJournalsByInvoiceId(invoice.id);
+	return { journals, settlement: deriveInvoiceSettlement(invoice, journals) };
 }
 
 /**
- * 売掛金仕訳を請求書の現在の内容で上書きする
+ * 請求書から生成した売掛金仕訳を、請求書の現在の内容で上書きする
  *
- * 証憑と evidenceStatus は保持される（buildSalesJournalUpdate() が含めないため）。
+ * 証憑・evidenceStatus・invoiceId・generatedFrom は保持される（buildSalesJournalUpdate() が含めないため）。
  */
 export async function syncSalesJournal(
 	journalId: string,
@@ -39,7 +43,7 @@ export async function syncSalesJournal(
 }
 
 /**
- * 請求書に紐付く仕訳を削除する（証憑ファイルも削除）
+ * 仕訳を削除する（証憑ファイルも削除）
  *
  * 証憑がファイルシステムに保存されている場合は、仕訳の年度の保存モードを見て
  * ディレクトリハンドルを取得し、ファイルも削除する。
@@ -61,4 +65,11 @@ export async function deleteLinkedJournal(journalId: string): Promise<boolean> {
 
 	await deleteJournal(journalId, directoryHandle);
 	return true;
+}
+
+/**
+ * 仕訳と請求書の紐づけを外す（仕訳は残す）
+ */
+export async function unlinkJournalFromInvoice(journalId: string): Promise<void> {
+	await updateJournal(journalId, { invoiceId: undefined, generatedFrom: undefined });
 }

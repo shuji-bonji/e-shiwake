@@ -6,6 +6,16 @@ import type { Invoice } from '$lib/types/invoice';
 import { formatCurrency } from '$lib/utils/invoice';
 import type { JournalEntry, JournalLine, Vendor } from '$lib/types';
 
+/** 売掛金仕訳の摘要（請求書番号を含む） */
+export function salesJournalDescription(invoiceNumber: string): string {
+	return `売掛金計上 ${invoiceNumber}`;
+}
+
+/** 入金仕訳の摘要（請求書番号を含む） */
+export function depositJournalDescription(invoiceNumber: string): string {
+	return `入金 ${invoiceNumber}`;
+}
+
 /**
  * 請求書から売掛金計上仕訳を自動生成する
  *
@@ -75,9 +85,11 @@ export function generateSalesJournal(
 		date: invoice.issueDate,
 		lines,
 		vendor: vendor.name,
-		description: `売掛金計上 ${invoice.invoiceNumber}`,
+		description: salesJournalDescription(invoice.invoiceNumber),
 		evidenceStatus: 'digital',
-		attachments: []
+		attachments: [],
+		invoiceId: invoice.id,
+		generatedFrom: 'invoice'
 	};
 }
 
@@ -138,56 +150,10 @@ export function generateDepositJournal(
 			}
 		],
 		vendor: vendor.name,
-		description: `入金 ${invoice.invoiceNumber}`,
+		description: depositJournalDescription(invoice.invoiceNumber),
 		evidenceStatus: 'none',
-		attachments: []
-	};
-}
-
-/**
- * 仕訳の金額（借方合計）を返す
- */
-export function getJournalAmount(journal: Pick<JournalEntry, 'lines'>): number {
-	return journal.lines
-		.filter((line) => line.type === 'debit')
-		.reduce((sum, line) => sum + line.amount, 0);
-}
-
-/**
- * 入金状況のサマリー
- */
-export interface DepositSummary {
-	/** 作成済み入金仕訳の合計額 */
-	depositedTotal: number;
-	/** 未入金残額（税込合計 − 入金合計。マイナスにはならない） */
-	remaining: number;
-	/** 入金合計が税込合計以上か */
-	isFullyDeposited: boolean;
-}
-
-/**
- * 請求書に紐付く入金仕訳から、入金合計と未入金残額を計算する
- *
- * @param invoice - 請求書（total を使う）
- * @param depositJournals - 紐付く入金仕訳（削除済みのものは除いて渡す）
- *
- * @example
- * ```typescript
- * // total: 110000, 入金仕訳 50000 が 1 件
- * calculateDepositSummary(invoice, [journal]);
- * // => { depositedTotal: 50000, remaining: 60000, isFullyDeposited: false }
- * ```
- */
-export function calculateDepositSummary(
-	invoice: Pick<Invoice, 'total'>,
-	depositJournals: Pick<JournalEntry, 'lines'>[]
-): DepositSummary {
-	const depositedTotal = depositJournals.reduce((sum, j) => sum + getJournalAmount(j), 0);
-	const remaining = Math.max(0, invoice.total - depositedTotal);
-	return {
-		depositedTotal,
-		remaining,
-		isFullyDeposited: depositedTotal >= invoice.total
+		attachments: [],
+		invoiceId: invoice.id
 	};
 }
 
@@ -233,7 +199,7 @@ function linesSummary(lines: JournalLine[]): string {
 /**
  * 作成済みの売掛金仕訳と、請求書の現在の内容から作り直した仕訳を比べ、不一致の項目を返す
  *
- * 比較するのは date / vendor / description / lines（行 ID は無視）。
+ * 比較するのは date / vendor / description / lines（行 ID は無視）。摘要は請求書番号を含んでいれば一致とみなす。
  * 証憑や evidenceStatus は請求書から作られる項目ではないため比較しない。
  *
  * @returns 不一致がなければ空配列
@@ -262,7 +228,11 @@ export function compareSalesJournal(
 			invoiceValue: expected.vendor
 		});
 	}
-	if (journal.description !== expected.description) {
+	// 摘要は請求書番号を含んでいれば一致とみなす（手で「9月分」などを足した摘要を不一致にしない）
+	if (
+		journal.description !== expected.description &&
+		!journal.description.includes(invoice.invoiceNumber)
+	) {
 		diffs.push({
 			field: 'description',
 			label: '摘要',

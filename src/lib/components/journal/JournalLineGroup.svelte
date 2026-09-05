@@ -23,6 +23,8 @@
 		total: number;
 		isEditing: boolean;
 		isValid: boolean;
+		/** 請求書から生成した仕訳: 行の追加削除・科目・金額・按分を不可にする */
+		locked?: boolean;
 		// 家事按分（借方のみ）
 		businessRatioTarget?: BusinessRatioInfo | null;
 		isBusinessRatioApplied?: boolean;
@@ -47,6 +49,7 @@
 		total,
 		isEditing,
 		isValid,
+		locked = false,
 		businessRatioTarget = null,
 		isBusinessRatioApplied = false,
 		appliedBusinessRatio = null,
@@ -71,7 +74,9 @@
 		{label}
 
 		<!-- 家事按分ボタン（借方のみ） -->
-		{#if isDebit && isBusinessRatioApplied && onremoveratio}
+		{#if locked}
+			<!-- 請求書から生成した仕訳は行を変更できない -->
+		{:else if isDebit && isBusinessRatioApplied && onremoveratio}
 			<button
 				type="button"
 				class="flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs text-amber-700 transition-colors hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
@@ -99,48 +104,50 @@
 		{/if}
 
 		<span class="ml-auto font-mono">{total.toLocaleString('ja-JP')}円</span>
-		<Tooltip.Provider>
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					<Button
-						variant="ghost"
-						size="icon"
-						class="size-6 text-foreground"
-						onclick={() => onaddline(side)}
-						tabindex={-1}
-					>
-						<Plus class="size-4" strokeWidth={3} />
-					</Button>
-				</Tooltip.Trigger>
-				<Tooltip.Content>
-					<div class="text-xs">
-						{#if isDebit}
-							<div class="mb-1 font-medium">借方に来る科目：</div>
-							<div class="flex items-center gap-1">
-								<ArrowUp class="size-3 text-blue-500" />資産の増加
-							</div>
-							<div class="flex items-center gap-1">
-								<ArrowUp class="size-3 text-red-500" />費用の発生
-							</div>
-							<div class="flex items-center gap-1">
-								<ArrowDown class="size-3 text-purple-500" />負債の減少
-							</div>
-						{:else}
-							<div class="mb-1 font-medium">貸方に来る科目：</div>
-							<div class="flex items-center gap-1">
-								<ArrowDown class="size-3 text-blue-500" />資産の減少
-							</div>
-							<div class="flex items-center gap-1">
-								<ArrowUp class="size-3 text-purple-500" />負債の増加
-							</div>
-							<div class="flex items-center gap-1">
-								<ArrowUp class="size-3 text-green-500" />収益の発生
-							</div>
-						{/if}
-					</div>
-				</Tooltip.Content>
-			</Tooltip.Root>
-		</Tooltip.Provider>
+		{#if !locked}
+			<Tooltip.Provider>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-6 text-foreground"
+							onclick={() => onaddline(side)}
+							tabindex={-1}
+						>
+							<Plus class="size-4" strokeWidth={3} />
+						</Button>
+					</Tooltip.Trigger>
+					<Tooltip.Content>
+						<div class="text-xs">
+							{#if isDebit}
+								<div class="mb-1 font-medium">借方に来る科目：</div>
+								<div class="flex items-center gap-1">
+									<ArrowUp class="size-3 text-blue-500" />資産の増加
+								</div>
+								<div class="flex items-center gap-1">
+									<ArrowUp class="size-3 text-red-500" />費用の発生
+								</div>
+								<div class="flex items-center gap-1">
+									<ArrowDown class="size-3 text-purple-500" />負債の減少
+								</div>
+							{:else}
+								<div class="mb-1 font-medium">貸方に来る科目：</div>
+								<div class="flex items-center gap-1">
+									<ArrowDown class="size-3 text-blue-500" />資産の減少
+								</div>
+								<div class="flex items-center gap-1">
+									<ArrowUp class="size-3 text-purple-500" />負債の増加
+								</div>
+								<div class="flex items-center gap-1">
+									<ArrowUp class="size-3 text-green-500" />収益の発生
+								</div>
+							{/if}
+						</div>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			</Tooltip.Provider>
+		{/if}
 	</div>
 	{#each lines as line (line.id)}
 		{@const accountType = getaccounttype(line.accountCode)}
@@ -152,6 +159,7 @@
 			canRemove={lines.length > 1}
 			{isEditing}
 			{isValid}
+			{locked}
 			{onaccountchange}
 			{onupdateline}
 			{onremoveline}

@@ -40,7 +40,13 @@
 	} from '$lib/utils/business-ratio';
 	import { supportsFileSystemAccess } from '$lib/utils/filesystem';
 	import { DIALOG_NONE, type DialogState } from './dialog-state';
+	import JournalInvoiceLink from './JournalInvoiceLink.svelte';
 	import JournalLineGroup from './JournalLineGroup.svelte';
+	import {
+		descriptionForLinkedJournal,
+		type InvoiceLinkOption
+	} from '$lib/utils/invoice-link-options';
+	import { hasReceivableLine } from '$lib/utils/invoice-settlement';
 	import JournalRowDialogs from './JournalRowDialogs.svelte';
 	import JournalRowHeader from './JournalRowHeader.svelte';
 	import PdfDropZone from './PdfDropZone.svelte';
@@ -52,6 +58,8 @@
 		directoryHandle?: FileSystemDirectoryHandle | null;
 		isEditing?: boolean;
 		isFlashing?: boolean;
+		/** 「対応する請求書」の候補（発行済みの請求書）。省略時は紐づけ欄を出さない */
+		invoiceOptions?: InvoiceLinkOption[];
 		onupdate: (journal: JournalEntry) => void;
 		ondelete: (id: string) => void;
 		onconfirm?: (id: string) => void;
@@ -65,11 +73,41 @@
 		directoryHandle = null,
 		isEditing = false,
 		isFlashing = false,
+		invoiceOptions,
 		onupdate,
 		ondelete,
 		onconfirm,
 		oncopy
 	}: Props = $props();
+
+	// 請求書との紐づけ
+	// - 1005 売掛金 の行があるときだけ紐づけ欄を出す
+	// - 請求書から生成した仕訳は、請求書が所有する項目（日付・取引先・摘要・明細行）を編集不可にする
+	const showInvoiceLink = $derived(invoiceOptions !== undefined && hasReceivableLine(journal));
+	const isLocked = $derived(journal.generatedFrom === 'invoice' && !!journal.invoiceId);
+
+	// 紐づけを外す（仕訳は残す）
+	function handleUnlinkInvoice() {
+		onupdate({ ...journal, invoiceId: undefined, generatedFrom: undefined });
+	}
+
+	// 手で紐づける／外す（generatedFrom は付けない）
+	// 紐づけたときは摘要を「売掛金計上 INV-…」「入金 INV-…」の形にそろえる（請求書番号を含む摘要はそのまま）
+	function handleLinkInvoice(invoiceId: string | undefined) {
+		const option = invoiceId ? invoiceOptions?.find((o) => o.id === invoiceId) : undefined;
+		const description = option
+			? descriptionForLinkedJournal(journal, option.invoiceNumber)
+			: journal.description;
+		onupdate({ ...journal, invoiceId, generatedFrom: undefined, description });
+	}
+
+	// 明細行の変更で 1005 売掛金 の行がなくなったら、請求書との紐づけも外す
+	function withLinkCheck(next: JournalEntry): JournalEntry {
+		if (next.invoiceId && !hasReceivableLine(next)) {
+			return { ...next, invoiceId: undefined, generatedFrom: undefined };
+		}
+		return next;
+	}
 
 	// バリデーション
 	const validation = $derived(validateJournal(journal));
@@ -368,7 +406,7 @@
 				? { ...line, accountCode, taxCategory: defaultTaxCategory ?? line.taxCategory }
 				: line
 		);
-		onupdate({ ...journal, lines: newLines });
+		onupdate(withLinkCheck({ ...journal, lines: newLines }));
 	}
 
 	// 貸方金額でTabキー押下時、最後の行なら取引先にフォーカス移動
@@ -412,7 +450,7 @@
 	// 仕訳行の削除
 	function removeLine(lineId: string) {
 		if (journal.lines.length <= 2) return;
-		onupdate({ ...journal, lines: journal.lines.filter((l) => l.id !== lineId) });
+		onupdate(withLinkCheck({ ...journal, lines: journal.lines.filter((l) => l.id !== lineId) }));
 	}
 
 	// Safari判定
@@ -666,6 +704,7 @@
 			{localDate}
 			{validation}
 			{isEditing}
+			locked={isLocked}
 			onupdatefield={updateField}
 			ondatechange={handleDateChange}
 			ondateblur={handleDateBlur}
@@ -690,6 +729,7 @@
 				total={validation.debitTotal}
 				{isEditing}
 				isValid={validation.isValid}
+				locked={isLocked}
 				{businessRatioTarget}
 				{isBusinessRatioApplied}
 				{appliedBusinessRatio}
@@ -712,6 +752,7 @@
 				total={validation.creditTotal}
 				{isEditing}
 				isValid={validation.isValid}
+				locked={isLocked}
 				getlineIndicator={getLineIndicator}
 				getaccounttype={getAccountType}
 				onaccountchange={handleAccountChange}
@@ -722,6 +763,17 @@
 				onkeydown={handleCreditAmountKeydown}
 			/>
 		</div>
+
+		<!-- 対応する請求書（1005 売掛金 の行があるときだけ） -->
+		{#if showInvoiceLink && invoiceOptions}
+			<JournalInvoiceLink
+				{journal}
+				options={invoiceOptions}
+				locked={isLocked}
+				onlink={handleLinkInvoice}
+				onunlink={handleUnlinkInvoice}
+			/>
+		{/if}
 
 		<!-- バリデーションエラー表示 -->
 		{#if !validation.isValid && journal.lines.some((l) => l.amount > 0)}

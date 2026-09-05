@@ -12,9 +12,17 @@
 		class?: string;
 		compact?: boolean;
 		tabindex?: number;
+		disabled?: boolean;
 	}
 
-	let { value, onchange, class: className, compact = true, tabindex }: Props = $props();
+	let {
+		value,
+		onchange,
+		class: className,
+		compact = true,
+		tabindex,
+		disabled = false
+	}: Props = $props();
 
 	let open = $state(false);
 	let triggerRef = $state<HTMLButtonElement>(null!);
@@ -73,6 +81,7 @@
 				size="sm"
 				role="combobox"
 				aria-expanded={open}
+				{disabled}
 				class={cn(
 					'h-7 justify-between px-2 font-mono text-xs font-normal',
 					value && getCategoryColor(value),

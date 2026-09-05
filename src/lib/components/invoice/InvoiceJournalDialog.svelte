@@ -1,89 +1,47 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { AlertTriangle, ExternalLink } from '@lucide/svelte';
 	import type { Invoice } from '$lib/types/invoice';
-	import type { Vendor, JournalEntry } from '$lib/types';
+	import type { Vendor } from '$lib/types';
 	import { toast } from 'svelte-sonner';
-	import { addJournal, updateInvoice, getJournalById } from '$lib/db';
-	import {
-		generateSalesJournal,
-		generateDepositJournal,
-		getJournalAmount,
-		calculateDepositSummary
-	} from '$lib/utils/invoice-journal';
+	import { addJournal } from '$lib/db';
+	import { generateSalesJournal, generateDepositJournal } from '$lib/utils/invoice-journal';
+	import type { InvoiceSettlement } from '$lib/utils/invoice-settlement';
 	import { formatCurrency } from '$lib/utils/invoice';
-	import { dispatchUICommand } from '$lib/stores/uiCommand.svelte';
 
+	/**
+	 * 請求書から仕訳を生成するダイアログ
+	 *
+	 * 生成する仕訳には invoiceId を入れる（売掛金仕訳には generatedFrom: 'invoice' も付ける）。
+	 * 作成後は仕訳帳の 1 件であり、請求書側は紐づく仕訳を集計して状態を導出するだけ。
+	 * 作成済みかどうかの判定（ボタンの活性）は呼び出し側が settlement で行う。
+	 */
 	interface Props {
 		open: boolean;
 		journalType: 'sales' | 'deposit';
 		invoice: Invoice | null;
-		invoiceId: string;
 		vendor: Vendor | null;
-		/** 仕訳作成後に呼ばれる。売掛金仕訳は journalId、入金仕訳は depositJournalIds（全件）を渡す */
-		onsave: (
-			result:
-				{ type: 'sales'; journalId: string } | { type: 'deposit'; depositJournalIds: string[] }
-		) => void;
+		/** 紐づく仕訳から導出した決済状態（入金額の初期値に使う） */
+		settlement: InvoiceSettlement | null;
+		/** 仕訳作成後に呼ばれる */
+		onsave: (journalId: string) => void;
 	}
 
-	let { open = $bindable(), journalType, invoice, invoiceId, vendor, onsave }: Props = $props();
+	let { open = $bindable(), journalType, invoice, vendor, settlement, onsave }: Props = $props();
 
 	let depositDate = $state(new Date().toISOString().slice(0, 10));
 	let depositAmount = $state(0);
 
-	// 作成済み仕訳（ダイアログを開いたときに DB から読み直す。削除済みの ID は除外する）
-	let existingSalesJournal = $state<JournalEntry | null>(null);
-	let existingDepositJournals = $state<JournalEntry[]>([]);
-	let isChecking = $state(false);
-
-	const depositSummary = $derived(
-		invoice ? calculateDepositSummary(invoice, existingDepositJournals) : null
-	);
-
-	const hasExisting = $derived(
-		journalType === 'sales' ? existingSalesJournal !== null : existingDepositJournals.length > 0
-	);
-
-	// ダイアログが開いた時に入力値をリセットし、作成済み仕訳を確認する
+	// ダイアログが開いた時に入力値をリセットする
 	$effect(() => {
 		if (open) {
 			depositDate = new Date().toISOString().slice(0, 10);
-			loadExistingJournals();
+			// 入金額の初期値は未入金残額（紐づく入金仕訳がなければ税込合計）
+			depositAmount = settlement?.remaining ?? invoice?.total ?? 0;
 		}
 	});
-
-	async function loadExistingJournals() {
-		if (!invoice) return;
-		isChecking = true;
-		try {
-			existingSalesJournal = invoice.journalId
-				? ((await getJournalById(invoice.journalId)) ?? null)
-				: null;
-
-			const found = await Promise.all(
-				(invoice.depositJournalIds ?? []).map((id) => getJournalById(id))
-			);
-			existingDepositJournals = found.filter((j): j is JournalEntry => j !== undefined);
-
-			// 入金額の初期値は未入金残額（全額入金済みなら 0）
-			depositAmount = calculateDepositSummary(invoice, existingDepositJournals).remaining;
-		} finally {
-			isChecking = false;
-		}
-	}
-
-	function openJournalSearch() {
-		if (!invoice) return;
-		dispatchUICommand({ type: 'set_search_query', data: { query: invoice.invoiceNumber } });
-		open = false;
-		goto(`${base}/`);
-	}
 
 	async function createJournal() {
 		if (!invoice) return;
@@ -97,22 +55,16 @@
 		}
 
 		try {
-			if (journalType === 'sales') {
-				const journalId = await addJournal(generateSalesJournal(invoice, vendor));
-				await updateInvoice(invoiceId, { journalId });
-				onsave({ type: 'sales', journalId });
-			} else {
-				const journalId = await addJournal(
-					generateDepositJournal(invoice, vendor, depositDate, '1003', depositAmount)
-				);
-				// 削除済みの ID は持ち越さず、存在する仕訳の ID だけを保存する
-				const depositJournalIds = [...existingDepositJournals.map((j) => j.id), journalId];
-				await updateInvoice(invoiceId, { depositJournalIds });
-				onsave({ type: 'deposit', depositJournalIds });
-			}
-
+			const journalData =
+				journalType === 'sales'
+					? generateSalesJournal(invoice, vendor)
+					: generateDepositJournal(invoice, vendor, depositDate, '1003', depositAmount);
+			const journalId = await addJournal(journalData);
+			onsave(journalId);
 			open = false;
-			toast.success('仕訳を作成しました');
+			toast.success(
+				journalType === 'sales' ? '売掛金仕訳を作成しました' : '入金仕訳を作成しました'
+			);
 		} catch (e) {
 			toast.error(e instanceof Error ? e.message : '仕訳の作成に失敗しました');
 		}
@@ -123,74 +75,27 @@
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
 			<Dialog.Title>
-				{journalType === 'sales' ? '売掛金仕訳を作成' : '入金仕訳を作成'}
+				{journalType === 'sales' ? '売掛金仕訳を作成' : '売掛金入金仕訳を作成'}
 			</Dialog.Title>
 			<Dialog.Description>
 				{#if journalType === 'sales'}
-					請求書発行に対応する売掛金仕訳を作成します。
+					請求書発行に対応する売掛金仕訳（借方 売掛金／貸方 売上高）を作成します。
+					請求書の控え（PDF）を証憑にする場合は、作成後に仕訳帳でこの仕訳へドラッグ＆ドロップして添付してください。
 				{:else}
-					入金日と入金額を指定して入金仕訳を作成します。
+					入金日と入金額を指定して入金仕訳（借方 普通預金／貸方 売掛金）を作成します。
 				{/if}
 			</Dialog.Description>
 		</Dialog.Header>
 
-		{#if hasExisting && !isChecking}
-			<!-- 作成済み仕訳の警告 -->
-			<div
-				class="rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm dark:bg-amber-950/30"
-			>
-				<div class="flex items-start gap-2">
-					<AlertTriangle class="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-					<div class="min-w-0 flex-1 space-y-2">
-						{#if journalType === 'sales' && existingSalesJournal}
-							<p class="font-medium text-amber-800 dark:text-amber-200">
-								この請求書の売掛金仕訳は作成済みです
-							</p>
-							<p class="text-amber-700 dark:text-amber-300">
-								{existingSalesJournal.date}
-								{formatCurrency(getJournalAmount(existingSalesJournal))}
-								「{existingSalesJournal.description}」
-							</p>
-							<p class="text-amber-700 dark:text-amber-300">
-								もう一度作成すると、売掛金と売上高が二重に計上されます。
-							</p>
-						{:else if journalType === 'deposit' && depositSummary}
-							<p class="font-medium text-amber-800 dark:text-amber-200">
-								{depositSummary.isFullyDeposited
-									? 'この請求書は全額入金済みです'
-									: `この請求書には入金仕訳が ${existingDepositJournals.length} 件あります`}
-							</p>
-							<ul class="space-y-0.5 text-amber-700 dark:text-amber-300">
-								{#each existingDepositJournals as j (j.id)}
-									<li>{j.date} {formatCurrency(getJournalAmount(j))}</li>
-								{/each}
-							</ul>
-							<p class="text-amber-700 dark:text-amber-300">
-								入金合計 {formatCurrency(depositSummary.depositedTotal)} / 税込合計 {formatCurrency(
-									invoice?.total ?? 0
-								)}（残額 {formatCurrency(depositSummary.remaining)}）
-							</p>
-							{#if depositSummary.isFullyDeposited}
-								<p class="text-amber-700 dark:text-amber-300">
-									さらに作成すると、売掛金がマイナスになります。
-								</p>
-							{/if}
-						{/if}
-						<button
-							type="button"
-							class="flex items-center gap-1 text-amber-800 underline hover:no-underline dark:text-amber-200"
-							onclick={openJournalSearch}
-						>
-							<ExternalLink class="size-3" />
-							仕訳帳で「{invoice?.invoiceNumber}」を検索
-						</button>
-					</div>
-				</div>
-			</div>
-		{/if}
-
 		{#if journalType === 'deposit'}
 			<div class="space-y-4 py-2">
+				{#if settlement && settlement.depositedTotal > 0}
+					<p class="text-sm text-muted-foreground">
+						入金済 ¥{formatCurrency(settlement.depositedTotal)} / 税込合計 ¥{formatCurrency(
+							invoice?.total ?? 0
+						)}（残額 ¥{formatCurrency(settlement.remaining)}）
+					</p>
+				{/if}
 				<div class="space-y-2">
 					<Label for="depositDate">入金日</Label>
 					<Input id="depositDate" type="date" bind:value={depositDate} />
@@ -207,17 +112,7 @@
 
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (open = false)}>キャンセル</Button>
-			<Button
-				variant={hasExisting && (journalType === 'sales' || depositSummary?.isFullyDeposited)
-					? 'destructive'
-					: 'default'}
-				onclick={createJournal}
-				disabled={isChecking}
-			>
-				{hasExisting && (journalType === 'sales' || depositSummary?.isFullyDeposited)
-					? 'それでも作成'
-					: '作成'}
-			</Button>
+			<Button onclick={createJournal}>作成</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

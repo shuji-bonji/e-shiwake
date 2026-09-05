@@ -16,6 +16,7 @@
 		placeholder?: string;
 		class?: string;
 		tabindex?: number;
+		disabled?: boolean;
 	}
 
 	let {
@@ -26,7 +27,8 @@
 		onkeydown,
 		placeholder = '取引先',
 		class: className,
-		tabindex
+		tabindex,
+		disabled = false
 	}: Props = $props();
 
 	let open = $state(false);
@@ -93,6 +95,7 @@
 				class={cn('', className)}
 				autocomplete="off"
 				{tabindex}
+				{disabled}
 			/>
 		{/snippet}
 	</Popover.Trigger>

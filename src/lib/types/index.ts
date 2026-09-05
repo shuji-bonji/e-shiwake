@@ -236,6 +236,8 @@ export interface JournalEntry {
 	description: string; // 摘要
 	evidenceStatus: EvidenceStatus; // 証跡ステータス
 	attachments: Attachment[]; // 紐付けられた証憑
+	invoiceId?: string; // 対応する請求書ID（1005 売掛金の行がある仕訳だけが持つ。任意）
+	generatedFrom?: 'invoice'; // 請求書の「売掛金仕訳」ボタンが生成した仕訳の印（入金仕訳には付けない）
 	createdAt: string; // 作成日時 ISO8601
 	updatedAt: string; // 更新日時 ISO8601
 }
