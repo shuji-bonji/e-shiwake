@@ -8,6 +8,10 @@
 	import { Plus, FileSpreadsheet, Pencil, Trash2, Copy } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import type { Invoice } from '$lib/types/invoice';
+	import type { JournalEntry } from '$lib/types';
+	import { getLinkedJournals, deleteLinkedJournal } from '$lib/utils/invoice-journal-sync';
+	import { getJournalAmount } from '$lib/utils/invoice-journal';
+	import { toast } from 'svelte-sonner';
 	import { InvoiceStatusLabels } from '$lib/types/invoice';
 	import type { Vendor } from '$lib/types';
 	import {
@@ -84,20 +88,46 @@
 		}
 	}
 
-	function openDeleteDialog(invoice: Invoice) {
+	// 削除対象の請求書に紐付く仕訳（DB に存在するものだけ）
+	let linkedSalesJournal = $state<JournalEntry | null>(null);
+	let linkedDepositJournals = $state<JournalEntry[]>([]);
+	let isDeleting = $state(false);
+
+	async function openDeleteDialog(invoice: Invoice) {
 		deletingInvoice = invoice;
+		const { sales, deposits } = await getLinkedJournals(invoice);
+		linkedSalesJournal = sales;
+		linkedDepositJournals = deposits;
 		deleteDialogOpen = true;
 	}
 
 	async function handleDelete() {
 		if (!deletingInvoice) return;
 
+		isDeleting = true;
 		try {
+			// 売掛金仕訳は請求書と 1 対 1 なので、請求書と一緒に削除する
+			const salesDeleted = linkedSalesJournal
+				? await deleteLinkedJournal(linkedSalesJournal.id)
+				: false;
 			await deleteInvoice(deletingInvoice.id);
 			deleteDialogOpen = false;
 			await loadInvoices();
+			if (salesDeleted) {
+				toast.success('請求書と売掛金仕訳を削除しました', {
+					description:
+						linkedDepositJournals.length > 0
+							? `入金仕訳 ${linkedDepositJournals.length} 件は仕訳帳に残っています`
+							: undefined
+				});
+			} else {
+				toast.success('請求書を削除しました');
+			}
 		} catch (error) {
 			console.error('Delete failed:', error);
+			toast.error(error instanceof Error ? error.message : '削除に失敗しました');
+		} finally {
+			isDeleting = false;
 		}
 	}
 
@@ -254,9 +284,35 @@
 				請求書「{deletingInvoice?.invoiceNumber}」を削除しますか？この操作は取り消せません。
 			</Dialog.Description>
 		</Dialog.Header>
+		{#if linkedSalesJournal || linkedDepositJournals.length > 0}
+			<div
+				class="space-y-2 rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm dark:bg-amber-950/30"
+			>
+				{#if linkedSalesJournal}
+					<p class="font-medium text-amber-800 dark:text-amber-200">
+						売掛金仕訳も一緒に削除されます
+					</p>
+					<p class="text-amber-700 dark:text-amber-300">
+						{linkedSalesJournal.date}
+						{formatCurrency(getJournalAmount(linkedSalesJournal))}
+						「{linkedSalesJournal.description}」
+						{#if linkedSalesJournal.attachments.length > 0}
+							（添付された証憑 {linkedSalesJournal.attachments.length} 件も削除されます）
+						{/if}
+					</p>
+				{/if}
+				{#if linkedDepositJournals.length > 0}
+					<p class="text-amber-700 dark:text-amber-300">
+						入金仕訳 {linkedDepositJournals.length} 件は仕訳帳に残ります。不要な場合は仕訳帳から削除してください。
+					</p>
+				{/if}
+			</div>
+		{/if}
 		<Dialog.Footer>
-			<Button variant="outline" onclick={() => (deleteDialogOpen = false)}>キャンセル</Button>
-			<Button variant="destructive" onclick={handleDelete}>削除</Button>
+			<Button variant="outline" onclick={() => (deleteDialogOpen = false)} disabled={isDeleting}>
+				キャンセル
+			</Button>
+			<Button variant="destructive" onclick={handleDelete} disabled={isDeleting}>削除</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

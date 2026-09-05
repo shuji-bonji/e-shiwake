@@ -51,6 +51,7 @@ export interface Invoice {
 	status: InvoiceStatus; // ステータス
 	note?: string; // 備考
 	journalId?: string; // 紐付く仕訳ID（売掛金計上時）
+	depositJournalIds?: string[]; // 紐付く入金仕訳ID（分割入金で複数になり得る）
 	createdAt: string; // 作成日時 ISO8601
 	updatedAt: string; // 更新日時 ISO8601
 }

@@ -3,7 +3,25 @@
 e-shiwake（電子仕訳）の変更履歴。[Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に準拠。
 [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
-## [Unreleased]
+## [0.6.1]
+
+### Added
+
+- 請求書の売掛金仕訳を二重に作成できないようにした（#55）
+  - 作成済み（`invoice.journalId` の仕訳が仕訳帳に存在する）なら「売掛金仕訳」ボタンを無効にし「作成済み」を表示する。仕訳帳でその仕訳を削除すると再び有効になる
+  - 売掛金仕訳の作成後に請求書（明細行・取引先・発行日・請求書番号）を変更すると、自動保存のあとに `compareSalesJournal()` で不一致を検出し、`syncSalesJournal()` で仕訳の日付・取引先・摘要・明細行を上書きしてトーストで通知する（証憑と evidenceStatus は保持。ステータス変更は対象外）
+  - 請求書一覧から請求書を削除すると、紐付く売掛金仕訳も削除してトーストで通知する（削除ダイアログに対象を表示）。入金仕訳は削除せず仕訳帳に残す
+- 入金仕訳が作成済みの場合、仕訳作成ダイアログに警告を表示するようにした（#55）
+  - `Invoice` に `depositJournalIds`（入金仕訳 ID の配列）を追加して紐付けを保存し、作成済みの一覧・入金合計・未入金残額を表示する。全額入金済みならボタンを「それでも作成」に変える
+  - 警告内の「仕訳帳で検索」で、請求書番号を検索した状態の仕訳帳へ移動する
+  - 請求書編集画面の入金仕訳ボタンに「n 件」のバッジを表示する
+- 入金仕訳ダイアログに入金額の入力欄を追加（初期値は未入金残額）。分割入金に対応し、`generateDepositJournal()` に `amount` 引数を追加
+- `calculateDepositSummary()` / `getJournalAmount()` / `compareSalesJournal()` / `buildSalesJournalUpdate()` を `invoice-journal.ts` に、`getLinkedJournals()` / `syncSalesJournal()` / `deleteLinkedJournal()` を `invoice-journal-sync.ts` に追加（純粋関数は単体テスト付き）
+
+### Changed
+
+- 請求書のコピー時に `depositJournalIds` もクリアする
+- バックアップ・インポートで `depositJournalIds` を引き継ぐ
 
 ## [0.6.0] - 2026-09-05
 

@@ -356,6 +356,7 @@ export async function importData(
 						status: invoice.status,
 						note: invoice.note,
 						journalId: invoice.journalId,
+						depositJournalIds: invoice.depositJournalIds,
 						createdAt: invoice.createdAt,
 						updatedAt: invoice.updatedAt
 					});
@@ -374,6 +375,7 @@ export async function importData(
 						status: invoice.status,
 						note: invoice.note,
 						journalId: invoice.journalId,
+						depositJournalIds: invoice.depositJournalIds,
 						updatedAt: invoice.updatedAt
 					});
 					result.invoicesImported++;
@@ -735,6 +737,7 @@ export async function importBackupData(data: BackupData): Promise<FullRestoreRes
 						status: invoice.status,
 						note: invoice.note,
 						journalId: invoice.journalId,
+						depositJournalIds: invoice.depositJournalIds,
 						createdAt: invoice.createdAt,
 						updatedAt: invoice.updatedAt
 					});

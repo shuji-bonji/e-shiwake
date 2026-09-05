@@ -3,6 +3,7 @@
  */
 
 import type { Invoice } from '$lib/types/invoice';
+import { formatCurrency } from '$lib/utils/invoice';
 import type { JournalEntry, JournalLine, Vendor } from '$lib/types';
 
 /**
@@ -115,7 +116,8 @@ export function generateDepositJournal(
 	invoice: Invoice,
 	vendor: Vendor,
 	depositDate: string,
-	bankAccountCode: string = '1003' // 普通預金
+	bankAccountCode: string = '1003', // 普通預金
+	amount: number = invoice.total // 入金額（分割入金の場合は税込合計より少ない）
 ): Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'> {
 	return {
 		date: depositDate,
@@ -124,14 +126,14 @@ export function generateDepositJournal(
 				id: crypto.randomUUID(),
 				type: 'debit',
 				accountCode: bankAccountCode,
-				amount: invoice.total,
+				amount,
 				taxCategory: 'na'
 			},
 			{
 				id: crypto.randomUUID(),
 				type: 'credit',
 				accountCode: '1005', // 売掛金
-				amount: invoice.total,
+				amount,
 				taxCategory: 'na'
 			}
 		],
@@ -140,4 +142,154 @@ export function generateDepositJournal(
 		evidenceStatus: 'none',
 		attachments: []
 	};
+}
+
+/**
+ * 仕訳の金額（借方合計）を返す
+ */
+export function getJournalAmount(journal: Pick<JournalEntry, 'lines'>): number {
+	return journal.lines
+		.filter((line) => line.type === 'debit')
+		.reduce((sum, line) => sum + line.amount, 0);
+}
+
+/**
+ * 入金状況のサマリー
+ */
+export interface DepositSummary {
+	/** 作成済み入金仕訳の合計額 */
+	depositedTotal: number;
+	/** 未入金残額（税込合計 − 入金合計。マイナスにはならない） */
+	remaining: number;
+	/** 入金合計が税込合計以上か */
+	isFullyDeposited: boolean;
+}
+
+/**
+ * 請求書に紐付く入金仕訳から、入金合計と未入金残額を計算する
+ *
+ * @param invoice - 請求書（total を使う）
+ * @param depositJournals - 紐付く入金仕訳（削除済みのものは除いて渡す）
+ *
+ * @example
+ * ```typescript
+ * // total: 110000, 入金仕訳 50000 が 1 件
+ * calculateDepositSummary(invoice, [journal]);
+ * // => { depositedTotal: 50000, remaining: 60000, isFullyDeposited: false }
+ * ```
+ */
+export function calculateDepositSummary(
+	invoice: Pick<Invoice, 'total'>,
+	depositJournals: Pick<JournalEntry, 'lines'>[]
+): DepositSummary {
+	const depositedTotal = depositJournals.reduce((sum, j) => sum + getJournalAmount(j), 0);
+	const remaining = Math.max(0, invoice.total - depositedTotal);
+	return {
+		depositedTotal,
+		remaining,
+		isFullyDeposited: depositedTotal >= invoice.total
+	};
+}
+
+/**
+ * 売掛金仕訳と請求書の不一致 1 件
+ */
+export interface SalesJournalDiff {
+	/** 不一致の項目 */
+	field: 'date' | 'vendor' | 'description' | 'lines';
+	/** 表示用ラベル */
+	label: string;
+	/** 仕訳側の現在値 */
+	journalValue: string;
+	/** 請求書から作り直した場合の値 */
+	invoiceValue: string;
+}
+
+/** 仕訳明細行を比較用の文字列にする（行 ID は無視し、順序にも依存しない） */
+function linesSignature(lines: JournalLine[]): string {
+	return lines
+		.map((l) => `${l.type}:${l.accountCode}:${l.amount}:${l.taxCategory ?? ''}`)
+		.sort()
+		.join('|');
+}
+
+/** 請求書由来の仕訳で使う勘定科目の表示名 */
+const ACCOUNT_NAMES: Record<string, string> = {
+	'1003': '普通預金',
+	'1005': '売掛金',
+	'4001': '売上高'
+};
+
+/** 仕訳明細行を表示用の文字列にする（例: "借方 110,000 / 貸方 売上高 110,000"） */
+function linesSummary(lines: JournalLine[]): string {
+	const debit = lines.filter((l) => l.type === 'debit').reduce((s, l) => s + l.amount, 0);
+	const credits = lines
+		.filter((l) => l.type === 'credit')
+		.map((l) => `${ACCOUNT_NAMES[l.accountCode] ?? l.accountCode} ${formatCurrency(l.amount)}`)
+		.join(', ');
+	return `借方 ${formatCurrency(debit)} / 貸方 ${credits}`;
+}
+
+/**
+ * 作成済みの売掛金仕訳と、請求書の現在の内容から作り直した仕訳を比べ、不一致の項目を返す
+ *
+ * 比較するのは date / vendor / description / lines（行 ID は無視）。
+ * 証憑や evidenceStatus は請求書から作られる項目ではないため比較しない。
+ *
+ * @returns 不一致がなければ空配列
+ */
+export function compareSalesJournal(
+	invoice: Invoice,
+	vendor: Vendor,
+	journal: Pick<JournalEntry, 'date' | 'vendor' | 'description' | 'lines'>
+): SalesJournalDiff[] {
+	const expected = generateSalesJournal(invoice, vendor);
+	const diffs: SalesJournalDiff[] = [];
+
+	if (journal.date !== expected.date) {
+		diffs.push({
+			field: 'date',
+			label: '日付',
+			journalValue: journal.date,
+			invoiceValue: expected.date
+		});
+	}
+	if (journal.vendor !== expected.vendor) {
+		diffs.push({
+			field: 'vendor',
+			label: '取引先',
+			journalValue: journal.vendor,
+			invoiceValue: expected.vendor
+		});
+	}
+	if (journal.description !== expected.description) {
+		diffs.push({
+			field: 'description',
+			label: '摘要',
+			journalValue: journal.description,
+			invoiceValue: expected.description
+		});
+	}
+	if (linesSignature(journal.lines) !== linesSignature(expected.lines)) {
+		diffs.push({
+			field: 'lines',
+			label: '金額',
+			journalValue: linesSummary(journal.lines),
+			invoiceValue: linesSummary(expected.lines)
+		});
+	}
+	return diffs;
+}
+
+/**
+ * 請求書の現在の内容で売掛金仕訳を上書きするための更新データを返す
+ *
+ * 証憑（attachments）や evidenceStatus は含めないので、updateJournal() に渡しても保持される。
+ */
+export function buildSalesJournalUpdate(
+	invoice: Invoice,
+	vendor: Vendor
+): Pick<JournalEntry, 'date' | 'vendor' | 'description' | 'lines'> {
+	const { date, vendor: vendorName, description, lines } = generateSalesJournal(invoice, vendor);
+	return { date, vendor: vendorName, description, lines };
 }

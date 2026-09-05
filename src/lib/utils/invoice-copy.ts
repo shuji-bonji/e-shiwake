@@ -12,7 +12,7 @@ import { getNextMonthEndDate } from './invoice';
  * - 支払期限は翌月末日に自動設定
  * - 請求書番号は空にリセット（保存時に自動採番）
  * - ステータスは「下書き」（draft）にリセット
- * - 仕訳紐付けはクリア（journalId = undefined）
+ * - 仕訳紐付けはクリア（journalId / depositJournalIds = undefined）
  * - 明細行のIDは新規生成される
  * - 取引先、明細行、備考は引き継がれる
  *
@@ -42,6 +42,7 @@ export function copyInvoiceForNew(original: Invoice): InvoiceInput {
 		taxBreakdown: { ...original.taxBreakdown },
 		status: 'draft',
 		note: original.note,
-		journalId: undefined
+		journalId: undefined,
+		depositJournalIds: undefined
 	};
 }
